@@ -1,0 +1,10 @@
+*.pyc
+*.DS_Store
+*egg-info
+*ipynb_checkpoints
+*.log
+*.xyz
+*topo
+*.traj
+*__pycache__*
+**/.vscode/
