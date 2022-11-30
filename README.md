@@ -9,7 +9,7 @@ Conda installation recommended.
 
 * In root directory of architector run:
 
-```
+```bash
 conda env create -f environment.yml
 conda activate architector
 python setup.py develop
@@ -35,13 +35,13 @@ Verified on latest Ubuntu Linux , MAC OS X, and on Win 10 powershell computer cl
 
 ## Basic Use of complex construction functionality:
 
-```
+```python
 from architector import build_complex
 out = build_complex(inputDict)
 ```
 
 ## Input dictionary structure and recommendations:
-```
+```python
 inputDict = {
 ################ Core (metal) structure and optional definitions #####################
 # Requires imput for what metal and what type of coordination environments to sample #
@@ -157,7 +157,7 @@ inputDict = {
 ```
 
 ## Output dictionary structure and recommendations:
-```
+```python
 out = {
     'core_geometry_i_nunpairedes_X_charge_Y': 
     # Key labels indicates metal center geometry, total unpaired electrons (X, spin), 
@@ -181,21 +181,21 @@ out = {
 * Note that output dictionary is an OrderDict sorted by energy (first entry is the lowest in energy.)
 
 Within the jupyter notebook framework it is quite easy to visualize all of the generated structures directly from the dictionary:
-```
+```python
 from architector import view_structures
 
 view_structures(out)
 ```
 
 With the following example line it is quite easy to export to xyz for use in any other electronic structure code:
-```
+```python
 out['core_geometry_i_nunpairedes_X_charge_Y']['ase_atoms'].write('core_geometry_i_nunpairedes_X_charge_Y.xyz')
 ```
 
 Alternatively, a file format converter is included with Architector which can read the formatted mol2 filetypes,
 which can be quite useful for maintaining the defined molecular graph and bond orders:
 
-```
+```python
 from architector import convert_io_molecule
 
 mol = convert_io_molecule(out['core_geometry_i_nunpairedes_X_charge_Y']['mol2string'])
@@ -211,7 +211,7 @@ from the output mol2string.
 ## Authors:
 
 * Michael G. Taylor
-* Daniel J. Burril
+* Daniel J. Burrill
 * Jan Janssen 
 * Danny Perez
 * Enrique R. Batista
