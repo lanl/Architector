@@ -10,8 +10,6 @@ setup(
     author='Michael G. Taylor et al.',
     packages=['architector'],
     install_requires=[
-        'requests',
-        'importlib; python_version >= "3.6"',
         'ase',
         'numpy',
         'py3Dmol',
