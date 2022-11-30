@@ -1,0 +1,15 @@
+name: testing
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - xtb-python
+  - ase
+  - numpy
+  - openbabel
+  - scipy
+  - numba
+  - py3Dmol
+  - pandas
+  - pynauty
+  - tqdm
