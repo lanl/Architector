@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 setup(
     name='architector',
     version='0.0.1',
-    author='Michael G. Taylor et al.'
+    author='Michael G. Taylor et al.',
     packages=['architector'],
     install_requires=[
         'requests',
