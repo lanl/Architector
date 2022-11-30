@@ -19,10 +19,11 @@ setup(
         'xtb-python'
     ],
     license="BSD 3-Clause License",
-    classifiers=["Development Status :: 2 - Beta",
+    classifiers=["Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
         "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering :: Chemistry"],
     description="The architector python package - for 3D inorganometallic complex design.",
-    long_description=long_description
+    long_description=long_description,
+    long_description_content_type='text/markdown'
 )
