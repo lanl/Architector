@@ -12,9 +12,8 @@ Conda installation recommended.
 ```bash
 conda env create -f environment.yml
 conda activate architector
-python setup.py develop
+pip install -e .
 ```
-It might give a warning about openbabel. This should not matter.
 
 Verified on latest Ubuntu Linux , MAC OS X, and on Win 10 powershell computer cluster as of 7/14/2022.
 
