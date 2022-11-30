@@ -214,8 +214,8 @@ from the output mol2string.
 * Daniel J. Burril
 * Jan Janssen 
 * Danny Perez
-* Ping Yang
 * Enrique R. Batista
+* Ping Yang
 
 ## Licensing and Copyright: 
 
