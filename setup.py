@@ -9,7 +9,6 @@ setup(
     author='Michael G. Taylor et al.',
     packages=['architector'],
     install_requires=[
-        'requests',
         'ase',
         'numpy',
         'py3Dmol',
