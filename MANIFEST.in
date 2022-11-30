@@ -1,0 +1,3 @@
+include versioneer.py
+include architector/_version.py
+include LICENSE.txt
