@@ -26,18 +26,9 @@ jobs:
         channel-priority: strict
         activate-environment: my-env
         use-mamba: true
-    - name: Set cache date and number
-      run: |
-        echo "DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
-        cat .github/variables/cache_number.env >> $GITHUB_ENV
-    - uses: actions/cache@v2
-      with:
-        path: /usr/share/miniconda3/envs/my-env
-        key: linux-64-py-3-10-conda-${{ hashFiles('environment.yml') }}-${{ env.DATE }}-${{ env.CACHE_NUMBER }}
-      id: cache
     - name: Update environment
+      shell: bash -l {0}
       run: mamba env update -n my-env -f environment.yml
-      if: steps.cache.outputs.cache-hit != 'true'
     - name: Pip check
       shell: bash -l {0}
       run: |
