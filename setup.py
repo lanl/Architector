@@ -14,6 +14,7 @@ setup(
         'ase',
         'numpy',
         'py3Dmol',
+        'pynauty',
         'scipy',
         'pandas',
         'xtb-python'
