@@ -5,17 +5,19 @@ It is capable of high-throughput in-silico construction of s-, p-, d-, and f-blo
 
 ## Installation
 
-Conda installation recommended.
+Conda installation recommended. The conda-forge distribution can be installed via: 
 
-* In root directory of architector run:
+```bash
+conda install -c conda-forge architector
+```
+
+* In case a developer version of the sofware is required in the root directory for Architector run:
 
 ```bash
 conda env create -f environment.yml
 conda activate architector
 pip install -e .
 ```
-
-Verified on latest Ubuntu Linux , MAC OS X, and on Win 10 powershell computer cluster as of 7/14/2022.
 
 ## Useful Tools/Examples:
 
