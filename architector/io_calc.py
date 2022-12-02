@@ -14,7 +14,6 @@ import architector.io_obabel as io_obabel
 from architector.io_align_mol import rmsd_align
 import architector.arch_context_manage as arch_context_manage
 import architector.io_molecule as io_molecule
-from ase.units import kcal # E Output from openbabel is in kcal/mol.
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
 
@@ -48,7 +47,10 @@ params={
 # Electronic parameters
 "metal_ox": None, # Oxidation State
 "metal_spin": None, # Spin State
-"solvent": 'none', # Add any named XTB solvent!
+"xtb_solvent": 'none', # Add any named XTB solvent!
+"xtb_accuracy":1.0, # Numerical Accuracy for XTB calculations
+"xtb_electronic_temperature":300, # In K -> fermi smearing - increase for convergence on harder systems
+"xtb_max_iterations":250, # Max iterations for xtb SCF.
 "full_spin": None, # Assign spin to the full complex (overrides metal_spin)
 "full_charge": None, # Assign charge to the complex (overrides ligand charges and metal_ox)!
 "full_method":"GFN2-xTB", # Which xtb method to use for final cleaning/evaulating conformers.
@@ -58,12 +60,15 @@ params={
 "vdwrad_metal":None,
 "covrad_metal":None,
 "scaled_radii_factor":None,
+"debug":False,
 }
 
 class CalcExecutor:
     def __init__(self, structure, parameters={}, init_sanity_check=False,
                 final_sanity_check=False, relax=False, assembly=False,
-                method='GFN2-xTB', solvent='none', fmax=0.1, maxsteps=1000,
+                method='GFN2-xTB', xtb_solvent='none', xtb_accuracy=1.0,
+                xtb_electronic_temperature=300, xtb_max_iterations=250,
+                fmax=0.1, maxsteps=1000,
                 detect_spin_charge=False, fix_m_neighbors=False,
                 default_params=params, ase_opt_method=None,
                 calculator=None):
@@ -88,8 +93,14 @@ class CalcExecutor:
             Level of theory to perform calculation at, by default 'GFN2-xTB'
             Current Valid options -> 'GFN2-xTB', 'UFF', 'GFN-FF', 'MMFF'
             Adding new methods will require integration with their ase calculators.
-        solvent : str, optional
+        xtb_solvent : str, optional
             Solvent passed to xTB calculator, by default 'none'
+        xtb_accuracy : float, optional
+            Accuracy for xtb SCF convergence, default 1.0 
+        xtb_electronic_temperature : float, optional
+            Electronic temp for smearing, default 300 K
+        xtb_max_iterations : float, optional
+            Maximum iterations for xtb SCF convergence, default 250.
         fmax : float, optional
             Max force in eV/Angstrom, by default 0.1
         maxsteps : int, optional
@@ -118,7 +129,10 @@ class CalcExecutor:
         self.calculator = calculator
         self.relax = relax
         self.assembly = assembly
-        self.solvent = solvent
+        self.xtb_solvent = xtb_solvent
+        self.xtb_accuracy = xtb_accuracy
+        self.xtb_electronic_temperature = xtb_electronic_temperature
+        self.xtb_max_iterations = xtb_max_iterations
         self.fmax = fmax
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
@@ -137,6 +151,11 @@ class CalcExecutor:
             self.opt_method = LBFGSLineSearch
         else:
             self.opt_method = ase_opt_method
+        # Temporary logfile or not for ase optimizer
+        if self.parameters['debug']: # Set logfile to suppress stdout output.
+            self.logfile = None
+        else:
+            self.logfile = 'tmp.log'
 
         # Output properties
         self.energy = None
@@ -167,7 +186,10 @@ class CalcExecutor:
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif 'gfn' in self.method.lower():
-                calc = XTB(method=self.method, solvent=self.solvent)
+                calc = XTB(method=self.method, solvent=self.xtb_solvent,
+                           max_iterations=self.xtb_max_iterations,
+                           electronic_temperature=self.xtb_electronic_temperature,
+                           accuracy=self.xtb_accuracy)
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.xtb_uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
@@ -186,10 +208,19 @@ class CalcExecutor:
                         try:
                             self.init_energy = copy.deepcopy(self.mol.ase_atoms.get_total_energy())
                             if self.parameters['save_trajectories']:
-                                dyn = self.opt_method(self.mol.ase_atoms, 
-                                                    trajectory='temp.traj')
+                                if self.logfile is None:
+                                    dyn = self.opt_method(self.mol.ase_atoms, 
+                                                        trajectory='temp.traj')
+                                else:
+                                    dyn = self.opt_method(self.mol.ase_atoms, 
+                                                        trajectory='temp.traj',
+                                                        logfile=self.logfile)
                             else:
-                                dyn = self.opt_method(self.mol.ase_atoms)
+                                if self.logfile is None:
+                                    dyn = self.opt_method(self.mol.ase_atoms)
+                                else:
+                                    dyn = self.opt_method(self.mol.ase_atoms,
+                                                        logfile=self.logfile)
                             dyn.run(fmax=self.fmax,steps=self.maxsteps)
                             if self.parameters['save_trajectories']:
                                 self.read_traj()

@@ -242,7 +242,6 @@ class Complex:
             self.calculator = CalcExecutor(self.complexMol,parameters=self.parameters,
                                             final_sanity_check=True,relax=single_point,assembly=single_point)
             if self.parameters['debug'] and (not self.calculator.successful):
-                print(e)
                 print('Failed final relaxation. - Retrying with UFF/XTB')
                 print(self.initMol.write_mol2('cool.mol2', writestring=True))
             # Retry with 2 step optimization -> first do UFF -> then do the requested method.
@@ -684,7 +683,7 @@ def build_complex(inputDict):
         order = np.argsort(xtb_energies)
         for j,i in enumerate(order):
             if tmp_inputDict['parameters']['crest_sampling'] and j == 0: # Run crest sampling on lowest energy isomer!
-                samples,energies = io_crest.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['solvent'])
+                samples,energies = io_crest.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['xtb_solvent'])
                 vals[i].update({'crest_conformers':samples,'crest_energies':energies})
                 vals[i].update({'energy':min(energies)})
                 tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])

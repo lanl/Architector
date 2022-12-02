@@ -696,7 +696,10 @@ def inparse(inputDict):
             "alternate_metal_spin": None, # Secondary spin state to check. 
                 
             # Method parameters.
-            "solvent": 'none', # Add any named XTB solvent!
+            "xtb_solvent": 'none', # Add any named XTB solvent!
+            "xtb_accuracy":1.0, # Numerical Accuracy for XTB calculations
+            "xtb_electronic_temperature":300, # In K -> fermi smearing - increase for convergence on harder systems
+            "xtb_max_iterations":250, # Max iterations for xtb SCF.
             "full_spin": None, # Assign spin to the full complex (overrides metal_spin)
             "full_charge": None, # Assign charge to the complex (overrides ligand charges and metal_ox)!
             "full_method":"GFN2-xTB", # Which method to use for final cleaning/evaulating conformers.
@@ -1025,28 +1028,31 @@ def inparse_2D(inputDict):
         #######################################################################
 
         default_parameters = {
-                            # Ligand to finish filling out coordination environment if underspecified.
-                            "fill_ligand": {"smiles":"O", "coordList":[0], "ligType":"mono"}, 
-                            # Secondary fill ligand will be a monodentate ligand to fill out coordination environment
-                            # in case the fill_ligand and specified ligands list cannot fully map.
-                            "secondary_fill_ligand":{"smiles":"O", "coordList":[0], "ligType":"mono"},
-                            # or integer index in reference to the ligand list!!
-                            "debug": False, # Print out addition info for debugging purposes.
+            # Ligand to finish filling out coordination environment if underspecified.
+            "fill_ligand": {"smiles":"O", "coordList":[0], "ligType":"mono"}, 
+            # Secondary fill ligand will be a monodentate ligand to fill out coordination environment
+            # in case the fill_ligand and specified ligands list cannot fully map.
+            "secondary_fill_ligand":{"smiles":"O", "coordList":[0], "ligType":"mono"},
+            # or integer index in reference to the ligand list!!
+            "debug": False, # Print out addition info for debugging purposes.
 
-                            # Electronic parameters
-                            "metal_ox": None,
-                            "metal_spin": None,
+            # Electronic parameters
+            "metal_ox": None,
+            "metal_spin": None,
 
-                            # XTB parameters.
-                            "solvent": 'none', # XTB solvents
-                            "full_spin": None,
-                            "full_charge": None,
+            # XTB parameters.
+            "xtb_solvent": 'none', # Add any named XTB solvent!
+            "xtb_accuracy":1.0, # Numerical Accuracy for XTB calculations
+            "xtb_electronic_temperature":300, # In K -> fermi smearing - increase for convergence on harder systems
+            "xtb_max_iterations":250, # Max iterations for xtb SCF.
+            "full_spin": None,
+            "full_charge": None,
 
-                            # Covalent radii and vdw radii of the metal if deviations requested.
-                            "vdwrad_metal":vdwrad_metal,
-                            "covrad_metal":covrad_metal,
-                            "scaled_radii_factor":None, # Bookeeping if scaled vdwrad/covrad passed.
-                            } 
+            # Covalent radii and vdw radii of the metal if deviations requested.
+            "vdwrad_metal":vdwrad_metal,
+            "covrad_metal":covrad_metal,
+            "scaled_radii_factor":None, # Bookeeping if scaled vdwrad/covrad passed.
+        } 
 
         outparams = dict()
 
