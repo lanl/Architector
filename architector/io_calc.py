@@ -208,19 +208,19 @@ class CalcExecutor:
                         try:
                             self.init_energy = copy.deepcopy(self.mol.ase_atoms.get_total_energy())
                             if self.parameters['save_trajectories']:
-                                if self.logfile is None:
-                                    dyn = self.opt_method(self.mol.ase_atoms, 
-                                                        trajectory='temp.traj')
-                                else:
+                                if self.logfile is not None:
                                     dyn = self.opt_method(self.mol.ase_atoms, 
                                                         trajectory='temp.traj',
                                                         logfile=self.logfile)
-                            else:
-                                if self.logfile is None:
-                                    dyn = self.opt_method(self.mol.ase_atoms)
                                 else:
+                                    dyn = self.opt_method(self.mol.ase_atoms, 
+                                                        trajectory='temp.traj')
+                            else:
+                                if self.logfile is not None:
                                     dyn = self.opt_method(self.mol.ase_atoms,
                                                         logfile=self.logfile)
+                                else:
+                                    dyn = self.opt_method(self.mol.ase_atoms)
                             dyn.run(fmax=self.fmax,steps=self.maxsteps)
                             if self.parameters['save_trajectories']:
                                 self.read_traj()

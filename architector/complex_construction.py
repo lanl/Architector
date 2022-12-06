@@ -70,7 +70,8 @@ class Ligand:
                                                         metal=self.metal,
                                                         ligtype=self.geo,
                                                         covrad_metal=covrad_metal,
-                                                        vdwrad_metal=vdwrad_metal
+                                                        vdwrad_metal=vdwrad_metal,
+                                                        debug=debug
                                                         )
         if len(conformers) > 0:
             self.conformerList = conformers
@@ -331,7 +332,8 @@ def gen_aligned_complex(newLigInputDicts,
                                 ligGeo,
                                 ligCharge,
                                 covrad_metal = inputDict['parameters']['covrad_metal'],
-                                vdwrad_metal = inputDict['parameters']['vdwrad_metal']
+                                vdwrad_metal = inputDict['parameters']['vdwrad_metal'],
+                                debug = inputDict['parameters']['debug']
                                 )
             # Store results
             ligandDict[ligid] = ligandClass
@@ -348,12 +350,13 @@ def gen_aligned_complex(newLigInputDicts,
                 newconf, rotscore, sane = io_lig.set_position_align(lig, 
                                                             new_ligcoordList, 
                                                             ligandCopy.corecoordList,
-                                                            covrad_metal=inputDict['parameters']['covrad_metal'])
+                                                            debug=inputDict['parameters']['debug'])
                 if sane:
                     ligconfVals.append(rotscore)
                     newligconfList.append(newconf)
                 else:
-                    print('Conformer sucks!')
+                    if inputDict['parameters']['debug']:
+                        print('Conformer sucks!')
             ligandCopy.conformerList = newligconfList
             ligandCopy.conformerRotScore = ligconfVals
             ligandList.append(copy.deepcopy(ligandCopy))
