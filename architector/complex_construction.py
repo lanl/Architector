@@ -572,8 +572,6 @@ def build_complex_driver(inputDict1,in_metal=False):
                     if '_init_only' in key: # Do not do duplicate test on init_only structures.
                         continue
                     else:
-                        print('uno', mol2strings[i])
-                        print('dos', val['mol2string'])
                         _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'],coresize=10)
                         if (rmsd_full < 0.5):
                             iscopy = True
