@@ -1327,7 +1327,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
                 if debug:
-                    print('V: ',V, 'L: ', L, 'X: ',X)
+                    # print('V: ',V, 'L: ', L, 'X: ',X)
+                    print('DG iteration passing.')
                 if count > (len(tseeds)-1):
                     fail_gen = True
                     status = True
@@ -1365,7 +1366,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
                 if debug:
-                    print('V: ',V, 'L: ', L, 'X: ',X)
+                    # print('V: ',V, 'L: ', L, 'X: ',X)
+                    print('DG iteration passing.')
                 if count > (len(tseeds)-1):
                     fail_gen = True
                     status = True
@@ -1403,7 +1405,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
                 if debug:
-                    print('V: ',V, 'L: ', L, 'X: ',X)
+                    # print('V: ',V, 'L: ', L, 'X: ',X)
+                    print('DG iteration passing.')
                 if count > (len(tseeds)-1):
                     fail_gen = True
                     status = True
@@ -1441,7 +1444,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
                 if debug:
-                    print('V: ',V, 'L: ', L, 'X: ',X)
+                    # print('V: ',V, 'L: ', L, 'X: ',X)
+                    print('DG iteration passing.')
                 if count > (len(tseeds)-1):
                     fail_gen = True
                     status = True

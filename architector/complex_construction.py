@@ -250,6 +250,9 @@ class Complex:
                 tmp_relax = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=single_point)
                 self.calculator = CalcExecutor(tmp_relax.mol,parameters=self.parameters,
                                                 final_sanity_check=True,relax=single_point)
+        else: # Ensure calculation object at least exists
+            self.calculator = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=False)
+            self.calculator.successful = False
         self.final_end_time = time.time()
         self.final_eval_total_time = self.final_end_time - self.final_start_time
         if self.calculator:
