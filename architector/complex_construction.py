@@ -569,14 +569,19 @@ def build_complex_driver(inputDict1,in_metal=False):
             iscopy = False
             if (ind > 0) and (not inputDict['parameters']['skip_duplicate_tests']): # Check for copies
                 for key,val in ordered_conf_dict.items():
-                    _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'],coresize=10)
-                    if (rmsd_full < 0.5):
-                        iscopy = True
-                        break
-                    rmsd_core, _, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'])
-                    if (rmsd_core < 0.7) and np.isclose(val['energy'],xtb_energies[i],atol=0.1):
-                        iscopy = True
-                        break
+                    if '_init_only' in key: # Do not do duplicate test on init_only structures.
+                        continue
+                    else:
+                        print('uno', mol2strings[i])
+                        print('dos', val['mol2string'])
+                        _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'],coresize=10)
+                        if (rmsd_full < 0.5):
+                            iscopy = True
+                            break
+                        rmsd_core, _, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'])
+                        if (rmsd_core < 0.7) and np.isclose(val['energy'],xtb_energies[i],atol=0.1):
+                            iscopy = True
+                            break
                 if (not iscopy):
                     ordered_conf_dict[keys[i]] = {'ase_atoms':structs[i].complexMol.ase_atoms,
                             'total_charge':int(structs[i].complexMol.charge),
