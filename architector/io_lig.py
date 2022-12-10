@@ -589,7 +589,7 @@ def detect_cps(OBMol, ligcoordList):
         list of lists of the corecoordList indices shared by each ring
     """
     # Are there sets of coordinating atoms that are given in inputs? - based on if list passed
-    multiflag_lig_con_sets = np.array([','.join([str(y) for y in sorted(x[1])]) for x in ligcoordList if isinstance(x[1],list)])
+    multiflag_lig_con_sets = np.array([','.join([str(y) for y in sorted(x[1])]) for x in ligcoordList if isinstance(x[1],(list,np.ndarray))])
     isCp = False
     cp_rings = []
     shared_coords = []
@@ -612,7 +612,6 @@ def detect_cps(OBMol, ligcoordList):
                         shared_coords.append([int(x) for x in shared.split(',')])
         else:
             # Flag sets of coordination indices
-            multiflag_lig_coords = np.array([x[0] for x in ligcoordList if isinstance(x[1],list)])
             rings = OBMol.GetSSSR()
             for ring in rings:
                 if all([ring.IsInRing(int(x)+1) for x in multiflag_lig_coords]):
@@ -1215,6 +1214,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         rotational loss for the ligand atoms to the coordination sites.
     """
     Conf3D =  io_obabel.get_obmol_smiles(ligsmiles, addHydrogens=True)
+    # Detect Cp rings - move before adding metal center.
+    isCp, cp_rings, shared_coords = detect_cps(Conf3D, ligcoordList)
     catoms = [x[0] for x in ligcoordList]
     # Calc charges from total charge from OBmol
     init_charges_lig = np.zeros(Conf3D.NumAtoms())
@@ -1227,8 +1228,6 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
     allcoords, anums, graph = io_obabel.get_OBMol_coords_anums_graph(Conf3D)
     bo_dict, atypes = io_obabel.get_OBMol_bo_dict_atom_types(Conf3D)
     init_charges_lig[0] = Conf3D.GetTotalCharge()
-    # Detect Cp rings
-    isCp, cp_rings, shared_coords = detect_cps(Conf3D, ligcoordList)
     cp_catoms = []
     if isCp:
         ligcoordList, corecoordList, cp_catoms, catoms = manage_cps(Conf3D, cp_rings, 
