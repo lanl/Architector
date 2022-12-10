@@ -569,7 +569,7 @@ def build_complex_driver(inputDict1,in_metal=False):
             iscopy = False
             if (ind > 0) and (not inputDict['parameters']['skip_duplicate_tests']): # Check for copies
                 for key,val in ordered_conf_dict.items():
-                    if '_init_only' in key: # Do not do duplicate test on init_only structures.
+                    if ('_init_only' in key) or ('_init_only' in keys[i]): # Do not do duplicate test on init_only structures.
                         continue
                     else:
                         _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'],coresize=10)
