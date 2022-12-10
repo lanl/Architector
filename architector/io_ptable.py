@@ -152,21 +152,21 @@ metal_charge_dict = {
     'La': 3, 'Ce': 3, 'Pr': 3, 'Nd': 3, 'Pm': 3, 'Sm': 3, 'Eu': 3, 'Gd': 3, 'Tb': 3, 'Dy': 3,
     'Ho': 3, 'Er': 3, 'Tm': 3, 'Yb': 3, 'Lu': 3,
     # Actinides
-    'Ac': 3, 'Th': 4, 'Pa': 5, 'U': 4, 'Np': 5, 'Pu': 4, 'Am': 3, 'Cm': 3, 'Bk': 3, 'Cf': 3,
+    'Ac': 3, 'Th': 4, 'Pa': 5, 'U': 4, 'Np': 4, 'Pu': 4, 'Am': 3, 'Cm': 3, 'Bk': 3, 'Cf': 3,
     'Es': 3, 'Fm': 3, 'Md': 3, 'No': 2, 'Lr': 3,
-    # First row transition metals -> Switching to Fe 3 to encourge more convergence.
-    'Sc': 3, 'Ti': 2, 'V': 2,  'Cr': 2, 'Mn': 2, 'Fe': 3, 'Co': 2, 'Ni': 2, 'Cu': 1, 'Zn': 2, 
+    # First row transition metals 
+    'Sc': 3, 'Ti': 4, 'V': 5,  'Cr': 3, 'Mn': 2, 'Fe': 2, 'Co': 2, 'Ni': 2, 'Cu': 2, 'Zn': 2, 
     # Second row transition metals 
-    'Y': 3, 'Zr': 4, 'Nb': 5,  'Mo': 4, 'Tc': 4, 'Ru': 3, 'Rh': 3, 'Pd': 0, 'Ag': 1, 'Cd': 2, 
+    'Y': 3, 'Zr': 4, 'Nb': 5,  'Mo': 6, 'Tc': 5, 'Ru': 2, 'Rh': 1, 'Pd': 2, 'Ag': 1, 'Cd': 2, 
     # Third row transition metals
-    'Hf': 4, 'Ta': 5, 'W': 4,  'Re': 4, 'Os': 4, 'Ir': 3, 'Pt': 2, 'Au': 1, 'Hg': 1,
+    'Hf': 4, 'Ta': 5, 'W': 6,  'Re': 5, 'Os': 2, 'Ir': 3, 'Pt': 2, 'Au': 3, 'Hg': 2,
     # 4th row transition metals
     'Rf': 3, 'Db': 5, 'Sg': 6, 'Bh': 7, 'Hs': 8,
     # Post-transition metals
     'Al': 3,
     'Ga': 3,
-    'In': 3, 'Sn': 2,
-    'Tl': 1, 'Pb': 2, 'Bi': 3, 
+    'In': 3, 'Sn': 4,
+    'Tl': 3, 'Pb': 2, 'Bi': 3, 
     'Nh': 1, 'Fl': 2, 'Mc': 1, 'Lv': 2,
     # Alkali/earth metals
     'Li': 1, 'Be': 2 , 
@@ -183,14 +183,14 @@ metal_spin_dict = {
     'La': 0, 'Ce': 1, 'Pr': 2, 'Nd': 3, 'Pm': 4, 'Sm': 5, 'Eu': 6, 'Gd': 7, 'Tb': 6, 'Dy': 5,
     'Ho': 4, 'Er': 3, 'Tm': 2, 'Yb': 1, 'Lu': 0,
     # Actinides
-    'Ac': 0, 'Th': 0, 'Pa': 0, 'U': 2, 'Np': 2, 'Pu': 4, 'Am': 6, 'Cm': 7, 'Bk': 6, 'Cf': 5,
+    'Ac': 0, 'Th': 0, 'Pa': 0, 'U': 2, 'Np': 3, 'Pu': 4, 'Am': 6, 'Cm': 7, 'Bk': 6, 'Cf': 5,
     'Es': 4, 'Fm': 3, 'Md': 2, 'No': 0, 'Lr': 0,
     # First row transition metals
-    'Sc': 0, 'Ti': 2, 'V': 3,  'Cr': 4, 'Mn': 5, 'Fe': 4, 'Co': 3, 'Ni': 2, 'Cu': 0, 'Zn': 0, 
+    'Sc': 0, 'Ti': 0, 'V': 0,  'Cr': 3, 'Mn': 5, 'Fe': 4, 'Co': 3, 'Ni': 2, 'Cu': 1, 'Zn': 0, 
     # Second row transition metals 
-    'Y': 0, 'Zr': 0, 'Nb': 0,  'Mo': 2, 'Tc': 3, 'Ru': 5, 'Rh': 4, 'Pd': 0, 'Ag': 0, 'Cd': 0, 
+    'Y': 0, 'Zr': 0, 'Nb': 0,  'Mo': 0, 'Tc': 2, 'Ru': 4, 'Rh': 2, 'Pd': 0, 'Ag': 0, 'Cd': 0, 
     # Third row transition metals
-    'Hf': 0, 'Ta': 0, 'W': 2,  'Re': 3, 'Os': 4, 'Ir': 4, 'Pt': 2, 'Au': 0, 'Hg': 1,
+    'Hf': 0, 'Ta': 0, 'W': 0,  'Re': 0, 'Os': 0, 'Ir': 0, 'Pt': 0, 'Au': 2, 'Hg': 0,
     # 4th row transition metals
     'Rf': 1, 'Db': 0, 'Sg': 0, 'Bh': 0, 'Hs': 0,
     # Post-transition metals
@@ -421,7 +421,8 @@ ligands_dict = {
 'benzoate_mono':{'smiles':'C1=CC=C(C=C1)C(=O)[O-]','coordList':[8],'ligType':'mono'},
 'benzoic_acid':{'smiles':'C1=CC=C(C=C1)C(=O)O','coordList':[7],'ligType':'mono'},
 'oxalate':{'smiles':'C(=O)(C(=O)[O-])[O-]','coordList':[4,5],'ligType':'bi_cis'},
-'nitrite':{'smiles':'N(=O)[O-]','coordList':[2],'ligType':'mono'},
+'nitrite_o':{'smiles':'N(=O)[O-]','coordList':[2],'ligType':'mono'},
+'nitrite_n':{'smiles':'N(=O)[O-]','coordList':[0],'ligType':'mono'},
 'acetonitrile':{'smiles':'CC#N','coordList':[2],'ligType':'mono'},
 'ammonia':{'smiles':'N','coordList':[0],'ligType':'mono'},
 'thf':{'smiles':'C1CCCO1','coordList':[4],'ligType':'mono'},

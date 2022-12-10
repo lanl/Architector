@@ -643,7 +643,7 @@ def build_complex(inputDict):
     if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) == 0) and \
        (max([len(x['coordList']) for x in tmp_inputDict['ligands']]) > 2):
         newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=True) # Run with larger radii
-        if inputDict['parameters']['debug']:
+        if tmp_inputDict['parameters']['debug']:
             print('Trying with larger scaled metal radii.')
         temp_ordered_conf_dict = build_complex_driver(newinpdict)
         newdict_append = dict()
@@ -652,14 +652,14 @@ def build_complex(inputDict):
         ordered_conf_dict.update(newdict_append)
         if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) > 0):
             try_smaller = False
-            if inputDict['parameters']['debug']:
+            if tmp_inputDict['parameters']['debug']:
                 print('Succeeded with larger scaled metal radii!')
         else:
             try_smaller=True
-            if inputDict['parameters']['debug']:
+            if tmp_inputDict['parameters']['debug']:
                 print('No possible structures for this structure even with larger radii structure.')
         if try_smaller: # Run with smaller radii
-            if inputDict['parameters']['debug']:
+            if tmp_inputDict['parameters']['debug']:
                 print('Trying with smaller scaled metal radii.')
             newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=False)
             temp_ordered_conf_dict = build_complex_driver(newinpdict)
@@ -668,10 +668,10 @@ def build_complex(inputDict):
                 newdict_append[key+'_smaller_scaled'] = val
             ordered_conf_dict.update(newdict_append)
             if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) > 0):
-                if inputDict['parameters']['debug']:
+                if tmp_inputDict['parameters']['debug']:
                     print('Succeeded with smaller scaled metal radii!')
             else:
-                if inputDict['parameters']['debug']:
+                if tmp_inputDict['parameters']['debug']:
                     print('No possible structures for this structure even with smaller radii structure.')
     # Final Reorder
     if len(ordered_conf_dict) > 0:
