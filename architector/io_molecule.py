@@ -885,7 +885,8 @@ class Molecule:
                     if isinstance(params.get('covrad_metal',False),float):
                         mrad = params['covrad_metal']
                 if np.any(np.isnan(posits)): # Any nan in positions
-                    print('Nan in positions.')
+                    if params.get('debug',False):
+                        print('Nan in positions.')
                     sane = False
                 else:
                     all_dists = atoms.get_all_distances()
