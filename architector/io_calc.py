@@ -288,6 +288,11 @@ class CalcExecutor:
         if self.final_sanity_check:
             self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
+
+        # Reset structure to inital state to avoid nans in output structures.
+        if np.any(np.isnan(self.mol.ase_atoms.get_positions())):
+            self.mol = io_molecule.convert_io_molecule(self.in_struct)
+            self.mol.calc_suggested_spin(params=self.parameters)
         
         if self.parameters['save_trajectories'] and (self.trajectory is not None):
             self.dump_traj()
