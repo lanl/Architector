@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import uuid
 import copy
+import os
 from ase.db import connect
 
 def isnotebook():
@@ -774,12 +775,13 @@ def inparse(inputDict):
                 outparams['alternate_metal_spin'] = io_ptable.second_choice_metal_spin_dict[metal]
 
         # Connect to ase database
+        outparams['ase_db_tmp_name'] = os.path.join(outparams['temp_prefix'],outparams['ase_atoms_db_name'])
         if outparams['dump_ase_atoms']:
-            db = connect(outparams['ase_atoms_db_name'], serial=True)
+            db = connect(outparams['ase_db_tmp_name'], serial=True)
             outparams['ase_db'] = db
         elif outparams['save_trajectories']:
             outparams['dump_ase_atoms'] = True
-            db = connect(outparams['ase_atoms_db_name'], serial=True)
+            db = connect(outparams['ase_db_tmp_name'], serial=True)
             outparams['ase_db'] = db
         else:
             outparams['ase_db'] = None

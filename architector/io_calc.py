@@ -27,6 +27,7 @@ params={
 "ase_atoms_db_name": 
     'architector_ase_db.json',
 "temp_prefix":"/tmp/",
+"ase_db_tmp_name":"/tmp/architector_ase_db.json",
 # Cutoff parameters
 "assemble_sanity_checks":True, # Turn on/off assembly sanity checks.
 "assemble_graph_sanity_cutoff":1.8,

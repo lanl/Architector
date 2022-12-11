@@ -8,6 +8,7 @@ Developed by Dan Burrill and Michael Taylor
 import copy
 import time
 import numpy as np
+import shutil
 from collections import OrderedDict
 
 import architector.io_process_input as io_process_input
@@ -18,7 +19,6 @@ import architector.io_molecule as io_molecule
 import architector.io_align_mol as io_align_mol
 import architector.io_crest as io_crest
 import architector.io_symmetry as io_symmetry
-import architector.arch_context_manage as arch_context_manage
 
 from architector.io_calc import CalcExecutor
 
@@ -703,6 +703,10 @@ def build_complex(inputDict):
             out_ordered_conf_dict[keys[i]] = vals[i]
     else:
         out_ordered_conf_dict = dict()
+    # At the end move the .json files generated to the cwd -> done to save time!
+    if tmp_inputDict['parameters']['save_trajectories'] or tmp_inputDict['parameters']['dump_ase_atoms']:
+        shutil.copy(tmp_inputDict['parameters']['ase_db_tmp_name'],
+                tmp_inputDict['parameters']['ase_atoms_db_name'])
     return out_ordered_conf_dict
 
 def build_complex_2D(inputDict):
