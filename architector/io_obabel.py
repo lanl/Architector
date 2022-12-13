@@ -416,10 +416,10 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
                              functionalizations=functionalizations)
     mmff94_ok = check_mmff_okay(obmol)
     if mmff94_ok:
-        FF = ob.OBForceField_FindType( "mmff94" )
+        FF = ob.OBForceField.FindForceField("MMFF94")
         FF.Setup(obmol) # Make sure setup works OK
     else:
-        FF = ob.OBForceField_FindType( "UFF" )
+        FF = ob.OBForceField.FindForceField("MMFF94")
         FF.Setup(obmol) # Make sure setup works OK
     FF.DiverseConfGen(rmsd_cutoff, conf_cutoff, energy_cutoff, confab_verbose)
     FF.GetConformers(obmol)

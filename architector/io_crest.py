@@ -135,6 +135,9 @@ def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
 
+    mol_charge = int(mol_charge) # Ensure integers
+    uhf = int(uhf)
+
     xyzstr = io_molecule.convert_ase_xyz(mol.ase_atoms)
 
     with arch_context_manage.make_temp_directory() as _:
@@ -248,6 +251,8 @@ def crest_conformers_lig(smiles,ase_atoms=None,charge=None,uhf=0,method='GFN2/GF
             uhf = uhf + 1
 
     xyzstr = io_molecule.convert_ase_xyz(ase_atoms)
+    mol_charge = int(mol_charge) # Ensure integers
+    uhf = int(uhf)
 
     with arch_context_manage.make_temp_directory() as _:
         # Write xyz file
@@ -417,7 +422,7 @@ def obmol_xtb_conformers(smiles,charge=None,uhf=0,method='GFN2-xTB',total_confs=
                                          solvent=solvent)
             fail = True
             try:
-                dyn = BFGSLineSearch(atoms)
+                dyn = BFGSLineSearch(atoms,logfile='tmp.log') # Mute output
                 dyn.run()
                 fail = False
             except:

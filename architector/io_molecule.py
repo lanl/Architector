@@ -26,7 +26,8 @@ def convert_io_molecule(structure,
                         detect_charge_spin=False,
                         charge=None,
                         uhf=None,
-                        xtb_uhf=None):
+                        xtb_uhf=None,
+                        xtb_charge=None):
     """convert_io_molecule
     Handle multiple types of structures passed and convert them to architector.io_molecule.Molecule objects.
 
@@ -42,6 +43,8 @@ def convert_io_molecule(structure,
         unpaired electrons in the molecule, default None
     xtb_uhf : int, optional
         unpaired electrons in molecule for use by XTB, default None
+    xtb_charge : int, optional
+        charge used for XTB relaxation, default None
     """
     mol = Molecule()
     if isinstance(structure,(str,ase.atoms.Atoms)):
@@ -97,6 +100,8 @@ def convert_io_molecule(structure,
                 mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             if xtb_uhf is not None:
                 mol.xtb_uhf = xtb_uhf
+            if xtb_charge is not None:
+                mol.xtb_charge = xtb_charge
             return mol
     elif isinstance(structure,architector.io_molecule.Molecule):
         # struct = mol
@@ -318,6 +323,10 @@ class Molecule:
             self.ase_atoms = read(filename,parallel=False)
         self.graph = []
         self.BO_dict = {}
+        self.charge = None
+        self.uhf = None
+        self.xtb_charge = None
+        self.xtb_uhf = None
         self.atom_types = [x.symbol for x in self.ase_atoms]
         self.cell = []
 
@@ -351,6 +360,10 @@ class Molecule:
                     atoms.append(Atom(symbol,coords))
         self.ase_atoms = atoms
         self.graph = []
+        self.charge = None
+        self.uhf = None
+        self.xtb_charge = None
+        self.xtb_uhf = None
         self.BO_dict = {}
         self.atom_types = [x.symbol for x in self.ase_atoms]
         self.cell = []
@@ -384,8 +397,11 @@ class Molecule:
             atom_groups = [str(1)]*natoms
         charges = np.zeros(natoms)
         charge_string = 'NoCharges'
-        ss = '@<TRIPOS>MOLECULE\n{} Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} XTB_Charge: {}\n'.format(filename,
-                int(self.charge),int(self.uhf),int(self.xtb_uhf),int(self.xtb_charge))
+        if (self.charge is not None) and (self.uhf is not None) and (self.xtb_charge is not None) and (self.xtb_uhf is not None):
+            ss = '@<TRIPOS>MOLECULE\n{} Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} XTB_Charge: {}\n'.format(filename,
+                    int(self.charge),int(self.uhf),int(self.xtb_uhf),int(self.xtb_charge))
+        else:
+            ss = '@<TRIPOS>MOLECULE\n{}\n'.format(filename)            
         ss += ' {0:5d} {1:5d} {2:5d} {3:5d} {4:5d}\n'.format(natoms,
                                     int(csg.nnz/2), disjoint_components[0],
                                     0, 0)
@@ -492,10 +508,10 @@ class Molecule:
         charge = None
         spin = None
         xtb_spin = None
+        xtb_charge = None
         for line in s:
             # Get Atoms First
             if ('Charge:' in line) and ('Unpaired_Electrons:' in line):
-                print(line)
                 charge = float(line.split()[2])
                 spin = int(line.split()[4])
                 xtb_spin = int(line.split()[6])
