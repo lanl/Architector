@@ -136,6 +136,7 @@ class CalcExecutor:
         self.fmax = fmax
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
+        self.force = False
         
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
@@ -174,6 +175,10 @@ class CalcExecutor:
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
         if self.mol.dists_sane:
             self.mol.calc_suggested_spin(params=self.parameters)
+            print(self.mol.xtb_charge,self.mol.charge)
+            if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
+                self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
+                self.method = 'GFN-FF' # GFNFF more stable for higher oxidation states.
             obabel_ff_requested = False
             if self.calculator is not None: # If ASE calculator passed use that by default
                 calc = self.calculator
@@ -194,8 +199,6 @@ class CalcExecutor:
                 uhf_vect[0] = self.mol.xtb_uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
                 charge_vect[0] = self.mol.xtb_charge
-                if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
-                    self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif ('uff' in self.method.lower()) or ('mmff' in self.method.lower()):
