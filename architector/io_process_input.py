@@ -632,9 +632,33 @@ def inparse(inputDict):
             if good:
                 coreTypes_run.append(coreType)
 
-        coreTypes = coreTypes_run
-        if len(coreTypes) == 0:
+        if len(coreTypes_run) == 0:
             print('Warning: No structures generated! No Coretype/ligand type match.')
+            print('Attempting ligand type assignment')
+            new_liglist = []
+            for tligdict in newinpDict['ligands']:
+                tmp_ligType = assign_ligType_bruteforce(core_geo_class, tligdict['smiles'], tligdict['coordList'], 
+                                        tmetal, covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
+                tligdict.update({'ligType': tmp_ligType})
+                new_liglist.append(tligdict)
+            newinpDict['ligands'] = newliglist
+            coreTypes_run = []
+            for coreType in coreTypes:
+                good = True
+                for lig in newinpDict['ligands']: # Check that all ligands can map to this geometry
+                    if lig['ligType'] == 'mono':
+                        good = True
+                    elif (coreType not in core_geo_class.liglist_geo_map_dict[lig['ligType']].keys()):
+                        good=False
+                if good:
+                    coreTypes_run.append(coreType)
+        
+        # Reset coreTypes             
+        coreTypes = coreTypes_run
+
+        if len(coreTypes) == 0:
+            print("Warning: No structures generated! Still couldn't map the ligands to the core")
+
         
         # Store saved info
         newinpDict['coreTypes'] = coreTypes
