@@ -70,7 +70,7 @@ def read_conformers(fileName):
     return molList,xtb_energies
 
 def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
-                    solvent='none', read_charge_spin=False):
+                    solvent='none'):
     '''
     Find conformers of a given structure with CREST.
 
@@ -104,9 +104,9 @@ def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
     mol = io_molecule.convert_io_molecule(structure)
     if charge is not None:
         mol.charge = charge
-    elif mol.charge is None:
+    elif mol.xtb_charge is None:
         mol.detect_charge_spin()
-    mol_charge = mol.charge
+    mol_charge = mol.xtb_charge
 
     even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms])-mol_charge) % 2
     if (uhf is not None):

@@ -120,7 +120,6 @@ class CalcExecutor:
 
         self.in_struct = structure
         self.mol = io_molecule.convert_io_molecule(structure)
-        self.uhf_xtb = None
         self.method = method
         default_params = params.copy()
         default_params.update(parameters)
@@ -183,7 +182,7 @@ class CalcExecutor:
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
-                charge_vect[0] = self.mol.charge
+                charge_vect[0] = self.mol.xtb_charge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif 'gfn' in self.method.lower():
@@ -194,7 +193,9 @@ class CalcExecutor:
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.xtb_uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
-                charge_vect[0] = self.mol.charge
+                charge_vect[0] = self.mol.xtb_charge
+                if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
+                    self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif ('uff' in self.method.lower()) or ('mmff' in self.method.lower()):

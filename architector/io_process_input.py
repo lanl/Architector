@@ -15,6 +15,7 @@ import pandas as pd
 import uuid
 import copy
 import os
+import mendeleev
 from ase.db import connect
 
 def isnotebook():
@@ -725,6 +726,15 @@ def inparse(inputDict):
         #     default_parameters['assemble_method'] = 'GFN-FF'
 
         outparams.update(default_parameters) 
+        # If acinide default to forcing trans oxos if 2 present (actinyls)
+        # Can still be turned off if desired.
+        if newinpDict['parameters']['is_actinide']:
+            count = 0 
+            for lig in newinpDict['ligands']:
+                if lig['smiles'] == '[O-2]':
+                    count += 1
+            if count == 2:
+                newinpDict['parameters']['force_trans_oxos'] = True
 
         if ('parameters' in newinpDict): # Load input parameters as changes to the defaults.
             if isinstance(newinpDict['parameters'],dict):
@@ -769,7 +779,12 @@ def inparse(inputDict):
         if outparams['metal_ox'] is None:
             outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
         if outparams['metal_spin'] is None:
-            outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
+            if outparams['metal_ox'] != io_ptable.metal_charge_dict[metal]:
+                # Calculate from mendeleev reference - Generally aufbau.
+                outparams['metal_spin'] = mendeleev.__dict__[newinpDict['core']['metal']].ec.ionize(outparams['metal_ox']).unpaired_electrons()
+            else: # Otherwise use refdict.
+                outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
+
         if outparams['alternate_metal_spin'] is None:
             if metal in io_ptable.second_choice_metal_spin_dict:
                 outparams['alternate_metal_spin'] = io_ptable.second_choice_metal_spin_dict[metal]
@@ -1082,7 +1097,11 @@ def inparse_2D(inputDict):
         if outparams['metal_ox'] is None:
             outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
         if outparams['metal_spin'] is None:
-            outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
+            if outparams['metal_ox'] != io_ptable.metal_charge_dict[metal]:
+                # Calculate from mendeleev reference - Generally aufbau.
+                outparams['metal_spin'] = mendeleev.__dict__[newinpDict['core']['metal']].ec.ionize(outparams['metal_ox']).unpaired_electrons()
+            else: # Otherwise use refdict.
+                outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
        
         ####### Add in missing ligands
         # Take the average of the coreTypes

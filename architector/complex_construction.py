@@ -210,7 +210,7 @@ class Complex:
             tmp_molecule.append_ligand({'ase_atoms':conformer,'bo_dict':ligand.BO_dict, 
                             'atom_types':ligand.atom_types})
             if self.parameters['debug']:
-                print(tmp_molecule.write_mol2('cool{}.xyz'.format(i),writestring=True))
+                print(tmp_molecule.write_mol2('cool{}.mol2'.format(i),writestring=True))
             out_eval = CalcExecutor(tmp_molecule,assembly=True, 
                                     parameters=self.parameters,
                                     init_sanity_check=True)
@@ -553,13 +553,11 @@ def build_complex_driver(inputDict1,in_metal=False):
             val.swap_metals_back(in_metal=in_metal)
             structs.append(val)
             if inputDict['parameters']['save_init_geos']:
-                init_mol2strings.append(val.initMol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} Key: {} .mol2'.format(
-                int(val.complexMol.charge), int(val.complexMol.uhf), int(val.complexMol.xtb_uhf), key), writestring=True))
+                init_mol2strings.append(val.initMol.write_mol2('{}'.format(key), writestring=True))
             else:
                 init_mol2strings.append(None)
             energy_sorted_inds.append(val.index) # Save energy sorted index for reference.
-            mol2strings.append(val.complexMol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} Key: {} .mol2'.format(
-                int(val.complexMol.charge), int(val.complexMol.uhf), int(val.complexMol.xtb_uhf), key), writestring=True))
+            mol2strings.append(val.complexMol.write_mol2('{}'.format(key), writestring=True))
         order = np.argsort(xtb_energies)
         # Iterate through all structures and check/remove duplicate structures.
         # Remove extra classes that we don't need to persist
@@ -584,6 +582,7 @@ def build_complex_driver(inputDict1,in_metal=False):
                     ordered_conf_dict[keys[i]] = {'ase_atoms':structs[i].complexMol.ase_atoms,
                             'total_charge':int(structs[i].complexMol.charge),
                             'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
+                            'xtb_total_charge':int(structs[i].complexMol.xtb_charge),
                             'calc_n_unpaired_electrons': structs[i].complexMol.uhf,
                             'metal_ox':inputDict['parameters']['metal_ox'],
                             'init_energy':structs[i].calculator.init_energy,
@@ -597,6 +596,7 @@ def build_complex_driver(inputDict1,in_metal=False):
                         'total_charge':int(structs[i].complexMol.charge),
                         'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
                         'calc_n_unpaired_electrons': structs[i].complexMol.uhf,
+                        'xtb_total_charge':int(structs[i].complexMol.xtb_charge),
                         'metal_ox':inputDict['parameters']['metal_ox'],
                         'init_energy':structs[i].calculator.init_energy,
                         'energy':xtb_energies[i],
@@ -698,8 +698,7 @@ def build_complex(inputDict):
                 tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
                 posits = io_molecule.convert_io_molecule(samples[0]).ase_atoms.get_positions()
                 tmpmol.ase_atoms.set_positions(posits)
-                vals[i].update({'mol2string':tmpmol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} .mol2'.format(
-                        int(tmpmol.charge),int(tmpmol.uhf),int(tmpmol.xtb_uhf)), writestring=True)})
+                vals[i].update({'mol2string':tmpmol.write_mol2('Crest_Min_Energy', writestring=True)})
             out_ordered_conf_dict[keys[i]] = vals[i]
     else:
         out_ordered_conf_dict = dict()
@@ -785,18 +784,24 @@ def build_complex_2D(inputDict):
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
     xtb_unpaired_electrons = copy.copy(uhf)
+    xtb_charge = copy.copy(mol_charge)
 
     if f_in_core: # F in core assumes for a 3+ lanthanide with 11 valence electrons for XTB
+        xtb_charge = charge + (3 - inputDict['parameters']['metal_ox'])
         even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms]))
-        even_odd_electrons = even_odd_electrons - io_ptable.elements.index(metals[0]) + 11 - mol_charge
+        even_odd_electrons = even_odd_electrons - io_ptable.elements.index(metals[0]) + 11 - xtb_charge
         even_odd_electrons = even_odd_electrons % 2
         if (even_odd_electrons == 0):
             xtb_unpaired_electrons = 0
         else:
             xtb_unpaired_electrons = 1
 
-    return {'mol2string':mol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} .mol2'.format(
-        int(charge),int(uhf),int(xtb_unpaired_electrons)), writestring=True),'input_dict':inputDict}
+    mol.xtb_uhf = xtb_unpaired_electrons
+    mol.xtb_charge = xtb_unpaired_electrons
+    mol.uhf = uhf
+    mol.charge = mol_charge
+
+    return {'mol2string':mol.write_mol2('2D_Mol:', writestring=True),'input_dict':inputDict}
 
 # Main
 if (__name__ == '__main__'):
