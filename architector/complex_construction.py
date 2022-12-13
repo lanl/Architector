@@ -494,7 +494,7 @@ def complex_driver(inputDict1,in_metal=False):
                         if inputDict['parameters']['debug']:
                             print('Complex Distances Sane: ', tmp_conformer.complexMol.dists_sane)
                         spin_n_unpaired = np.sum(tmp_conformer.complexMol.xtb_uhf)
-                        tot_charge = np.sum(tmp_conformer.complexMol.charge)
+                        tot_charge = np.sum(tmp_conformer.complexMol.xtb_charge)
                         if tmp_conformer.calculator is not None:
                             if tmp_conformer.complexMol.dists_sane and tmp_conformer.calculator.successful: # Check sanity after
                                 conf_dict.update({coreType + '_' + str(ind) + '_nunpairedes_' + \
@@ -502,6 +502,7 @@ def complex_driver(inputDict1,in_metal=False):
                                 if inputDict['parameters']['return_only_1']:
                                         return conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1
                             elif tmp_conformer.initMol.dists_sane and inputDict['parameters']['save_init_geos']:
+                                tmp_conformer.calculator.energy = 10000 # Set to high energy.
                                 conf_dict.update({coreType + '_' + str(ind) + '_nunpairedes_' + \
                                     str(int(spin_n_unpaired))+'_charge_'+str(int(tot_charge))+'_init_only':tmp_conformer})
                                 if inputDict['parameters']['return_only_1']:
