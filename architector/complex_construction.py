@@ -350,9 +350,9 @@ def gen_aligned_complex(newLigInputDicts,
             ligandCopy.corecoordList = coreCoordList # DO NOT DELETE THIS LINE
             newligconfList = []
             ligconfVals = []
-            for i,lig in enumerate(ligandCopy.conformerList):
-                new_ligcoordList = [[val[0],ligandCopy.ligcoordList[i][1]] for i,val in enumerate(ligandCopy.out_ligcoordLists[i])]
-                rot_angle = ligandCopy.rotList[i]
+            for j,lig in enumerate(ligandCopy.conformerList):
+                new_ligcoordList = [[val[0],ligandCopy.ligcoordList[k][1]] for k,val in enumerate(ligandCopy.out_ligcoordLists[j])]
+                rot_angle = ligandCopy.rotList[j]
                 if rot_angle != 0: # Apply same rotations.
                     newconf, rotscore, sane = io_lig.set_position_align(lig, 
                                                     new_ligcoordList, 

@@ -1759,6 +1759,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
                        rot_coord_vect=True, rot_angle=0)
         conf_list.append(rotatedConformer)
         val_list.append(val_list[0])
+        rot_list.append(0)
         tligcoordList_out.append(tligcoordList_out[0])
         if OBmol_lig.NumAtoms() > 2: # For 3 add rotation versions of the ligands
             rotatedConformer, _ , _ = set_position_align(conf, tligcoordList_out[0], corecoordList, isCp=False, debug=debug,
