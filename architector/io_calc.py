@@ -194,6 +194,8 @@ class CalcExecutor:
                            accuracy=self.xtb_accuracy)
                 if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
                     self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
+                    if self.assembly: # FF more stable for highly charged assembly complexes.
+                        self.method = 'GFN-FF'
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.xtb_uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
