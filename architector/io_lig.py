@@ -1681,7 +1681,6 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             rot_list.append(0)
     else:
         for i in range(nconformers):
-            seed = seeds[i]
             conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
