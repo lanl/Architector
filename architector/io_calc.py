@@ -176,9 +176,6 @@ class CalcExecutor:
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
         if self.mol.dists_sane:
             self.mol.calc_suggested_spin(params=self.parameters)
-            if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
-                self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
-                self.method = 'GFN-FF' # GFNFF more stable for higher oxidation states.
             obabel_ff_requested = False
             if self.calculator is not None: # If ASE calculator passed use that by default
                 calc = self.calculator
@@ -195,6 +192,8 @@ class CalcExecutor:
                            max_iterations=self.xtb_max_iterations,
                            electronic_temperature=self.xtb_electronic_temperature,
                            accuracy=self.xtb_accuracy)
+                if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
+                    self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.xtb_uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))

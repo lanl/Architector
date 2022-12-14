@@ -64,7 +64,7 @@ class Ligand:
         # Generate conformations
         if debug:
             print("GENERATING CONFORMATIONS for {}".format(smiles))
-        conformers, rotscores, tligcoordList, relax, bo_dict, atypes = io_lig.find_conformers(self.smiles, 
+        conformers, rotscores, tligcoordList, relax, bo_dict, atypes, rotlist = io_lig.find_conformers(self.smiles, 
                                                         self.ligcoordList, 
                                                         self.corecoordList, 
                                                         metal=self.metal,
@@ -76,6 +76,7 @@ class Ligand:
         if len(conformers) > 0:
             self.conformerList = conformers
             self.conformerRotScore = rotscores
+            self.rotList = rotlist
             self.out_ligcoordLists = tligcoordList
             self.selectedConformer = self.conformerList[0]
             self.exists = True 
@@ -92,6 +93,7 @@ class Ligand:
             self.relax = False
             self.conformerList = []
             self.out_ligcoordLists = []
+            self.rotLists = []
             self.selectedConformer = None
             self.liggen_end_time = time.time()
             self.BO_dict = dict()
@@ -350,10 +352,19 @@ def gen_aligned_complex(newLigInputDicts,
             ligconfVals = []
             for i,lig in enumerate(ligandCopy.conformerList):
                 new_ligcoordList = [[val[0],ligandCopy.ligcoordList[i][1]] for i,val in enumerate(ligandCopy.out_ligcoordLists[i])]
-                newconf, rotscore, sane = io_lig.set_position_align(lig, 
-                                                            new_ligcoordList, 
-                                                            ligandCopy.corecoordList,
-                                                            debug=inputDict['parameters']['debug'])
+                rot_angle = ligandCopy.rotList[i]
+                if rot_angle != 0: # Apply same rotations.
+                    newconf, rotscore, sane = io_lig.set_position_align(lig, 
+                                                    new_ligcoordList, 
+                                                    ligandCopy.corecoordList,
+                                                    debug=inputDict['parameters']['debug'],
+                                                    rot_coord_vect=True,
+                                                    rot_angle=rot_angle)
+                else:
+                    newconf, rotscore, sane = io_lig.set_position_align(lig, 
+                                                                        new_ligcoordList, 
+                                                                        ligandCopy.corecoordList,
+                                                                        debug=inputDict['parameters']['debug'])
                 if sane:
                     ligconfVals.append(rotscore)
                     newligconfList.append(newconf)

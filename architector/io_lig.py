@@ -1562,12 +1562,15 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         list of ase atoms objects.
     val_list : list
         list of values of the conformers to match the rotation of the coordination sites.
+    rot_list : list
+        list of rotations applied the ligands in degrees.
     """
     if debug:
         print('DEBUG LIGANDS:',ligsmiles, ligcoordList, corecoordList, metal) #for debug
     conf_list = []
     val_list = []
     tligcoordList_out = []
+    rot_list = []
     
     if debug:
         seeds = [np.random.randint(1,100) for x in range(nconformers)]
@@ -1584,6 +1587,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         else:
             if debug:
                 print('Failed sanity checks after rotation!')
@@ -1599,6 +1603,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         else:
             if debug:
                 print('Failed sanity checks after rotation!')
@@ -1613,6 +1618,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         else:
             if debug:
                 print('Failed sanity checks after rotation!')
@@ -1628,6 +1634,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         else:
             if debug:
                 print('Failed sanity checks after rotation!')
@@ -1643,6 +1650,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         
         # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
@@ -1656,6 +1664,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
 
         # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
@@ -1669,6 +1678,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
     else:
         for i in range(nconformers):
             seed = seeds[i]
@@ -1681,6 +1691,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
                 conf_list.append(conf)
                 val_list.append(val)
                 tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
             else:
                 if debug:
                     print('Failed sanity checks after rotation!')
@@ -1696,6 +1707,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         
         # print('Add conformer with no MMFF relaxation')
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
@@ -1707,6 +1719,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         else:
             if debug:
                 print('Failed sanity checks after rotation!')
@@ -1723,6 +1736,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
         
         # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
@@ -1737,6 +1751,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(conf)
             val_list.append(val)
             tligcoordList_out.append(tligcoordList)
+            rot_list.append(0)
 
     if (len(ligcoordList) == 1) and (len(conf_list) > 0) and (OBmol_lig.NumAtoms()>1): # Add aligned monodentate and 45 and 90-degree rotated conformers
         conf = conf_list[0]
@@ -1749,10 +1764,12 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             rotatedConformer, _ , _ = set_position_align(conf, tligcoordList_out[0], corecoordList, isCp=False, debug=debug,
             rot_coord_vect=True, rot_angle=45)
             conf_list.append(rotatedConformer)
+            rot_list.append(45)
             val_list.append(val_list[0])
             tligcoordList_out.append(tligcoordList_out[0])
             rotatedConformer, _ , _ = set_position_align(conf, tligcoordList_out[0], corecoordList, isCp=False, debug=debug,
             rot_coord_vect=True, rot_angle=90)
+            rot_list.append(90)
             conf_list.append(rotatedConformer)
             val_list.append(val_list[0])
             tligcoordList_out.append(tligcoordList_out[0])
@@ -1765,6 +1782,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             rotatedConformer, _ , _ = set_position_align(conf_copy, tligcoordList_out[i], corecoordList, isCp=False, debug=debug,
                 rot_coord_vect=True, rot_angle=180)
             conf_list.append(rotatedConformer)
+            rot_list.append(180)
             val_list.append(val_list[i])
             tligcoordList_out.append(tligcoordList_out[i])
     # Add in rotated 120 and 240 degree rotated versions of the generated conformers.
@@ -1776,11 +1794,13 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             rotatedConformer, _ , _ = set_position_align(conf_copy, tligcoordList_out[i], corecoordList, isCp=False, debug=debug,
                 rot_coord_vect=True, rot_angle=120)
             conf_list.append(rotatedConformer)
+            rot_list.append(120)
             val_list.append(val_list[i])
             tligcoordList_out.append(tligcoordList_out[i])
             rotatedConformer, _ , _ = set_position_align(conf_copy, tligcoordList_out[i], corecoordList, isCp=False, debug=debug,
                 rot_coord_vect=True, rot_angle=240)
             conf_list.append(rotatedConformer)
+            rot_list.append(240)
             val_list.append(val_list[i])
             tligcoordList_out.append(tligcoordList_out[i])
 
@@ -1788,4 +1808,4 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         seeds = [np.random.randint(1,100) for x in range(nconformers)]
         print('Final seeds (post-ligand generation): ', seeds)
         
-    return conf_list, val_list, tligcoordList_out, final_relax, bo_dict, atypes
+    return conf_list, val_list, tligcoordList_out, final_relax, bo_dict, atypes, rot_list
