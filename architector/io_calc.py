@@ -61,6 +61,7 @@ params={
 "vdwrad_metal":None,
 "covrad_metal":None,
 "scaled_radii_factor":None,
+"force_generation":False,
 "debug":False,
 }
 
@@ -136,7 +137,7 @@ class CalcExecutor:
         self.fmax = fmax
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
-        self.force = False
+        self.force_generation = False
         
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
@@ -175,7 +176,6 @@ class CalcExecutor:
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
         if self.mol.dists_sane:
             self.mol.calc_suggested_spin(params=self.parameters)
-            print(self.mol.xtb_charge,self.mol.charge)
             if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
                 self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
                 self.method = 'GFN-FF' # GFNFF more stable for higher oxidation states.
@@ -285,6 +285,15 @@ class CalcExecutor:
                         self.errors.append(e)
                         if self.parameters['debug']:
                             print('Warning - method did not converge!',e)
+            if (not self.successful) and (self.force_generation):
+                try:
+                    self.energy = io_obabel.obmol_energy(self.mol)
+                    self.init_energy = copy.deepcopy(self.energy)
+                    self.successful = True
+                except Exception as e:
+                    self.errors.append(e)
+                    if self.parameters['debug']:
+                        print('Warning - method did not converge!',e)
             self.calc_time = time.time() - self.calc_time
             self.done = True
         else:

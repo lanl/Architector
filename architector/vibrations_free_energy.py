@@ -84,7 +84,8 @@ def normal_mode_sample(relaxed_atoms,temp=298.15,n=10,seed=42): # T=1 produced o
         non_zero_inds = np.where(np.real(vib_energies) > 0.0001)[0]
         kbT = ase.units.kB*temp
         # Seed
-        np.random.seed(seed)
+        if seed:
+            np.random.seed(seed)
         na = len(relaxed_atoms)
         displaced_structures = []
         for i in range(n):

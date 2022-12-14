@@ -342,7 +342,7 @@ def triangle(LB, UB, natoms):
                         raise ValueError('Bounds Incorrect.')
     return LL, UL
 
-def metrize(LB, UB, natoms, seed=False, non_triangle=False, debug=False):
+def metrize(LB, UB, natoms, non_triangle=False, debug=False):
     """metrize
     Metrization selects random in-range distances. Copied from ref [2], pp. 253-254.
     Scales O(N^3). 
@@ -355,18 +355,12 @@ def metrize(LB, UB, natoms, seed=False, non_triangle=False, debug=False):
             Upper bounds matrix.
         natoms : int
             Number of atoms in the molecule.
-        seed : bool, optional
-            Flag for random number seed. Default is False.
         
     Returns
     -------
         D : np.array
             Distance matrix.  
     """
-    if seed:
-        if debug:
-            print('Seed met:, ',seed)
-        np.random.seed(seed)
     D = np.zeros((natoms, natoms))
     LB, UB = triangle(LB, UB, natoms)
     for i in range(natoms-1):
@@ -1107,7 +1101,6 @@ def set_position_align(ase_atoms, ligcoordList, corecoordList, isCp=False, debug
                 inds = np.arange(0,len(ideal),1)
                 orderings = np.array([np.array(x) for x in itertools.permutations(inds,len(inds))])
                 if len(orderings) > 100:
-                    np.random.seed(42)
                     ordering_inds = np.random.choice(np.arange(0,len(orderings),1),100)
                     orderings = orderings[ordering_inds]
                 r = []
@@ -1178,7 +1171,7 @@ def set_position_align(ase_atoms, ligcoordList, corecoordList, isCp=False, debug
     return (rotatedConformer, minval, sane)
 
 def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe', 
-                          seed=42,add_angle_constraints=True, non_triangle=False,
+                          add_angle_constraints=True, non_triangle=False,
                           rot_coord_vect=False, rot_angle=0, skip_mmff=False,
                           covrad_metal=None, vdwrad_metal=None, no_ff=False,
                           debug=False
@@ -1195,8 +1188,6 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         List of lists inidicated connection sites by geometry 
     metal : str, optional
         Metal to be calculated -> by default, Fe
-    seed : str, optional 
-        random seed to be used for ligand generation.
     covrad_metal : float, optional
         covalent radii of the metal, default None
     vdwrad_metal : float, optional
@@ -1271,7 +1262,6 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
     # Here, I start with tighter constraints and loosen them to get to a final conformer.
     shape = get_ideal_angles(core_vects)
     status = False
-    tseeds = [x+1 for x in range(200)] # Do 200 at most.
     count = 0
     fail_gen = False
     LB, UB = get_bounds_matrix(allcoords, graph, natoms, 
@@ -1283,7 +1273,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         try:
             tLB = LB.copy()
             tUB = UB.copy()
-            D = metrize(tLB, tUB, natoms, seed=(tseeds[count]+seed), non_triangle=non_triangle,debug=debug)
+            D = metrize(tLB, tUB, natoms, non_triangle=non_triangle,debug=debug)
             D0 = get_cm_dists(D, natoms)
             G = get_metric_matrix(D, D0, natoms)
             L, V = get_3_eigs(G, natoms)
@@ -1302,7 +1292,6 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
     if fail_gen:
         if debug:
             print('Trying More Dist Geom with 0.2 Bond Tol LB and Loosened Metal_Center Constraints.')
-        tseeds = [x+1 for x in range(200)] # Do 200 at most.
         status = False
         count = 0
         LB, UB = get_bounds_matrix(allcoords, graph, natoms, 
@@ -1315,7 +1304,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
             try:
                 tLB = LB.copy()
                 tUB = UB.copy()
-                D = metrize(tLB, tUB, natoms, seed=(tseeds[count]+seed+1), non_triangle=non_triangle,debug=debug)
+                D = metrize(tLB, tUB, natoms, non_triangle=non_triangle,debug=debug)
                 D0 = get_cm_dists(D, natoms)
                 G = get_metric_matrix(D, D0, natoms)
                 L, V = get_3_eigs(G, natoms)
@@ -1329,7 +1318,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 if debug:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
-                if count > (len(tseeds)-1):
+                if count > 200:
                     fail_gen = True
                     status = True
                 else:
@@ -1340,7 +1329,6 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
     if fail_gen:
         if debug:
             print('Trying More Dist Geom with 0.2 Bond Tol LB, 0.2 Angle tol LB, and Loosened Metal_Center Constraints')
-        tseeds = [x+1 for x in range(200)] # Do 400 at most.
         status = False
         count = 0
         LB, UB = get_bounds_matrix(allcoords, graph, natoms, 
@@ -1354,7 +1342,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
             try:
                 tLB = LB.copy()
                 tUB = UB.copy()
-                D = metrize(tLB, tUB, natoms, seed=(tseeds[count]+seed+1), non_triangle=non_triangle,debug=debug)
+                D = metrize(tLB, tUB, natoms, non_triangle=non_triangle,debug=debug)
                 D0 = get_cm_dists(D, natoms)
                 G = get_metric_matrix(D, D0, natoms)
                 L, V = get_3_eigs(G, natoms)
@@ -1368,7 +1356,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 if debug:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
-                if count > (len(tseeds)-1):
+                if count > 200:
                     fail_gen = True
                     status = True
                 else:
@@ -1386,14 +1374,13 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 h_bond_tol=0.1, h_angle_tol=0.2,
                 isCp=isCp, cp_catoms=cp_catoms,
                 add_angle_constraints=add_angle_constraints)
-        tseeds = [x+1 for x in range(200)] # Do 400 at most.
         status = False
         count = 0
         while not status:
             try:
                 tLB = LB.copy()
                 tUB = UB.copy()
-                D = metrize(tLB, tUB, natoms, seed=(tseeds[count]+seed+1), non_triangle=non_triangle, debug=debug)
+                D = metrize(tLB, tUB, natoms, non_triangle=non_triangle, debug=debug)
                 D0 = get_cm_dists(D, natoms)
                 G = get_metric_matrix(D, D0, natoms)
                 L, V = get_3_eigs(G, natoms)
@@ -1407,7 +1394,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 if debug:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
-                if count > (len(tseeds)-1):
+                if count > 200:
                     fail_gen = True
                     status = True
                 else:
@@ -1425,14 +1412,13 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                                     h_bond_tol=0.1, h_angle_tol=0.3,
                                     isCp=isCp, cp_catoms=cp_catoms,
                                     add_angle_constraints=add_angle_constraints)
-        tseeds = [x+1 for x in range(200)] # Do 400 at most.
         status = False
         count = 0
         while not status:
             try:
                 tLB = LB.copy()
                 tUB = UB.copy()
-                D = metrize(tLB, tUB, natoms, seed=(tseeds[count]+seed+1), non_triangle=non_triangle, debug=debug)
+                D = metrize(tLB, tUB, natoms, non_triangle=non_triangle, debug=debug)
                 D0 = get_cm_dists(D, natoms)
                 G = get_metric_matrix(D, D0, natoms)
                 L, V = get_3_eigs(G, natoms)
@@ -1446,7 +1432,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 if debug:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
-                if count > (len(tseeds)-1):
+                if count > 200:
                     fail_gen = True
                     status = True
                 else:
@@ -1465,7 +1451,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         if np.any(np.isnan(res1)):
             if debug:
                 print('Dist Geom produced Nan. - Skipping!')
-            Conf3D_out = io_obabel.convert_obmol_ase(Conf3D,add_hydrogens=add_hydrogens)
+            Conf3D_out = io_obabel.convert_obmol_ase(Conf3D, add_hydrogens=add_hydrogens)
             final_relax = False
             fail = True
             tligcoordList = ligcoordList.copy()
@@ -1582,17 +1568,16 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
     conf_list = []
     val_list = []
     tligcoordList_out = []
-    master_seed = 42
-    np.random.seed(master_seed)
-    seeds = [np.random.randint(1,100) for x in range(nconformers)]
+    
     if debug:
-        print('Init seeds: ', seeds)
+        seeds = [np.random.randint(1,100) for x in range(nconformers)]
+        print('Init seeds (pre-ligand generation): ', seeds)
     OBmol_lig = io_obabel.get_obmol_smiles(ligsmiles)
 
     if (OBmol_lig.NumAtoms() < 4): # Limit smaller molecules conformers (not useful)
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
-                                         metal=metal, seed=seeds[0],
+                                         metal=metal,
                                          skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1607,7 +1592,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             print('Generating cis/mer/facs')
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
-                                         metal=metal, seed=seeds[0],
+                                         metal=metal,
                                          skip_mmff=skip_mmff,covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1621,7 +1606,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             print('Generating cis/mer/facs.')
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
-                                         metal=metal, seed=seeds[2],
+                                         metal=metal,
                                          skip_mmff=True, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1634,10 +1619,9 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         
         # Limit conformers for bidentate cis/tri_mer/tri_fac -> generate rotated/flipped versions!!!
         # for i in range(1):
-        seed = seeds[1]
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                         corecoordList, 
-                                        metal=metal, seed=seed,
+                                        metal=metal, 
                                         skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1651,7 +1635,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # Add N+1 without the explicit angle constraints
         conf, val, sane, final_relax, _ , _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, seed=master_seed, 
+                                            metal=metal, 
                                             add_angle_constraints=False,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
@@ -1663,7 +1647,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, seed=master_seed, 
+                                            metal=metal, 
                                             add_angle_constraints=True,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1676,7 +1660,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, seed=master_seed, 
+                                            metal=metal,  
                                             add_angle_constraints=False,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1690,7 +1674,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             seed = seeds[i]
             conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, seed=seed,
+                                            metal=metal, 
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
             if sane:
@@ -1704,7 +1688,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # Add N+1 without the explicit angle constraints
         conf, val, sane, final_relax, _ , _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, seed=master_seed, 
+                                            metal=metal, 
                                             add_angle_constraints=False,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
@@ -1716,7 +1700,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # print('Add conformer with no MMFF relaxation')
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
-                                         metal=metal, seed=seeds[2],
+                                         metal=metal, 
                                          skip_mmff=True, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1730,7 +1714,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, seed=master_seed, 
+                                            metal=metal, 
                                             add_angle_constraints=True,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1743,7 +1727,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, seed=master_seed, 
+                                            metal=metal, 
                                             add_angle_constraints=False,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, 
@@ -1799,5 +1783,9 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf_list.append(rotatedConformer)
             val_list.append(val_list[i])
             tligcoordList_out.append(tligcoordList_out[i])
+
+    if debug:
+        seeds = [np.random.randint(1,100) for x in range(nconformers)]
+        print('Final seeds (post-ligand generation): ', seeds)
         
     return conf_list, val_list, tligcoordList_out, final_relax, bo_dict, atypes

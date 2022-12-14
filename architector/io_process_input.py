@@ -677,6 +677,9 @@ def inparse(inputDict):
             "relax": True, # Perform xTB geomtetry relaxation of assembled complexes
             "debug": False, # Print out addition info for debugging purposes.
             "save_init_geos": False, # Save initial geometries before relaxations with xTB.
+            "seed":None, # If a seed is passed (int/float) use it to initialize np.random.seed for reproducability.
+            # If you want to replicate whole workflows - set np.random.seed() at the beginning of your workflow.
+            ### OPENBABEL STILL HAS RANDOMNESS
             "save_trajectories": False, # Save full relaxation trajectories from xTB to the ase db.
             "return_timings":True, # Return all the timings.
             "return_full_complex_class":False, # Return the complex class containing all ligand geometry and core information.
@@ -732,6 +735,8 @@ def inparse(inputDict):
             "assemble_method":"GFN2-xTB", # Which method to use for assembling conformers. 
             "fmax":0.1, # eV/Angstrom - max force for relaxation.
             "maxsteps":1000, # Steps involved in relaxation
+            "force_generation":False, # Whether to force the construction to proceed without xtb energies - defaults to UFF
+            # In cases of XTB outright failure.
             # For very large speedup - use GFN-FF, though this is much less stable (especially for Lanthanides)
             # Or UFF
 
@@ -833,6 +838,10 @@ def inparse(inputDict):
         # # Load logger
         # if outparams['logg']
         newinpDict['parameters'] = outparams
+
+        # Initialize seed.
+        if isinstance(newinpDict['parameters']['seed'],(int,float,np.float,np.int)):
+            np.random.seed(int(newinpDict['parameters']['seed']))
     
         return newinpDict
     else:
