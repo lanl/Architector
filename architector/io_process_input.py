@@ -777,10 +777,16 @@ def inparse(inputDict):
             outparams['n_conformers'] = 50
             outparams['n_symmetries'] = 50
 
+        if outparams['force_generation']:
+            # Graph Sanity cutoff for imposed molecular graph represents the maximum elongation of bonds
+            # rcov1*full_graph_sanity_cutoff is the maximum value for the bond lengths.
+            outparams["assemble_smallest_dist_cutoff"] = 0.7 # Force this to be tighter if no optimization done.
+            outparams["full_smallest_dist_cutoff"] = 0.7 # Force this to be tighter if no optimization done.
+
         # Make looser final cutoff allowances for graph distances for alkali and alkali earth metals
         # Tend to form more ionic bonds that may get elongated.
         if newinpDict['core']['metal'] in io_ptable.alkali_and_alkaline_earth:
-            outparams['full_graph_sanity_cutoff'] = 1.65 
+            outparams['full_graph_sanity_cutoff'] = 1.8
 
         # Push out full graph sanity for cp rings.
         if any([True for x in newinpDict['ligands'] if (x['ligType'] == 'sandwich')]):

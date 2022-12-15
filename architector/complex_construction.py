@@ -243,7 +243,8 @@ class Complex:
             if self.parameters['debug']:
                 print("Final Evaluation - Opt Molecule/Single point")
             self.calculator = CalcExecutor(self.complexMol,parameters=self.parameters,
-                                            final_sanity_check=True,relax=single_point,assembly=single_point)
+                                            final_sanity_check=self.parameters['full_sanity_check'],
+                                            relax=single_point,assembly=single_point)
             if self.parameters['debug'] and (not self.calculator.successful):
                 print('Failed final relaxation. - Retrying with UFF/XTB')
                 print(self.initMol.write_mol2('cool.mol2', writestring=True))
@@ -251,7 +252,8 @@ class Complex:
             if (not self.calculator.successful):
                 tmp_relax = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=single_point)
                 self.calculator = CalcExecutor(tmp_relax.mol,parameters=self.parameters,
-                                                final_sanity_check=True,relax=single_point)
+                                                final_sanity_check=self.parameters['full_sanity_check'],
+                                                relax=single_point)
         else: # Ensure calculation object at least exists
             self.calculator = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=False)
             self.calculator.successful = False
@@ -654,6 +656,7 @@ def build_complex(inputDict):
     ordered_conf_dict = build_complex_driver(inputDict)
     # Try larger radii generation for multidentate complexes if no complexes generated in an attempt to get at high-spin
     # > Covalent radii typically understimated for higher spin conformations
+    in_metal = inputDict['parameters']['original_metal']
     if 'mol2string' in inputDict:
         tmp_inputDict = io_process_input.inparse(inputDict)
     else:
@@ -663,7 +666,7 @@ def build_complex(inputDict):
         newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=True) # Run with larger radii
         if tmp_inputDict['parameters']['debug']:
             print('Trying with larger scaled metal radii.')
-        temp_ordered_conf_dict = build_complex_driver(newinpdict)
+        temp_ordered_conf_dict = build_complex_driver(newinpdict,in_metal=in_metal)
         newdict_append = dict()
         for key,val in temp_ordered_conf_dict.items():
             newdict_append[key+'_larger_scaled'] = val
@@ -680,7 +683,7 @@ def build_complex(inputDict):
             if tmp_inputDict['parameters']['debug']:
                 print('Trying with smaller scaled metal radii.')
             newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=False)
-            temp_ordered_conf_dict = build_complex_driver(newinpdict)
+            temp_ordered_conf_dict = build_complex_driver(newinpdict,in_metal=in_metal)
             newdict_append = dict()
             for key,val in temp_ordered_conf_dict.items():
                 newdict_append[key+'_smaller_scaled'] = val
