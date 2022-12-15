@@ -274,7 +274,12 @@ class Complex:
         self.initMol.atom_types[0] = copy.deepcopy(self.complexMol.ase_atoms.symbols[0])
         string = self.initMol.write_mol2('init_geo', writestring=True)
         self.init_geo_swapped_metal = copy.deepcopy(string)
-        if self.parameters['in_metal']: # Switch to the original metal.
+        if in_metal: # Switch to the original metal.
+            self.initMol.ase_atoms[0].symbol = in_metal
+            self.initMol.atom_types[0] = in_metal
+            self.complexMol.ase_atoms[0].symbol = in_metal
+            self.complexMol.atom_types[0] = in_metal
+        elif self.parameters['in_metal']: # Switch to the original metal.
             self.initMol.ase_atoms[0].symbol = self.parameters['in_metal']
             self.initMol.atom_types[0] = self.parameters['in_metal']
             self.complexMol.ase_atoms[0].symbol = self.parameters['in_metal']
@@ -284,11 +289,7 @@ class Complex:
             self.initMol.atom_types[0] = self.parameters['original_metal']
             self.complexMol.ase_atoms[0].symbol = self.parameters['original_metal']
             self.complexMol.atom_types[0] = self.parameters['original_metal']
-        elif in_metal: # Switch to the original metal.
-            self.initMol.ase_atoms[0].symbol = in_metal
-            self.initMol.atom_types[0] = in_metal
-            self.complexMol.ase_atoms[0].symbol = in_metal
-            self.complexMol.atom_types[0] = in_metal
+
 
 def gen_aligned_complex(newLigInputDicts, 
                         ligandDict,
