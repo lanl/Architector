@@ -243,7 +243,7 @@ class Complex:
             if self.parameters['debug']:
                 print("Final Evaluation - Opt Molecule/Single point")
             self.calculator = CalcExecutor(self.complexMol,parameters=self.parameters,
-                                            final_sanity_check=self.parameters['full_sanity_check'],
+                                            final_sanity_check=self.parameters['full_sanity_checks'],
                                             relax=single_point,assembly=single_point)
             if self.parameters['debug'] and (not self.calculator.successful):
                 print('Failed final relaxation. - Retrying with UFF/XTB')
