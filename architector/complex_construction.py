@@ -252,7 +252,7 @@ class Complex:
             if (not self.calculator.successful):
                 tmp_relax = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=single_point)
                 self.calculator = CalcExecutor(tmp_relax.mol,parameters=self.parameters,
-                                                final_sanity_check=self.parameters['full_sanity_check'],
+                                                final_sanity_check=self.parameters['full_sanity_checks'],
                                                 relax=single_point)
         else: # Ensure calculation object at least exists
             self.calculator = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=False)
