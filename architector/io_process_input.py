@@ -675,7 +675,7 @@ def inparse(inputDict):
             # 'n_lig_combos':1, # Number of randomized ligand conformations to run/return for each conformer -> possibly add back
             "crest_sampling":False, # Perform CREST sampling on lowest-energy conformer?
             "relax": True, # Perform xTB geomtetry relaxation of assembled complexes
-            "debug": False, # Print out addition info for debugging purposes.
+            "debug": False, # Print out additional info for debugging purposes.
             "save_init_geos": False, # Save initial geometries before relaxations with xTB.
             "seed":None, # If a seed is passed (int/float) use it to initialize np.random.seed for reproducability.
             # If you want to replicate whole workflows - set np.random.seed() at the beginning of your workflow.

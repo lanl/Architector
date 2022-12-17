@@ -16,7 +16,8 @@ setup(
         'pynauty',
         'scipy',
         'pandas',
-        'xtb-python'
+        'xtb-python',
+        'mendeleev'
     ],
     license="BSD 3-Clause License",
     classifiers=["Development Status :: 4 - Beta",
