@@ -846,7 +846,7 @@ def inparse(inputDict):
         newinpDict['parameters'] = outparams
 
         # Initialize seed.
-        if isinstance(newinpDict['parameters']['seed'],(int,float,np.float,np.int)):
+        if isinstance(newinpDict['parameters']['seed'],(int,float,np.float64,np.int64)):
             np.random.seed(int(newinpDict['parameters']['seed']))
     
         return newinpDict

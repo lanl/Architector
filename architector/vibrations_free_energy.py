@@ -104,7 +104,7 @@ def normal_mode_sample(relaxed_atoms,temp=298.15,n=10,seed=42): # T=1 produced o
                 displacement = norm_mode*r
                 displaced_posits += displacement
             out_atoms.set_positions(displaced_posits)
-            out_atoms.set_calculator(calc)
+            out_atoms.calc = calc
             try:
                 out_atoms.get_total_energy()
                 displaced_structures.append(out_atoms)

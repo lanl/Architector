@@ -159,7 +159,7 @@ metal_charge_dict = {
     # Second row transition metals 
     'Y': 3, 'Zr': 4, 'Nb': 5,  'Mo': 6, 'Tc': 5, 'Ru': 2, 'Rh': 1, 'Pd': 2, 'Ag': 1, 'Cd': 2, 
     # Third row transition metals
-    'Hf': 4, 'Ta': 5, 'W': 6,  'Re': 5, 'Os': 2, 'Ir': 3, 'Pt': 2, 'Au': 3, 'Hg': 2,
+    'Hf': 4, 'Ta': 5, 'W': 6,  'Re': 4, 'Os': 2, 'Ir': 3, 'Pt': 2, 'Au': 3, 'Hg': 2,
     # 4th row transition metals
     'Rf': 3, 'Db': 5, 'Sg': 6, 'Bh': 7, 'Hs': 8,
     # Post-transition metals
@@ -190,7 +190,7 @@ metal_spin_dict = {
     # Second row transition metals 
     'Y': 0, 'Zr': 0, 'Nb': 0,  'Mo': 0, 'Tc': 2, 'Ru': 4, 'Rh': 2, 'Pd': 0, 'Ag': 0, 'Cd': 0, 
     # Third row transition metals
-    'Hf': 0, 'Ta': 0, 'W': 0,  'Re': 0, 'Os': 0, 'Ir': 0, 'Pt': 0, 'Au': 2, 'Hg': 0,
+    'Hf': 0, 'Ta': 0, 'W': 0,  'Re': 1, 'Os': 0, 'Ir': 0, 'Pt': 0, 'Au': 2, 'Hg': 0,
     # 4th row transition metals
     'Rf': 1, 'Db': 0, 'Sg': 0, 'Bh': 0, 'Hs': 0,
     # Post-transition metals

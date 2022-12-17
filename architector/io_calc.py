@@ -207,7 +207,7 @@ class CalcExecutor:
             else:
                 raise ValueError('Warning - no known method or calculator requested.')
             if not obabel_ff_requested:
-                self.mol.ase_atoms.set_calculator(calc)
+                self.mol.ase_atoms.calc = calc
                 if self.relax:
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
