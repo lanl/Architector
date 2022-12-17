@@ -70,7 +70,7 @@ def read_conformers(fileName):
     return molList,xtb_energies
 
 def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
-                    solvent='none', read_charge_spin=False):
+                    solvent='none'):
     '''
     Find conformers of a given structure with CREST.
 
@@ -104,9 +104,9 @@ def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
     mol = io_molecule.convert_io_molecule(structure)
     if charge is not None:
         mol.charge = charge
-    elif mol.charge is None:
+    elif mol.xtb_charge is None:
         mol.detect_charge_spin()
-    mol_charge = mol.charge
+    mol_charge = mol.xtb_charge
 
     even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms])-mol_charge) % 2
     if (uhf is not None):
@@ -134,6 +134,9 @@ def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
             uhf = uhf - 1 
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
+
+    mol_charge = int(mol_charge) # Ensure integers
+    uhf = int(uhf)
 
     xyzstr = io_molecule.convert_ase_xyz(mol.ase_atoms)
 
@@ -248,6 +251,8 @@ def crest_conformers_lig(smiles,ase_atoms=None,charge=None,uhf=0,method='GFN2/GF
             uhf = uhf + 1
 
     xyzstr = io_molecule.convert_ase_xyz(ase_atoms)
+    mol_charge = int(mol_charge) # Ensure integers
+    uhf = int(uhf)
 
     with arch_context_manage.make_temp_directory() as _:
         # Write xyz file
@@ -417,7 +422,7 @@ def obmol_xtb_conformers(smiles,charge=None,uhf=0,method='GFN2-xTB',total_confs=
                                          solvent=solvent)
             fail = True
             try:
-                dyn = BFGSLineSearch(atoms)
+                dyn = BFGSLineSearch(atoms,logfile='tmp.log') # Mute output
                 dyn.run()
                 fail = False
             except:

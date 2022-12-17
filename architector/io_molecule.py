@@ -26,7 +26,8 @@ def convert_io_molecule(structure,
                         detect_charge_spin=False,
                         charge=None,
                         uhf=None,
-                        xtb_uhf=None):
+                        xtb_uhf=None,
+                        xtb_charge=None):
     """convert_io_molecule
     Handle multiple types of structures passed and convert them to architector.io_molecule.Molecule objects.
 
@@ -42,6 +43,8 @@ def convert_io_molecule(structure,
         unpaired electrons in the molecule, default None
     xtb_uhf : int, optional
         unpaired electrons in molecule for use by XTB, default None
+    xtb_charge : int, optional
+        charge used for XTB relaxation, default None
     """
     mol = Molecule()
     if isinstance(structure,(str,ase.atoms.Atoms)):
@@ -97,6 +100,8 @@ def convert_io_molecule(structure,
                 mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             if xtb_uhf is not None:
                 mol.xtb_uhf = xtb_uhf
+            if xtb_charge is not None:
+                mol.xtb_charge = xtb_charge
             return mol
     elif isinstance(structure,architector.io_molecule.Molecule):
         # struct = mol
@@ -165,7 +170,7 @@ def convert_xyz_ase(structure_str):
 class Molecule:
 
     def __init__(self, in_ase=False, BO_dict={}, atom_types=[], cell=[], charge=None,
-                uhf=None, xtb_uhf=None):
+                uhf=None, xtb_uhf=None, xtb_charge=None):
         self.dists_sane = True
         self.sanity_check_dict = {}
         if isinstance(in_ase,ase.atoms.Atoms):
@@ -174,6 +179,7 @@ class Molecule:
             self.charge = charge
             self.uhf = uhf
             self.xtb_uhf = xtb_uhf
+            self.xtb_charge = xtb_charge
             self.atom_types = atom_types
             self.cell = cell
             if len(BO_dict) > 0:
@@ -192,6 +198,7 @@ class Molecule:
             self.charge = charge
             self.uhf = uhf
             self.xtb_uhf = xtb_uhf
+            self.xtb_charge = xtb_charge
             self.cell = cell
             if len(BO_dict) > 0:
                 self.graph = np.zeros((len(self.ase_atoms),len(self.ase_atoms)))
@@ -210,7 +217,7 @@ class Molecule:
             raise ValueError('Need ase.atoms.Atoms/xyz/mol2 as input for molecule class!')
 
     def load_ase(self,in_ase, BO_dict=dict(), atom_types=[], cell=[],
-                charge=None, uhf=None, xtb_uhf=None):
+                charge=None, uhf=None, xtb_uhf=None, xtb_charge=None):
         """load_ase read in ase atoms object.
 
         Parameters
@@ -254,6 +261,10 @@ class Molecule:
             self.xtb_uhf = xtb_uhf
         else:
             self.xtb_uhf = int(np.sum(self.ase_atoms.get_initial_magnetic_moments()))
+        if xtb_charge is not None:
+            self.xtb_charge = xtb_charge
+        else: 
+            self.xtb_charge = np.sum(self.ase_atoms.get_initial_charges())
         if len(self.BO_dict) > 0:
             self.graph = np.zeros((len(self.ase_atoms),len(self.ase_atoms)))
             for key,_ in self.BO_dict.items():
@@ -312,6 +323,10 @@ class Molecule:
             self.ase_atoms = read(filename,parallel=False)
         self.graph = []
         self.BO_dict = {}
+        self.charge = None
+        self.uhf = None
+        self.xtb_charge = None
+        self.xtb_uhf = None
         self.atom_types = [x.symbol for x in self.ase_atoms]
         self.cell = []
 
@@ -345,6 +360,10 @@ class Molecule:
                     atoms.append(Atom(symbol,coords))
         self.ase_atoms = atoms
         self.graph = []
+        self.charge = None
+        self.uhf = None
+        self.xtb_charge = None
+        self.xtb_uhf = None
         self.BO_dict = {}
         self.atom_types = [x.symbol for x in self.ase_atoms]
         self.cell = []
@@ -378,7 +397,11 @@ class Molecule:
             atom_groups = [str(1)]*natoms
         charges = np.zeros(natoms)
         charge_string = 'NoCharges'
-        ss = '@<TRIPOS>MOLECULE\n{}\n'.format(filename)
+        if (self.charge is not None) and (self.uhf is not None) and (self.xtb_charge is not None) and (self.xtb_uhf is not None):
+            ss = '@<TRIPOS>MOLECULE\n{} Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} XTB_Charge: {}\n'.format(filename,
+                    int(self.charge),int(self.uhf),int(self.xtb_uhf),int(self.xtb_charge))
+        else:
+            ss = '@<TRIPOS>MOLECULE\n{}\n'.format(filename)            
         ss += ' {0:5d} {1:5d} {2:5d} {3:5d} {4:5d}\n'.format(natoms,
                                     int(csg.nnz/2), disjoint_components[0],
                                     0, 0)
@@ -485,12 +508,14 @@ class Molecule:
         charge = None
         spin = None
         xtb_spin = None
+        xtb_charge = None
         for line in s:
             # Get Atoms First
             if ('Charge:' in line) and ('Unpaired_Electrons:' in line):
-                charge = float(line.split()[1])
-                spin = int(line.split()[3])
-                xtb_spin = int(line.split()[5])
+                charge = float(line.split()[2])
+                spin = int(line.split()[4])
+                xtb_spin = int(line.split()[6])
+                xtb_charge = int(line.split()[8])
             if ('<TRIPOS>BOND' in line) or ('<TRIPOS>UNITY_ATOM_ATTR' in line):
                 read_atoms = False
             if ('<TRIPOS>SUBSTRUCTURE' in line) or ('<TRIPOS>UNITY_ATOM_ATTR' in line):
@@ -556,6 +581,7 @@ class Molecule:
         self.charge = charge
         self.uhf = spin
         self.xtb_uhf = xtb_spin
+        self.xtb_charge = xtb_charge
 
     def detect_charge_spin(self):
         """detect_charge_spin 
@@ -594,6 +620,7 @@ class Molecule:
         self.charge = int(charge)
         self.uhf = int(uhf)
         self.xtb_uhf = int(xtb_uhf)
+        self.xtb_charge = int(charge)
 
     def find_metal(self):
         """find_metal 
@@ -760,7 +787,9 @@ class Molecule:
             newkey = tuple(newkey)
             newligbodict.update({newkey:val})
         self.BO_dict.update(newligbodict)
-        self.charge += lig_ase_atoms.get_initial_charges().sum()
+        lcs = lig_ase_atoms.get_initial_charges().sum()
+        self.charge += lcs
+        self.xtb_charge += lcs
         self.ase_atoms += lig_ase_atoms
         self.atom_types += lig_atom_types
         self.create_graph_from_bo_dict()
@@ -885,7 +914,8 @@ class Molecule:
                     if isinstance(params.get('covrad_metal',False),float):
                         mrad = params['covrad_metal']
                 if np.any(np.isnan(posits)): # Any nan in positions
-                    print('Nan in positions.')
+                    if params.get('debug',False):
+                        print('Nan in positions.')
                     sane = False
                 else:
                     all_dists = atoms.get_all_distances()
@@ -959,6 +989,8 @@ class Molecule:
         # Prioritize input full charge > ase atoms charge > self.charge > metal_ox > None
         if (params.get('full_charge',None) is not None):
             charge_vect[0] = params['full_charge']
+        elif (self.charge is not None) and (self.xtb_charge != self.charge):
+            charge_vect[0] = self.charge
         elif np.any(self.ase_atoms.get_initial_charges() != 0): # Prioritize ASE atoms charge
             charge_vect = self.ase_atoms.get_initial_charges()
         elif self.charge is not None: 
@@ -976,6 +1008,10 @@ class Molecule:
                     charge_vect[0] = tmol.GetTotalCharge()
                     
         mol_charge = np.sum(charge_vect)
+        xtb_charge = copy.deepcopy(mol_charge)
+        if np.any([True for x in self.ase_atoms.get_chemical_symbols() if x in io_ptable.heavy_metals]) and \
+            ((params.get('metal_ox', None) is not None)):
+            xtb_charge = mol_charge + (3-params.get('metal_ox', None))
 
         # Handle spin / magnetism
         even_odd_electrons = (np.sum([atom.number for atom in self.ase_atoms])-mol_charge) % 2
@@ -1005,20 +1041,21 @@ class Molecule:
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
 
-        uhf_start = np.zeros(len(self.ase_atoms))
+        xtb_uhf = 0
         if not np.any([True for x in self.ase_atoms.get_chemical_symbols() if x in io_ptable.heavy_metals]):
-            uhf_start[0] = uhf
+            xtb_uhf = uhf
         else: # F in core assumes for a 3+ lanthanide there are 11 valence electrons (8 once the 3+ is taken into account)
             even_odd_electrons = (np.sum([atom.number for atom in self.ase_atoms]))
             even_odd_electrons = even_odd_electrons - \
-                io_ptable.elements.index(self.ase_atoms.get_chemical_symbols()[metals[0]]) + 11 - mol_charge
+                io_ptable.elements.index(self.ase_atoms.get_chemical_symbols()[metals[0]]) + 11 - xtb_charge
             even_odd_electrons = even_odd_electrons % 2
             if (even_odd_electrons == 0):
-                uhf_start[0] = 0
+                xtb_uhf = 0
             else:
-                uhf_start[0] = 1
+                xtb_uhf = 1
         
         # Assign to complex
         self.charge = mol_charge
         self.uhf = uhf
-        self.xtb_uhf = int(np.sum(uhf_start))
+        self.xtb_uhf = xtb_uhf
+        self.xtb_charge = xtb_charge

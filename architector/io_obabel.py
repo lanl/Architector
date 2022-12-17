@@ -416,10 +416,10 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
                              functionalizations=functionalizations)
     mmff94_ok = check_mmff_okay(obmol)
     if mmff94_ok:
-        FF = ob.OBForceField_FindType( "mmff94" )
+        FF = ob.OBForceField.FindForceField("MMFF94")
         FF.Setup(obmol) # Make sure setup works OK
     else:
-        FF = ob.OBForceField_FindType( "UFF" )
+        FF = ob.OBForceField.FindForceField("MMFF94")
         FF.Setup(obmol) # Make sure setup works OK
     FF.DiverseConfGen(rmsd_cutoff, conf_cutoff, energy_cutoff, confab_verbose)
     FF.GetConformers(obmol)
@@ -860,12 +860,11 @@ def obmol_lig_split(mol2string,return_info=False,calc_coord_atoms=True):
                 ligobmol.AddBond(start_ind,end_ind,bo_dict[k])
         ligobmol.PerceiveBondOrders()
         # Key block for catching where coordinating atoms were deprotonated
+        ### WORKING -> Does not work great for nitrogen compounds.
         for l, atom in enumerate(ob.OBMolAtomIter(ligobmol)):
-            total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetExplicitValence())
-            if (total_val not in io_ptable.filled_valence_electrons) and \
-                (l in coord_atom_list):
-                close = np.min(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
-                atom.SetFormalCharge(int(atom.GetFormalCharge()-close))
+            total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
+            close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
+            atom.SetFormalCharge(int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val)))
         new_smiles = get_smiles_obmol(ligobmol,canonicalize=True)
         ligand_smiles.append(new_smiles)
         if calc_coord_atoms:

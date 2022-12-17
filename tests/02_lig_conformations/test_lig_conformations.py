@@ -56,7 +56,6 @@ class Test03LigConfirmations1(unittest.TestCase):
                 test['ligcoordList'],
                 test['corecoordList'],
                 metal=test['metal'],
-                seed=42
             )
             out.append(outatoms)
 
@@ -111,7 +110,6 @@ class Test03LigConfirmations1(unittest.TestCase):
 #                 test['ligcoordList'],
 #                 test['corecoordList'],
 #                 metal=test['metal'],
-#                 seed=43
 #             )
 #             out.append(outatoms)
 
@@ -165,7 +163,6 @@ class Test03LigConfirmations3(unittest.TestCase):
                 test['ligcoordList'],
                 test['corecoordList'],
                 metal=test['metal'],
-                seed=43
             )
             out.append(outatoms)
 
@@ -218,7 +215,6 @@ class Test03LigConfirmations4(unittest.TestCase):
                 test['ligcoordList'],
                 test['corecoordList'],
                 metal=test['metal'],
-                seed=43
             )
             out.append(outatoms)
 
@@ -271,7 +267,6 @@ class Test03LigConfirmations4(unittest.TestCase):
 #                 test['ligcoordList'],
 #                 test['corecoordList'],
 #                 metal=test['metal'],
-#                 seed=43
 #             )
 #             out.append(outatoms)
 
@@ -319,7 +314,6 @@ class Test03LigConfirmations6(unittest.TestCase):
                 test['ligcoordList'],
                 test['corecoordList'],
                 metal=test['metal'],
-                seed=43
             )
             out.append(outatoms)
 

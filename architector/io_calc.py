@@ -27,6 +27,7 @@ params={
 "ase_atoms_db_name": 
     'architector_ase_db.json',
 "temp_prefix":"/tmp/",
+"ase_db_tmp_name":"/tmp/architector_ase_db.json",
 # Cutoff parameters
 "assemble_sanity_checks":True, # Turn on/off assembly sanity checks.
 "assemble_graph_sanity_cutoff":1.8,
@@ -60,6 +61,7 @@ params={
 "vdwrad_metal":None,
 "covrad_metal":None,
 "scaled_radii_factor":None,
+"force_generation":False,
 "debug":False,
 }
 
@@ -119,7 +121,6 @@ class CalcExecutor:
 
         self.in_struct = structure
         self.mol = io_molecule.convert_io_molecule(structure)
-        self.uhf_xtb = None
         self.method = method
         default_params = params.copy()
         default_params.update(parameters)
@@ -136,6 +137,7 @@ class CalcExecutor:
         self.fmax = fmax
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
+        self.force_generation = False
         
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
@@ -182,7 +184,7 @@ class CalcExecutor:
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
-                charge_vect[0] = self.mol.charge
+                charge_vect[0] = self.mol.xtb_charge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif 'gfn' in self.method.lower():
@@ -190,10 +192,14 @@ class CalcExecutor:
                            max_iterations=self.xtb_max_iterations,
                            electronic_temperature=self.xtb_electronic_temperature,
                            accuracy=self.xtb_accuracy)
+                if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
+                    self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
+                    if self.assembly: # FF more stable for highly charged assembly complexes.
+                        self.method = 'GFN-FF'
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.xtb_uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
-                charge_vect[0] = self.mol.charge
+                charge_vect[0] = self.mol.xtb_charge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif ('uff' in self.method.lower()) or ('mmff' in self.method.lower()):
@@ -201,7 +207,7 @@ class CalcExecutor:
             else:
                 raise ValueError('Warning - no known method or calculator requested.')
             if not obabel_ff_requested:
-                self.mol.ase_atoms.set_calculator(calc)
+                self.mol.ase_atoms.calc = calc
                 if self.relax:
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
@@ -280,6 +286,15 @@ class CalcExecutor:
                         self.errors.append(e)
                         if self.parameters['debug']:
                             print('Warning - method did not converge!',e)
+            if (not self.successful) and (self.force_generation):
+                try:
+                    self.energy = io_obabel.obmol_energy(self.mol)
+                    self.init_energy = copy.deepcopy(self.energy)
+                    self.successful = True
+                except Exception as e:
+                    self.errors.append(e)
+                    if self.parameters['debug']:
+                        print('Warning - method did not converge!',e)
             self.calc_time = time.time() - self.calc_time
             self.done = True
         else:
@@ -288,6 +303,11 @@ class CalcExecutor:
         if self.final_sanity_check:
             self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
+
+        # Reset structure to inital state to avoid nans in output structures.
+        if np.any(np.isnan(self.mol.ase_atoms.get_positions())):
+            self.mol = io_molecule.convert_io_molecule(self.in_struct)
+            self.mol.calc_suggested_spin(params=self.parameters)
         
         if self.parameters['save_trajectories'] and (self.trajectory is not None):
             self.dump_traj()

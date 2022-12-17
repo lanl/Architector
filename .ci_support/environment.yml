@@ -13,3 +13,4 @@ dependencies:
   - pandas
   - pynauty
   - tqdm
+  - mendeleev

@@ -8,6 +8,7 @@ Developed by Dan Burrill and Michael Taylor
 import copy
 import time
 import numpy as np
+import shutil
 from collections import OrderedDict
 
 import architector.io_process_input as io_process_input
@@ -18,7 +19,6 @@ import architector.io_molecule as io_molecule
 import architector.io_align_mol as io_align_mol
 import architector.io_crest as io_crest
 import architector.io_symmetry as io_symmetry
-import architector.arch_context_manage as arch_context_manage
 
 from architector.io_calc import CalcExecutor
 
@@ -64,7 +64,7 @@ class Ligand:
         # Generate conformations
         if debug:
             print("GENERATING CONFORMATIONS for {}".format(smiles))
-        conformers, rotscores, tligcoordList, relax, bo_dict, atypes = io_lig.find_conformers(self.smiles, 
+        conformers, rotscores, tligcoordList, relax, bo_dict, atypes, rotlist = io_lig.find_conformers(self.smiles, 
                                                         self.ligcoordList, 
                                                         self.corecoordList, 
                                                         metal=self.metal,
@@ -76,6 +76,7 @@ class Ligand:
         if len(conformers) > 0:
             self.conformerList = conformers
             self.conformerRotScore = rotscores
+            self.rotList = rotlist
             self.out_ligcoordLists = tligcoordList
             self.selectedConformer = self.conformerList[0]
             self.exists = True 
@@ -92,6 +93,7 @@ class Ligand:
             self.relax = False
             self.conformerList = []
             self.out_ligcoordLists = []
+            self.rotLists = []
             self.selectedConformer = None
             self.liggen_end_time = time.time()
             self.BO_dict = dict()
@@ -210,7 +212,7 @@ class Complex:
             tmp_molecule.append_ligand({'ase_atoms':conformer,'bo_dict':ligand.BO_dict, 
                             'atom_types':ligand.atom_types})
             if self.parameters['debug']:
-                print(tmp_molecule.write_mol2('cool{}.xyz'.format(i),writestring=True))
+                print(tmp_molecule.write_mol2('cool{}.mol2'.format(i),writestring=True))
             out_eval = CalcExecutor(tmp_molecule,assembly=True, 
                                     parameters=self.parameters,
                                     init_sanity_check=True)
@@ -241,7 +243,8 @@ class Complex:
             if self.parameters['debug']:
                 print("Final Evaluation - Opt Molecule/Single point")
             self.calculator = CalcExecutor(self.complexMol,parameters=self.parameters,
-                                            final_sanity_check=True,relax=single_point,assembly=single_point)
+                                            final_sanity_check=self.parameters['full_sanity_checks'],
+                                            relax=single_point,assembly=single_point)
             if self.parameters['debug'] and (not self.calculator.successful):
                 print('Failed final relaxation. - Retrying with UFF/XTB')
                 print(self.initMol.write_mol2('cool.mol2', writestring=True))
@@ -249,7 +252,11 @@ class Complex:
             if (not self.calculator.successful):
                 tmp_relax = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=single_point)
                 self.calculator = CalcExecutor(tmp_relax.mol,parameters=self.parameters,
-                                                final_sanity_check=True,relax=single_point)
+                                                final_sanity_check=self.parameters['full_sanity_checks'],
+                                                relax=single_point)
+        else: # Ensure calculation object at least exists
+            self.calculator = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=False)
+            self.calculator.successful = False
         self.final_end_time = time.time()
         self.final_eval_total_time = self.final_end_time - self.final_start_time
         if self.calculator:
@@ -267,7 +274,12 @@ class Complex:
         self.initMol.atom_types[0] = copy.deepcopy(self.complexMol.ase_atoms.symbols[0])
         string = self.initMol.write_mol2('init_geo', writestring=True)
         self.init_geo_swapped_metal = copy.deepcopy(string)
-        if self.parameters['in_metal']: # Switch to the original metal.
+        if in_metal: # Switch to the original metal.
+            self.initMol.ase_atoms[0].symbol = in_metal
+            self.initMol.atom_types[0] = in_metal
+            self.complexMol.ase_atoms[0].symbol = in_metal
+            self.complexMol.atom_types[0] = in_metal
+        elif self.parameters['in_metal']: # Switch to the original metal.
             self.initMol.ase_atoms[0].symbol = self.parameters['in_metal']
             self.initMol.atom_types[0] = self.parameters['in_metal']
             self.complexMol.ase_atoms[0].symbol = self.parameters['in_metal']
@@ -277,11 +289,7 @@ class Complex:
             self.initMol.atom_types[0] = self.parameters['original_metal']
             self.complexMol.ase_atoms[0].symbol = self.parameters['original_metal']
             self.complexMol.atom_types[0] = self.parameters['original_metal']
-        elif in_metal: # Switch to the original metal.
-            self.initMol.ase_atoms[0].symbol = in_metal
-            self.initMol.atom_types[0] = in_metal
-            self.complexMol.ase_atoms[0].symbol = in_metal
-            self.complexMol.atom_types[0] = in_metal
+
 
 def gen_aligned_complex(newLigInputDicts, 
                         ligandDict,
@@ -345,12 +353,21 @@ def gen_aligned_complex(newLigInputDicts,
             ligandCopy.corecoordList = coreCoordList # DO NOT DELETE THIS LINE
             newligconfList = []
             ligconfVals = []
-            for i,lig in enumerate(ligandCopy.conformerList):
-                new_ligcoordList = [[val[0],ligandCopy.ligcoordList[i][1]] for i,val in enumerate(ligandCopy.out_ligcoordLists[i])]
-                newconf, rotscore, sane = io_lig.set_position_align(lig, 
-                                                            new_ligcoordList, 
-                                                            ligandCopy.corecoordList,
-                                                            debug=inputDict['parameters']['debug'])
+            for j,lig in enumerate(ligandCopy.conformerList):
+                new_ligcoordList = [[val[0],ligandCopy.ligcoordList[k][1]] for k,val in enumerate(ligandCopy.out_ligcoordLists[j])]
+                rot_angle = ligandCopy.rotList[j]
+                if rot_angle != 0: # Apply same rotations.
+                    newconf, rotscore, sane = io_lig.set_position_align(lig, 
+                                                    new_ligcoordList, 
+                                                    ligandCopy.corecoordList,
+                                                    debug=inputDict['parameters']['debug'],
+                                                    rot_coord_vect=True,
+                                                    rot_angle=rot_angle)
+                else:
+                    newconf, rotscore, sane = io_lig.set_position_align(lig, 
+                                                                        new_ligcoordList, 
+                                                                        ligandCopy.corecoordList,
+                                                                        debug=inputDict['parameters']['debug'])
                 if sane:
                     ligconfVals.append(rotscore)
                     newligconfList.append(newconf)
@@ -491,7 +508,7 @@ def complex_driver(inputDict1,in_metal=False):
                         if inputDict['parameters']['debug']:
                             print('Complex Distances Sane: ', tmp_conformer.complexMol.dists_sane)
                         spin_n_unpaired = np.sum(tmp_conformer.complexMol.xtb_uhf)
-                        tot_charge = np.sum(tmp_conformer.complexMol.charge)
+                        tot_charge = np.sum(tmp_conformer.complexMol.xtb_charge)
                         if tmp_conformer.calculator is not None:
                             if tmp_conformer.complexMol.dists_sane and tmp_conformer.calculator.successful: # Check sanity after
                                 conf_dict.update({coreType + '_' + str(ind) + '_nunpairedes_' + \
@@ -499,6 +516,7 @@ def complex_driver(inputDict1,in_metal=False):
                                 if inputDict['parameters']['return_only_1']:
                                         return conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1
                             elif tmp_conformer.initMol.dists_sane and inputDict['parameters']['save_init_geos']:
+                                tmp_conformer.calculator.energy = 10000 # Set to high energy.
                                 conf_dict.update({coreType + '_' + str(ind) + '_nunpairedes_' + \
                                     str(int(spin_n_unpaired))+'_charge_'+str(int(tot_charge))+'_init_only':tmp_conformer})
                                 if inputDict['parameters']['return_only_1']:
@@ -550,13 +568,11 @@ def build_complex_driver(inputDict1,in_metal=False):
             val.swap_metals_back(in_metal=in_metal)
             structs.append(val)
             if inputDict['parameters']['save_init_geos']:
-                init_mol2strings.append(val.initMol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} Key: {} .mol2'.format(
-                int(val.complexMol.charge), int(val.complexMol.uhf), int(val.complexMol.xtb_uhf), key), writestring=True))
+                init_mol2strings.append(val.initMol.write_mol2('{}'.format(key), writestring=True))
             else:
                 init_mol2strings.append(None)
             energy_sorted_inds.append(val.index) # Save energy sorted index for reference.
-            mol2strings.append(val.complexMol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} Key: {} .mol2'.format(
-                int(val.complexMol.charge), int(val.complexMol.uhf), int(val.complexMol.xtb_uhf), key), writestring=True))
+            mol2strings.append(val.complexMol.write_mol2('{}'.format(key), writestring=True))
         order = np.argsort(xtb_energies)
         # Iterate through all structures and check/remove duplicate structures.
         # Remove extra classes that we don't need to persist
@@ -566,6 +582,9 @@ def build_complex_driver(inputDict1,in_metal=False):
             iscopy = False
             if (ind > 0) and (not inputDict['parameters']['skip_duplicate_tests']): # Check for copies
                 for key,val in ordered_conf_dict.items():
+                    # if ('_init_only' in key) or ('_init_only' in keys[i]): # Do not do duplicate test on init_only structures.
+                    #     continue
+                    # else:
                     _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'],coresize=10)
                     if (rmsd_full < 0.5):
                         iscopy = True
@@ -578,6 +597,7 @@ def build_complex_driver(inputDict1,in_metal=False):
                     ordered_conf_dict[keys[i]] = {'ase_atoms':structs[i].complexMol.ase_atoms,
                             'total_charge':int(structs[i].complexMol.charge),
                             'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
+                            'xtb_total_charge':int(structs[i].complexMol.xtb_charge),
                             'calc_n_unpaired_electrons': structs[i].complexMol.uhf,
                             'metal_ox':inputDict['parameters']['metal_ox'],
                             'init_energy':structs[i].calculator.init_energy,
@@ -591,6 +611,7 @@ def build_complex_driver(inputDict1,in_metal=False):
                         'total_charge':int(structs[i].complexMol.charge),
                         'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
                         'calc_n_unpaired_electrons': structs[i].complexMol.uhf,
+                        'xtb_total_charge':int(structs[i].complexMol.xtb_charge),
                         'metal_ox':inputDict['parameters']['metal_ox'],
                         'init_energy':structs[i].calculator.init_energy,
                         'energy':xtb_energies[i],
@@ -636,6 +657,7 @@ def build_complex(inputDict):
     ordered_conf_dict = build_complex_driver(inputDict)
     # Try larger radii generation for multidentate complexes if no complexes generated in an attempt to get at high-spin
     # > Covalent radii typically understimated for higher spin conformations
+    in_metal = inputDict['parameters']['original_metal']
     if 'mol2string' in inputDict:
         tmp_inputDict = io_process_input.inparse(inputDict)
     else:
@@ -643,35 +665,35 @@ def build_complex(inputDict):
     if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) == 0) and \
        (max([len(x['coordList']) for x in tmp_inputDict['ligands']]) > 2):
         newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=True) # Run with larger radii
-        if inputDict['parameters']['debug']:
+        if tmp_inputDict['parameters']['debug']:
             print('Trying with larger scaled metal radii.')
-        temp_ordered_conf_dict = build_complex_driver(newinpdict)
+        temp_ordered_conf_dict = build_complex_driver(newinpdict,in_metal=in_metal)
         newdict_append = dict()
         for key,val in temp_ordered_conf_dict.items():
             newdict_append[key+'_larger_scaled'] = val
         ordered_conf_dict.update(newdict_append)
         if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) > 0):
             try_smaller = False
-            if inputDict['parameters']['debug']:
+            if tmp_inputDict['parameters']['debug']:
                 print('Succeeded with larger scaled metal radii!')
         else:
             try_smaller=True
-            if inputDict['parameters']['debug']:
+            if tmp_inputDict['parameters']['debug']:
                 print('No possible structures for this structure even with larger radii structure.')
         if try_smaller: # Run with smaller radii
-            if inputDict['parameters']['debug']:
+            if tmp_inputDict['parameters']['debug']:
                 print('Trying with smaller scaled metal radii.')
             newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=False)
-            temp_ordered_conf_dict = build_complex_driver(newinpdict)
+            temp_ordered_conf_dict = build_complex_driver(newinpdict,in_metal=in_metal)
             newdict_append = dict()
             for key,val in temp_ordered_conf_dict.items():
                 newdict_append[key+'_smaller_scaled'] = val
             ordered_conf_dict.update(newdict_append)
             if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) > 0):
-                if inputDict['parameters']['debug']:
+                if tmp_inputDict['parameters']['debug']:
                     print('Succeeded with smaller scaled metal radii!')
             else:
-                if inputDict['parameters']['debug']:
+                if tmp_inputDict['parameters']['debug']:
                     print('No possible structures for this structure even with smaller radii structure.')
     # Final Reorder
     if len(ordered_conf_dict) > 0:
@@ -685,18 +707,21 @@ def build_complex(inputDict):
             vals.append(val)
         order = np.argsort(xtb_energies)
         for j,i in enumerate(order):
-            if tmp_inputDict['parameters']['crest_sampling'] and j == 0: # Run crest sampling on lowest energy isomer!
+            if tmp_inputDict['parameters']['crest_sampling'] and (j == 0): # Run crest sampling on lowest energy isomer!
                 samples,energies = io_crest.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['xtb_solvent'])
                 vals[i].update({'crest_conformers':samples,'crest_energies':energies})
                 vals[i].update({'energy':min(energies)})
                 tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
                 posits = io_molecule.convert_io_molecule(samples[0]).ase_atoms.get_positions()
                 tmpmol.ase_atoms.set_positions(posits)
-                vals[i].update({'mol2string':tmpmol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} .mol2'.format(
-                        int(tmpmol.charge),int(tmpmol.uhf),int(tmpmol.xtb_uhf)), writestring=True)})
+                vals[i].update({'mol2string':tmpmol.write_mol2('Crest_Min_Energy', writestring=True)})
             out_ordered_conf_dict[keys[i]] = vals[i]
     else:
         out_ordered_conf_dict = dict()
+    # At the end move the .json files generated to the cwd -> done to save time!
+    if tmp_inputDict['parameters']['save_trajectories'] or tmp_inputDict['parameters']['dump_ase_atoms']:
+        shutil.copy(tmp_inputDict['parameters']['ase_db_tmp_name'],
+                tmp_inputDict['parameters']['ase_atoms_db_name'])
     return out_ordered_conf_dict
 
 def build_complex_2D(inputDict):
@@ -775,18 +800,24 @@ def build_complex_2D(inputDict):
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
     xtb_unpaired_electrons = copy.copy(uhf)
+    xtb_charge = copy.copy(mol_charge)
 
     if f_in_core: # F in core assumes for a 3+ lanthanide with 11 valence electrons for XTB
+        xtb_charge = charge + (3 - inputDict['parameters']['metal_ox'])
         even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms]))
-        even_odd_electrons = even_odd_electrons - io_ptable.elements.index(metals[0]) + 11 - mol_charge
+        even_odd_electrons = even_odd_electrons - io_ptable.elements.index(metals[0]) + 11 - xtb_charge
         even_odd_electrons = even_odd_electrons % 2
         if (even_odd_electrons == 0):
             xtb_unpaired_electrons = 0
         else:
             xtb_unpaired_electrons = 1
 
-    return {'mol2string':mol.write_mol2('Charge: {} Unpaired_Electrons: {} XTB_Unpaired_Electrons: {} .mol2'.format(
-        int(charge),int(uhf),int(xtb_unpaired_electrons)), writestring=True),'input_dict':inputDict}
+    mol.xtb_uhf = xtb_unpaired_electrons
+    mol.xtb_charge = xtb_unpaired_electrons
+    mol.uhf = uhf
+    mol.charge = mol_charge
+
+    return {'mol2string':mol.write_mol2('2D_Mol:', writestring=True),'input_dict':inputDict}
 
 # Main
 if (__name__ == '__main__'):

@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 import uuid
 import copy
+import os
+import mendeleev
 from ase.db import connect
 
 def isnotebook():
@@ -630,9 +632,33 @@ def inparse(inputDict):
             if good:
                 coreTypes_run.append(coreType)
 
-        coreTypes = coreTypes_run
-        if len(coreTypes) == 0:
+        if len(coreTypes_run) == 0:
             print('Warning: No structures generated! No Coretype/ligand type match.')
+            print('Attempting ligand type assignment')
+            new_liglist = []
+            for tligdict in newinpDict['ligands']:
+                tmp_ligType = assign_ligType_bruteforce(core_geo_class, tligdict['smiles'], tligdict['coordList'], 
+                                        tmetal, covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
+                tligdict.update({'ligType': tmp_ligType})
+                new_liglist.append(tligdict)
+            newinpDict['ligands'] = newliglist
+            coreTypes_run = []
+            for coreType in coreTypes:
+                good = True
+                for lig in newinpDict['ligands']: # Check that all ligands can map to this geometry
+                    if lig['ligType'] == 'mono':
+                        good = True
+                    elif (coreType not in core_geo_class.liglist_geo_map_dict[lig['ligType']].keys()):
+                        good=False
+                if good:
+                    coreTypes_run.append(coreType)
+        
+        # Reset coreTypes             
+        coreTypes = coreTypes_run
+
+        if len(coreTypes) == 0:
+            print("Warning: No structures generated! Still couldn't map the ligands to the core")
+
         
         # Store saved info
         newinpDict['coreTypes'] = coreTypes
@@ -649,8 +675,11 @@ def inparse(inputDict):
             # 'n_lig_combos':1, # Number of randomized ligand conformations to run/return for each conformer -> possibly add back
             "crest_sampling":False, # Perform CREST sampling on lowest-energy conformer?
             "relax": True, # Perform xTB geomtetry relaxation of assembled complexes
-            "debug": False, # Print out addition info for debugging purposes.
+            "debug": False, # Print out additional info for debugging purposes.
             "save_init_geos": False, # Save initial geometries before relaxations with xTB.
+            "seed":None, # If a seed is passed (int/float) use it to initialize np.random.seed for reproducability.
+            # If you want to replicate whole workflows - set np.random.seed() at the beginning of your workflow.
+            ### OPENBABEL STILL HAS RANDOMNESS
             "save_trajectories": False, # Save full relaxation trajectories from xTB to the ase db.
             "return_timings":True, # Return all the timings.
             "return_full_complex_class":False, # Return the complex class containing all ligand geometry and core information.
@@ -706,6 +735,8 @@ def inparse(inputDict):
             "assemble_method":"GFN2-xTB", # Which method to use for assembling conformers. 
             "fmax":0.1, # eV/Angstrom - max force for relaxation.
             "maxsteps":1000, # Steps involved in relaxation
+            "force_generation":False, # Whether to force the construction to proceed without xtb energies - defaults to UFF
+            # In cases of XTB outright failure.
             # For very large speedup - use GFN-FF, though this is much less stable (especially for Lanthanides)
             # Or UFF
 
@@ -724,6 +755,15 @@ def inparse(inputDict):
         #     default_parameters['assemble_method'] = 'GFN-FF'
 
         outparams.update(default_parameters) 
+        # If acinide default to forcing trans oxos if 2 present (actinyls)
+        # Can still be turned off if desired.
+        if newinpDict['parameters']['is_actinide']:
+            count = 0 
+            for lig in newinpDict['ligands']:
+                if lig['smiles'] == '[O-2]':
+                    count += 1
+            if count == 2:
+                newinpDict['parameters']['force_trans_oxos'] = True
 
         if ('parameters' in newinpDict): # Load input parameters as changes to the defaults.
             if isinstance(newinpDict['parameters'],dict):
@@ -737,10 +777,16 @@ def inparse(inputDict):
             outparams['n_conformers'] = 50
             outparams['n_symmetries'] = 50
 
+        if outparams['force_generation']:
+            # Graph Sanity cutoff for imposed molecular graph represents the maximum elongation of bonds
+            # rcov1*full_graph_sanity_cutoff is the maximum value for the bond lengths.
+            outparams["assemble_smallest_dist_cutoff"] = 0.7 # Force this to be tighter if no optimization done.
+            outparams["full_smallest_dist_cutoff"] = 0.7 # Force this to be tighter if no optimization done.
+
         # Make looser final cutoff allowances for graph distances for alkali and alkali earth metals
         # Tend to form more ionic bonds that may get elongated.
         if newinpDict['core']['metal'] in io_ptable.alkali_and_alkaline_earth:
-            outparams['full_graph_sanity_cutoff'] = 1.65 
+            outparams['full_graph_sanity_cutoff'] = 1.8
 
         # Push out full graph sanity for cp rings.
         if any([True for x in newinpDict['ligands'] if (x['ligType'] == 'sandwich')]):
@@ -768,18 +814,24 @@ def inparse(inputDict):
         if outparams['metal_ox'] is None:
             outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
         if outparams['metal_spin'] is None:
-            outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
+            if outparams['metal_ox'] != io_ptable.metal_charge_dict[metal]:
+                # Calculate from mendeleev reference - Generally aufbau.
+                outparams['metal_spin'] = mendeleev.__dict__[newinpDict['core']['metal']].ec.ionize(outparams['metal_ox']).unpaired_electrons()
+            else: # Otherwise use refdict.
+                outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
+
         if outparams['alternate_metal_spin'] is None:
             if metal in io_ptable.second_choice_metal_spin_dict:
                 outparams['alternate_metal_spin'] = io_ptable.second_choice_metal_spin_dict[metal]
 
         # Connect to ase database
+        outparams['ase_db_tmp_name'] = os.path.join(outparams['temp_prefix'],outparams['ase_atoms_db_name'])
         if outparams['dump_ase_atoms']:
-            db = connect(outparams['ase_atoms_db_name'], serial=True)
+            db = connect(outparams['ase_db_tmp_name'], serial=True)
             outparams['ase_db'] = db
         elif outparams['save_trajectories']:
             outparams['dump_ase_atoms'] = True
-            db = connect(outparams['ase_atoms_db_name'], serial=True)
+            db = connect(outparams['ase_db_tmp_name'], serial=True)
             outparams['ase_db'] = db
         else:
             outparams['ase_db'] = None
@@ -792,6 +844,10 @@ def inparse(inputDict):
         # # Load logger
         # if outparams['logg']
         newinpDict['parameters'] = outparams
+
+        # Initialize seed.
+        if isinstance(newinpDict['parameters']['seed'],(int,float,np.float64,np.int64)):
+            np.random.seed(int(newinpDict['parameters']['seed']))
     
         return newinpDict
     else:
@@ -1080,7 +1136,11 @@ def inparse_2D(inputDict):
         if outparams['metal_ox'] is None:
             outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
         if outparams['metal_spin'] is None:
-            outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
+            if outparams['metal_ox'] != io_ptable.metal_charge_dict[metal]:
+                # Calculate from mendeleev reference - Generally aufbau.
+                outparams['metal_spin'] = mendeleev.__dict__[newinpDict['core']['metal']].ec.ionize(outparams['metal_ox']).unpaired_electrons()
+            else: # Otherwise use refdict.
+                outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
        
         ####### Add in missing ligands
         # Take the average of the coreTypes
