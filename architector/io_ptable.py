@@ -247,6 +247,36 @@ second_choice_metal_spin_dict = {
     # 'Fr': 0, 'Ra': 0
     }
 
+metal_CN_dict = {
+    # Lanthanides
+    'La': [7,8,9], 'Ce': [7,8,9], 'Pr': [7,8,9], 'Nd': [7,8,9], 'Pm': [7,8,9], 'Sm': [7,8,9], 'Eu': [7,8,9], 'Gd': [7,8,9], 'Tb': [7,8,9], 'Dy': [7,8,9],
+    'Ho': [7,8,9], 'Er': [7,8,9], 'Tm': [7,8,9], 'Yb': [7,8,9], 'Lu': [7,8,9],
+    # Actinides
+    'Ac': [7,8,9], 'Th': [7,8,9], 'Pa': [7,8,9], 'U': [7,8,9], 'Np': [7,8,9], 'Pu': [7,8,9], 'Am': [7,8,9], 'Cm': [7,8,9], 'Bk': [7,8,9], 'Cf': [7,8,9],
+    'Es': [7,8,9], 'Fm': [7,8,9], 'Md': [7,8,9], 'No': [7,8,9], 'Lr': [7,8,9],
+    # First row transition metals 
+    'Sc': [4,6], 'Ti': [4,6], 'V': [4,6],  'Cr': [4,6], 'Mn': [4,6], 'Fe': [4,6], 'Co': [4,6], 'Ni': [4,6], 'Cu': [4,6], 'Zn': [4,6], 
+    # Second row transition metals 
+    'Y': [4,6], 'Zr': [4,6], 'Nb': [4,6],  'Mo': [4,6], 'Tc': [4,6], 'Ru': [4,6], 'Rh': [4,6], 'Pd': [4,6], 'Ag': [4,6], 'Cd': [4,6], 
+    # Third row transition metals
+    'Hf': [4,6], 'Ta': [4,6], 'W': [4,6],  'Re': [4,6], 'Os': [4,6], 'Ir': [4,6], 'Pt': [4,6], 'Au': [4,6], 'Hg': [4,6],
+    # 4th row transition metals
+    'Rf': [4,6], 'Db': [4,6], 'Sg': [4,6], 'Bh': [4,6], 'Hs': [4,6],
+    # Post-transition metals
+    'Al': [4,6],
+    'Ga': [4,6],
+    'In': [4,6], 'Sn': [4,6],
+    'Tl': [4,6], 'Pb': [4,6], 'Bi': [4,6], 
+    'Nh': [4,6], 'Fl': [4,6], 'Mc': [4,6], 'Lv': [4,6],
+    # Alkali/earth metals
+    'Li': [4,6,8], 'Be': [4,6,8], 
+    'Na': [4,6,8], 'Mg': [4,6,8], 
+    'K': [4,6,8], 'Ca': [4,6,8], 
+    'Rb': [4,6,8], 'Sr': [4,6,8], 
+    'Cs': [4,6,8], 'Ba': [4,6,8], 
+    'Fr': [4,6,8], 'Ra': [4,6,8]
+    }
+
 # GFN2-xTB single atom energies see io_xtb_calc.calc_xtb_ref_dict for reference.
 xtb_single_atom_ref_es = {'H': -10.707211383396714, 
  'He': -47.432891698445495,

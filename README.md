@@ -63,11 +63,12 @@ inputDict = {
     "coreType": None, 
     # e.g. 'octahedral' ....
     # or list of coreTypes - e.g. ['octahedral','trigonal_prismatic','tetrahedral']
-    "coreCN": 6 (SUGGETED!)
+    "coreCN": 6 #(SUGGETED!)
     # Core coordination number (CN) (int)
     # Will calculate all possible geometries with the given coreCN 
     # Tends to sample the metal space better than other options.
     # OR list of CNs [4,6] -> Will calculate all possible geometries with these CNs.
+    # NOTE that if nothing is passed, a list of common coreCNs will be used to attempt structure generation.
     }, 
 ############## Ligands  list and optional definitions ####################
 # Requires either smiles and metal-coordinating site definitions or default ligand names  #

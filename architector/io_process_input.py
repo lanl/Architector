@@ -385,6 +385,10 @@ def inparse(inputDict):
                     coreTypes += core_geo_class.cn_geo_dict[6]
                 else:
                     raise ValueError('Unrecognized type passed to inputDict["core"]["coreCN"] - need list/int/float/None/bool.')
+            else: # Use default list of CNs to generate complexes.
+                core_geo_class = io_core.Geometries()
+                for x in io_ptable.metal_CN_dict[metal]:
+                    coreTypes += core_geo_class.cn_geo_dict[x]
             # Catch cases where no coretypes known.
             if len(coreTypes) == 0:
                 raise ValueError('No coreTypes defined!!!!!!')
@@ -962,6 +966,11 @@ def inparse_2D(inputDict):
                 coreTypes += core_geo_class.cn_geo_dict[6]
             else:
                 raise ValueError('Unrecognized type passed to inputDict["core"]["coreCN"] - need list/int/float/None/bool.')
+        else: # Use default list of CNs to generate complexes.
+            core_geo_class = io_core.Geometries()
+            for x in io_ptable.metal_CN_dict[metal]:
+                coreTypes += core_geo_class.cn_geo_dict[x]
+
         # Catch cases where no coretypes known.
         if len(coreTypes) == 0:
             raise ValueError('No coreTypes defined!!!!!!')
