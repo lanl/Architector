@@ -26,7 +26,6 @@ jobs:
         channel-priority: strict
         activate-environment: my-env
         use-mamba: true
-        miniforge-variant: Mambaforge
     - name: Update environment
       shell: bash -l {0}
       run: mamba env update -n my-env -f environment.yml
