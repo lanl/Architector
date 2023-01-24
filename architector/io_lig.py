@@ -1723,7 +1723,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             if debug:
                 print('Failed sanity checks after rotation!')
         
-        # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
+        # Add N+2 with the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
