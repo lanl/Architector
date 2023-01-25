@@ -18,7 +18,7 @@ jobs:
     - name: Setup environment
       run: cp .ci_support/environment.yml environment.yml
     - name: Setup Mambaforge
-      uses: conda-incubator/setup-miniconda@v2
+      uses: conda-incubator/setup-miniconda@v2.2.0
       with:
         python-version: '3.10'
         miniforge-variant: Mambaforge
