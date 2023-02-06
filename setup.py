@@ -9,7 +9,7 @@ setup(
     version=versioneer.get_version(),
     author='Michael G. Taylor et al.',
     packages=['architector'],
-    package_data={"architector": ["*csv"]},
+    package_data={"data": ["*.csv"]},
     install_requires=[
         'ase',
         'numpy',
