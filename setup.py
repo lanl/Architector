@@ -17,7 +17,7 @@ setup(
         'pynauty',
         'scipy',
         'pandas',
-        'mendeleev'
+        'mendeleev',
         'sqlalchemy<2.0.0'
     ],
     license="BSD 3-Clause License",
