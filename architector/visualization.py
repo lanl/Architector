@@ -144,23 +144,43 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
             else:
                 label_posits = mol.ase_atoms.get_center_of_mass().flatten()  # Put it at the geometric center of the molecule.
             coords = mol.write_mol2('tmp.mol2', writestring=True)
-            view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y))
-            view_ats.setStyle({representation:{'colorscheme':'Jmol'}},viewer=(x,y))
-            if len(label) > 0:
-                view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
-                    'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
-                    'backgroundColor':"'black'",'backgroundOpacity':'0.5',
-                    'fontOpacity':'1','fontSize':'{}'.format(labelsize),
-                    'fontColor':"white",'inFront':'true',}, viewer=(x,y))
-            if labelinds:
-                inds = [x for x in range(len(mol.ase_atoms))]
-                for j in inds:
-                    atom_posit = mol.ase_atoms.positions[j]
-                    view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
-                    'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
-                    'backgroundColor':"'black'",'backgroundOpacity':'0.4',
-                    'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
-                    'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
+            if representation == 'ball_stick':
+                view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
+                view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}},viewer=(x,y)) 
+                view_ats.addStyle({'stick':{'colorscheme':'Jmol'}},viewer=(x,y)) 
+                if len(label) > 0:
+                    view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
+                        'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
+                        'backgroundColor':"'black'",'backgroundOpacity':'0.5',
+                        'fontOpacity':'1','fontSize':'{}'.format(labelsize),
+                        'fontColor':"white",'inFront':'true',}, viewer=(x,y))
+                if labelinds:
+                    inds = [x for x in range(len(mol.ase_atoms))]
+                    for j in inds:
+                        atom_posit = mol.ase_atoms.positions[j]
+                        view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
+                        'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                        'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                        'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
+                        'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
+            else:
+                view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y))
+                view_ats.setStyle({representation:{'colorscheme':'Jmol'}},viewer=(x,y))
+                if len(label) > 0:
+                    view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
+                        'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
+                        'backgroundColor':"'black'",'backgroundOpacity':'0.5',
+                        'fontOpacity':'1','fontSize':'{}'.format(labelsize),
+                        'fontColor':"white",'inFront':'true',}, viewer=(x,y))
+                if labelinds:
+                    inds = [x for x in range(len(mol.ase_atoms))]
+                    for j in inds:
+                        atom_posit = mol.ase_atoms.positions[j]
+                        view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
+                        'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                        'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                        'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
+                        'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
             if vector:
                 view_ats.addArrow(vector)
             view_ats.zoomTo(viewer=(x,y))
