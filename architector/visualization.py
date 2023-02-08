@@ -50,8 +50,8 @@ def type_convert(structures):
     return outlist
                 
             
-def view_structures(structures,w=200,h=200,columns=4,representation='stick',labelsize=12,
-                 labels=False, labelinds=False, vector=None):
+def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick',labelsize=12,
+                 labels=False, labelinds=False, vector=None, sphere_scale=0.3):
     """
     py3Dmol view atoms object(s)
     xyz_names = xyz files that will be rendered in a tiled format in jupyter (list,str)
@@ -84,14 +84,25 @@ def view_structures(structures,w=200,h=200,columns=4,representation='stick',labe
         else:
             label_posits = mol.ase_atoms.get_center_of_mass().flatten()  # Put it at the geometric center of the molecule.
         coords = mol.write_mol2('tmp.mol2', writestring=True)
-        view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
-        view_ats.setStyle({representation:{'colorscheme':'Jmol'}}) 
-        if label:
-            view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
-                  'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
-                  'backgroundColor':"'black'",'backgroundOpacity':'0.3',
-                  'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
-                  'fontColor':"white",'inFront':'true'})
+        if representation == 'ball_stick':
+            view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+            view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
+            view_ats.addStyle({'stick':{'colorscheme':'Jmol'}}) 
+            if label:
+                view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
+                    'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
+                    'backgroundColor':"'black'",'backgroundOpacity':'0.3',
+                    'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                    'fontColor':"white",'inFront':'true'})
+        else:
+            view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+            view_ats.setStyle({representation:{'colorscheme':'Jmol'}}) 
+            if label:
+                view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
+                    'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
+                    'backgroundColor':"'black'",'backgroundOpacity':'0.3',
+                    'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                    'fontColor':"white",'inFront':'true'})
         if labelinds:
             inds = [x for x in range(len(mol.ase_atoms))]
             for i in inds:
