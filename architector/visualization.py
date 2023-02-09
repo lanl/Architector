@@ -51,19 +51,22 @@ def type_convert(structures):
                 
             
 def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick',labelsize=12,
-                 labels=False, labelinds=False, vector=None, sphere_scale=0.3):
+                 labels=False, labelinds=False, vector=None, sphere_scale=0.3,stick_scale=0.25):
     """
     py3Dmol view atoms object(s)
     xyz_names = xyz files that will be rendered in a tiled format in jupyter (list,str)
     w = width of frame (or subframes) in pixels (int)
     h = height of frame (or subframes) in pixels (int)
     cols = number of columns in subframe (int)
-    representation = how the molecule will be viewed (str)
+    representation = how the molecule will be viewed 
+        - valid options include ('ball_stick' - default, 'stick', 'sphere') (str)
     labelsize = size of the data label (in Points) (int)
     labels = turn labels on/off (bool)
     labelinds = whether to add the indices as text objects to the visualized molecule.
     vector = {'start': {'x':-10.0, 'y':0.0, 'z':0.0}, 'end': {'x':-10.0, 'y':0.0, 'z':10.0},
               'radius':2,'color':'red'}
+    sphere_scale = how much to scale the spheres from the vdw radii (float) - default 0.3
+    stick_scale = how much to scale the stick radii (float) - default 0.25
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -87,7 +90,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
         if representation == 'ball_stick':
             view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
             view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
-            view_ats.addStyle({'stick':{'colorscheme':'Jmol'}}) 
+            view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}}) 
             if label:
                 view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
                     'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
@@ -96,7 +99,12 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                     'fontColor':"white",'inFront':'true'})
         else:
             view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
-            view_ats.setStyle({representation:{'colorscheme':'Jmol'}}) 
+            if representation == 'stick':
+                view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}})
+            elif representation == 'sphere':
+                 view_ats.setStyle({representation:{'colorscheme':'Jmol','scale':sphere_scale}})
+            else:
+                 view_ats.setStyle({representation:{'colorscheme':'Jmol'}})
             if label:
                 view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
                     'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
@@ -147,7 +155,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
             if representation == 'ball_stick':
                 view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
                 view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}},viewer=(x,y)) 
-                view_ats.addStyle({'stick':{'colorscheme':'Jmol'}},viewer=(x,y)) 
+                view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}},viewer=(x,y)) 
                 if len(label) > 0:
                     view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
                         'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
@@ -165,7 +173,12 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                         'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
             else:
                 view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y))
-                view_ats.setStyle({representation:{'colorscheme':'Jmol'}},viewer=(x,y))
+                if representation == 'stick':
+                    view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}},viewer=(x,y))
+                elif representation == 'sphere':
+                    view_ats.setStyle({representation:{'colorscheme':'Jmol','scale':sphere_scale}},viewer=(x,y))
+                else:
+                    view_ats.setStyle({representation:{'colorscheme':'Jmol'}},viewer=(x,y))
                 if len(label) > 0:
                     view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
                         'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
