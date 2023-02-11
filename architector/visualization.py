@@ -51,7 +51,7 @@ def type_convert(structures):
                 
             
 def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick',labelsize=12,
-                 labels=False, labelinds=False, vector=None, sphere_scale=0.3,stick_scale=0.25):
+                 labels=False, labelinds=None, vector=None, sphere_scale=0.3,stick_scale=0.25):
     """
     py3Dmol view atoms object(s)
     xyz_names = xyz files that will be rendered in a tiled format in jupyter (list,str)
@@ -111,10 +111,13 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                     'backgroundColor':"'black'",'backgroundOpacity':'0.3',
                     'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
                     'fontColor':"white",'inFront':'true'})
-        if labelinds:
-            inds = [x for x in range(len(mol.ase_atoms))]
-            for i in inds:
-                atom_posit = mol.ase_atoms.positions[i]
+        if labelinds is not None:
+            if isinstance(labelinds,list):
+                inds = labelinds
+            else:
+                inds = [x for x in range(len(mol.ase_atoms))]
+            for p,i in enumerate(inds):
+                atom_posit = mol.ase_atoms.positions[p]
                 view_ats.addLabel("{}".format(i), {'position':{'x':'{}'.format(atom_posit[0]),
                   'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
                   'backgroundColor':"'black'",'backgroundOpacity':'0.4',
@@ -162,10 +165,13 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                         'backgroundColor':"'black'",'backgroundOpacity':'0.5',
                         'fontOpacity':'1','fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true',}, viewer=(x,y))
-                if labelinds:
-                    inds = [x for x in range(len(mol.ase_atoms))]
-                    for j in inds:
-                        atom_posit = mol.ase_atoms.positions[j]
+                if labelinds is not None:
+                    if isinstance(labelinds,list):
+                        inds = labelinds
+                    else:
+                        inds = [x for x in range(len(mol.ase_atoms))]
+                    for p,j in enumerate(inds):
+                        atom_posit = mol.ase_atoms.positions[p]
                         view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
                         'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
                         'backgroundColor':"'black'",'backgroundOpacity':'0.4',
@@ -185,10 +191,13 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                         'backgroundColor':"'black'",'backgroundOpacity':'0.5',
                         'fontOpacity':'1','fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true',}, viewer=(x,y))
-                if labelinds:
-                    inds = [x for x in range(len(mol.ase_atoms))]
-                    for j in inds:
-                        atom_posit = mol.ase_atoms.positions[j]
+                if labelinds is not None:
+                    if isinstance(labelinds,list):
+                        inds = labelinds
+                    else:
+                        inds = [x for x in range(len(mol.ase_atoms))]
+                    for p,j in enumerate(inds):
+                        atom_posit = mol.ase_atoms.positions[p]
                         view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
                         'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
                         'backgroundColor':"'black'",'backgroundOpacity':'0.4',
