@@ -525,7 +525,7 @@ ligands_dict = {
         'coordList':[2,5,9,11,14,17,21,25],'ligType':'octa_square_antiprismatic'},
 '3,4,3-li(1-2-hopo)':{'smiles':'C1=CC(=O)N(C(=C1)C(=O)NCCCN(CCCCN(CCCNC(=O)C2=CC=CC(=O)N2[O-])C(=O)C3=CC=CC(=O)N3[O-])C(=O)C4=CC=CC(=O)N4[O-])[O-]', 
         'coordList':[3,53,52,50,30,32,40,42],'ligType':'octa_square_antiprismatic'},
-'dheba':{'smiles':'CCCCC(CC)COP(=O)([O-])OCC(CC)CCCC','coordList':[10,11],'ligType':'bi_cis_bulky'},
+'dehpa':{'smiles':'CCCCC(CC)COP(=O)([O-])OCC(CC)CCCC','coordList':[10,11],'ligType':'bi_cis_bulky'},
 'edta':{'smiles':'[O-]C(=O)CN(CCN(CC([O-])=O)CC([O-])=O)CC([O-])=O','coordList':[0,4,7,10,14,18],
         'ligType':'hexa_octahedral'},
 'ethylenediaminetriacetate':{'smiles':'C(C[NH+](CC(=O)[O-])CC(=O)[O-])NCC(=O)[O-]',
