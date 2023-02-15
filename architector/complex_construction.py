@@ -799,6 +799,7 @@ def build_complex_2D(inputDict):
             uhf = uhf - 1 
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
+
     xtb_unpaired_electrons = copy.copy(uhf)
     xtb_charge = copy.copy(mol_charge)
 
@@ -813,7 +814,7 @@ def build_complex_2D(inputDict):
             xtb_unpaired_electrons = 1
 
     mol.xtb_uhf = xtb_unpaired_electrons
-    mol.xtb_charge = xtb_unpaired_electrons
+    mol.xtb_charge = xtb_charge
     mol.uhf = uhf
     mol.charge = mol_charge
 
