@@ -547,9 +547,13 @@ def inparse(inputDict):
                     newinpDict['parameters'] = dict()
                 if isinstance(newinpDict['parameters'],dict):
                     newinpDict['parameters']['full_spin'] = mol.xtb_uhf
+                    if (mol.uhf is not None):
+                        newinpDict['parameters']['full_spin_nonxtb'] = mol.uhf
                 else:
                     newinpDict['parameters'] = dict()
                     newinpDict['parameters']['full_spin'] = mol.xtb_uhf
+                    if (mol.uhf is not None):
+                        newinpDict['parameters']['full_spin_nonxtb'] = mol.uhf
             metal_inds = [i for i,x in enumerate(mol.ase_atoms.get_chemical_symbols()) if x in io_ptable.all_metals]
             if len(metal_inds) == 1: # Only one metal - perform ligand breakdown to find all ligands.
                 ##### Core Preprocessing ####

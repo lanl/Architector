@@ -272,6 +272,8 @@ class Complex:
         """
         self.initMol.ase_atoms[0].symbol = copy.deepcopy(self.complexMol.ase_atoms.symbols[0])
         self.initMol.atom_types[0] = copy.deepcopy(self.complexMol.ase_atoms.symbols[0])
+        if (self.parameters.get('full_spin_nonxtb',None) is not None):
+            self.initMol.uhf = self.parameters['full_spin_nonxtb']
         string = self.initMol.write_mol2('init_geo', writestring=True)
         self.init_geo_swapped_metal = copy.deepcopy(string)
         if in_metal: # Switch to the original metal.
@@ -568,10 +570,14 @@ def build_complex_driver(inputDict1,in_metal=False):
             val.swap_metals_back(in_metal=in_metal)
             structs.append(val)
             if inputDict['parameters']['save_init_geos']:
+                if (inputDict['parameters'].get('full_spin_nonxtb',None) is not None):
+                    val.initMol.uhf = inputDict['parameters']['full_spin_nonxtb']
                 init_mol2strings.append(val.initMol.write_mol2('{}'.format(key), writestring=True))
             else:
                 init_mol2strings.append(None)
             energy_sorted_inds.append(val.index) # Save energy sorted index for reference.
+            if (inputDict['parameters'].get('full_spin_nonxtb',None) is not None):
+                val.complexMol.uhf = inputDict['parameters']['full_spin_nonxtb']
             mol2strings.append(val.complexMol.write_mol2('{}'.format(key), writestring=True))
         order = np.argsort(xtb_energies)
         # Iterate through all structures and check/remove duplicate structures.
