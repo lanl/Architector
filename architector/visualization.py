@@ -118,11 +118,12 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                 inds = [x for x in range(len(mol.ase_atoms))]
             for p,i in enumerate(inds):
                 atom_posit = mol.ase_atoms.positions[p]
-                view_ats.addLabel("{}".format(i), {'position':{'x':'{}'.format(atom_posit[0]),
-                  'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
-                  'backgroundColor':"'black'",'backgroundOpacity':'0.4',
-                  'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
-                  'fontColor':"white",'inFront':'true'})
+                if i is not None:
+                    view_ats.addLabel("{}".format(i), {'position':{'x':'{}'.format(atom_posit[0]),
+                    'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                    'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                    'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                    'fontColor':"white",'inFront':'true'})
         if vector:
             view_ats.addArrow(vector)
         view_ats.zoomTo()
@@ -172,11 +173,12 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                         inds = [x for x in range(len(mol.ase_atoms))]
                     for p,j in enumerate(inds):
                         atom_posit = mol.ase_atoms.positions[p]
-                        view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
-                        'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
-                        'backgroundColor':"'black'",'backgroundOpacity':'0.4',
-                        'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
-                        'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
+                        if j is not None:
+                            view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
+                            'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                            'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                            'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
+                            'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
             else:
                 view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y))
                 if representation == 'stick':
@@ -198,11 +200,12 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                         inds = [x for x in range(len(mol.ase_atoms))]
                     for p,j in enumerate(inds):
                         atom_posit = mol.ase_atoms.positions[p]
-                        view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
-                        'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
-                        'backgroundColor':"'black'",'backgroundOpacity':'0.4',
-                        'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
-                        'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
+                        if j is not None:
+                            view_ats.addLabel("{}".format(j), {'position':{'x':'{}'.format(atom_posit[0]),
+                            'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                            'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                            'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
+                            'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
             if vector:
                 view_ats.addArrow(vector)
             view_ats.zoomTo(viewer=(x,y))
