@@ -51,7 +51,8 @@ def type_convert(structures):
                 
             
 def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick',labelsize=12,
-                 labels=False, labelinds=None, vector=None, sphere_scale=0.3,stick_scale=0.25):
+                 labels=False, labelinds=None, vector=None, sphere_scale=0.3,stick_scale=0.25,
+                 metal_scale=0.75):
     """
     py3Dmol view atoms object(s)
     xyz_names = xyz files that will be rendered in a tiled format in jupyter (list,str)
@@ -67,6 +68,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
               'radius':2,'color':'red'}
     sphere_scale = how much to scale the spheres from the vdw radii (float) - default 0.3
     stick_scale = how much to scale the stick radii (float) - default 0.25
+    metal_scael = how much to scale the metal radii (float) - default 0.75
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -90,6 +92,9 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
         if representation == 'ball_stick':
             view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
             view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
+            msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_ind]
+            for ms in set(msyms):
+                view_ats.setStyle({'elem':ms},{'sphere':{'scale':metal_scale}})
             view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}}) 
             if label:
                 view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
@@ -159,6 +164,9 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
             if representation == 'ball_stick':
                 view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
                 view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}},viewer=(x,y)) 
+                msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
+                for ms in set(msyms):
+                    view_ats.setStyle({'elem':ms},{'sphere':{'scale':metal_scale}},viewer=(x,y))
                 view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}},viewer=(x,y)) 
                 if len(label) > 0:
                     view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
