@@ -94,7 +94,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
             view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
             msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_ind]
             for ms in set(msyms):
-                view_ats.setStyle({'elem':ms},{'sphere':{'scale':metal_scale}})
+                view_ats.setStyle({'elem':ms},{'sphere':{'colorscheme':'Jmol','scale':metal_scale}})
             view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}}) 
             if label:
                 view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
@@ -166,7 +166,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                 view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}},viewer=(x,y)) 
                 msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
                 for ms in set(msyms):
-                    view_ats.setStyle({'elem':ms},{'sphere':{'scale':metal_scale}},viewer=(x,y))
+                    view_ats.setStyle({'elem':ms},{'sphere':{'colorscheme':'Jmol','scale':metal_scale}},viewer=(x,y))
                 view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}},viewer=(x,y)) 
                 if len(label) > 0:
                     view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
