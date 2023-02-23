@@ -203,7 +203,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                         'fontColor':"white",'inFront':'true',}, viewer=(x,y))
                 if labelinds is not None:
                     if isinstance(labelinds,list):
-                        inds = labelinds
+                        inds = labelinds[i]
                     else:
                         inds = [x for x in range(len(mol.ase_atoms))]
                     for p,j in enumerate(inds):
