@@ -154,7 +154,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
         else:
             raise ValueError('What sort of labels are wanting? Not recognized.')
         x,y = 0,0 # Subframe position
-        for i,mol in enumerate(mols):
+        for k,mol in enumerate(mols):
             metal_inds = [i for i,x in enumerate(mol.ase_atoms) if (x.symbol in io_ptable.all_metals)]
             if len(metal_inds) > 0 : # Take advantage of empty list
                 label_posits = mol.ase_atoms.positions[metal_inds[0]].flatten()
@@ -169,14 +169,14 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                     view_ats.setStyle({'elem':ms},{'sphere':{'colorscheme':'Jmol','scale':metal_scale}},viewer=(x,y))
                 view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}},viewer=(x,y)) 
                 if len(label) > 0:
-                    view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
+                    view_ats.addLabel("{}".format(label[k]), {'position':{'x':'{}'.format(label_posits[0]),
                         'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
                         'backgroundColor':"'black'",'backgroundOpacity':'0.5',
                         'fontOpacity':'1','fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true',}, viewer=(x,y))
                 if labelinds is not None:
                     if isinstance(labelinds,list):
-                        inds = labelinds
+                        inds = labelinds[k]
                     else:
                         inds = [x for x in range(len(mol.ase_atoms))]
                     for p,j in enumerate(inds):
@@ -196,14 +196,14 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                 else:
                     view_ats.setStyle({representation:{'colorscheme':'Jmol'}},viewer=(x,y))
                 if len(label) > 0:
-                    view_ats.addLabel("{}".format(label[i]), {'position':{'x':'{}'.format(label_posits[0]),
+                    view_ats.addLabel("{}".format(label[k]), {'position':{'x':'{}'.format(label_posits[0]),
                         'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
                         'backgroundColor':"'black'",'backgroundOpacity':'0.5',
                         'fontOpacity':'1','fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true',}, viewer=(x,y))
                 if labelinds is not None:
                     if isinstance(labelinds,list):
-                        inds = labelinds[i]
+                        inds = labelinds[k]
                     else:
                         inds = [x for x in range(len(mol.ase_atoms))]
                     for p,j in enumerate(inds):
