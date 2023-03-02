@@ -820,9 +820,13 @@ def inparse(inputDict):
             outparams['n_symmetries'] = outparams['n_conformers']
 
         if outparams['metal_ox'] is None:
-            outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
+            if metal in io_ptable.metal_charge_dict:
+                outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
+            else: # Pull lowest positive "main" oxidation state from mendeleev
+                elem = mendeleev.__dict__[newinpDict['core']['metal']]
+                outparams['metal_ox'] = [x.oxidation_state for x in elem._oxidation_states if (x.category == 'main') and (x.oxidation_state > 0)][0]
         if outparams['metal_spin'] is None:
-            if outparams['metal_ox'] != io_ptable.metal_charge_dict[metal]:
+            if outparams['metal_ox'] != io_ptable.metal_charge_dict.get(metal,100):
                 # Calculate from mendeleev reference - Generally aufbau.
                 outparams['metal_spin'] = mendeleev.__dict__[newinpDict['core']['metal']].ec.ionize(outparams['metal_ox']).unpaired_electrons()
             else: # Otherwise use refdict.
@@ -1147,9 +1151,13 @@ def inparse_2D(inputDict):
                 raise ValueError('Unrecognized ligand name: {}'.format(outparams['secondary_fill_ligand']))
 
         if outparams['metal_ox'] is None:
-            outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
+            if metal in io_ptable.metal_charge_dict:
+                outparams['metal_ox'] = io_ptable.metal_charge_dict[metal]
+            else: # Pull lowest positive "main" oxidation state from mendeleev
+                elem = mendeleev.__dict__[newinpDict['core']['metal']]
+                outparams['metal_ox'] = [x.oxidation_state for x in elem._oxidation_states if (x.category == 'main') and (x.oxidation_state > 0)][0]
         if outparams['metal_spin'] is None:
-            if outparams['metal_ox'] != io_ptable.metal_charge_dict[metal]:
+            if outparams['metal_ox'] != io_ptable.metal_charge_dict.get(metal,100):
                 # Calculate from mendeleev reference - Generally aufbau.
                 outparams['metal_spin'] = mendeleev.__dict__[newinpDict['core']['metal']].ec.ionize(outparams['metal_ox']).unpaired_electrons()
             else: # Otherwise use refdict.
