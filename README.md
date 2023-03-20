@@ -229,6 +229,9 @@ from the output mol2string.
 * Enrique R. Batista
 * Ping Yang
 
+## Code Citation:
+[![DOI](https://zenodo.org/badge/572577325.svg)](https://zenodo.org/badge/latestdoi/572577325)
+
 ## Licensing and Copyright: 
 
 See LICENSE.txt for licensing information. Architector is licensed under the BSD-3 license.
