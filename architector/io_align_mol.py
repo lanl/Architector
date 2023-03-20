@@ -227,8 +227,10 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
 
     Returns
     -------
-    rmsd : float
-        RMSD per atom comparison between the molecules.
+    (rmsd_loss_core, rmsd_loss_full, flag_struct) : tuple
+        rmsd core, rmsd full, flag struct - If return_structures == False
+    (rmsd_loss_core, rmsd_loss_full, compareMol,  aligned_genMol, compareMol core, aligned_genMol_core, flag_struct, coreinds)
+        if return_structures == True
     """
 
     genMol = convert_io_molecule(genMol)
@@ -254,6 +256,7 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         outcore = tmp_self_comp
         rmsd_loss_core = 1000
         rmsd_loss_full = 1000
+        coreinds = None
     else:
         # Set ordering to be identical based on canonical labels.
         genMol_metalind = genMol.find_metal()
@@ -268,6 +271,7 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
 
         tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy() 
         tmp_ref_comp = compareMol.ase_atoms[compareMol_subset_component_inds].copy() 
+        coreinds = compareMol_subset_component_inds
 
         flag_struct = False
 
@@ -332,7 +336,8 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
                     genMol.write_mol2('aligned.mol2',writestring=True),
                     convert_ase_xyz(tmp_ref_comp),
                     convert_ase_xyz(outcore),
-                    flag_struct)
+                    flag_struct,
+                    coreinds)
         else:
             return (rmsd_loss_core, rmsd_loss_full, flag_struct)
     else:

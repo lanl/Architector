@@ -815,13 +815,20 @@ class Molecule:
         """
         run_check = True
         if (len(params) > 0) and (not assembly):
-            run_check = params['full_sanity_checks']
-            factor = params['full_graph_sanity_cutoff']
+            run_check = params.get('full_sanity_checks',run_check)
+            factor = params.get('full_graph_sanity_cutoff',factor)
         elif (len(params) > 0):
-            run_check = params['assemble_sanity_checks']
-            factor = params['assemble_graph_sanity_cutoff']
+            run_check = params.get('assemble_sanity_checks',run_check)
+            factor = params.get('assemble_graph_sanity_cutoff',factor)
         else:
             params = {'covrad_metal':None}
+        if (len(self.graph) == 0) and (len(self.BO_dict) == 0):
+            self.create_mol_graph()
+            self.create_BO_dict()
+        elif (len(self.BO_dict) > 0):
+            self.create_graph_from_bo_dict()
+        elif len(self.graph) > 0:
+            self.create_BO_dict()
         sane = self.dists_sane
         graph_dists_dict = {}
         if run_check:
@@ -887,13 +894,15 @@ class Molecule:
         """
         run_check = True
         if (len(params) > 0)  and (not assembly):
-            run_check = params['full_sanity_checks']
-            smallest_dist_cutoff = params['full_smallest_dist_cutoff']
-            min_dist_cutoff = params['full_min_dist_cutoff']
+            run_check = params.get('full_sanity_checks',run_check)
+            smallest_dist_cutoff = params.get('full_smallest_dist_cutoff',smallest_dist_cutoff)
+            min_dist_cutoff = params.get('full_min_dist_cutoff',min_dist_cutoff)
         elif (len(params) > 0) :
-            run_check = params['assemble_sanity_checks']
-            smallest_dist_cutoff = params['assemble_smallest_dist_cutoff']
-            min_dist_cutoff = params['assemble_min_dist_cutoff']
+            run_check = params.get('assemble_sanity_checks',run_check)
+            smallest_dist_cutoff = params.get('assemble_smallest_dist_cutoff',smallest_dist_cutoff)
+            min_dist_cutoff = params.get('assemble_min_dist_cutoff',min_dist_cutoff)
+        if debug:
+            params.update({'debug':debug})
         sane = self.dists_sane
         min_dist_dict = {}
         smallest_dist_dict = {}
