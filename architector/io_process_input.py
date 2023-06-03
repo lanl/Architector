@@ -744,6 +744,7 @@ def inparse(inputDict):
             "fmax":0.1, # eV/Angstrom - max force for relaxation.
             "maxsteps":1000, # Steps involved in relaxation
             "force_generation":False, # Whether to force the construction to proceed without xtb energies - defaults to UFF
+            "ff_preopt":False, # Perform forcefield pre-optimization of full complex? - default False.
             # In cases of XTB outright failure.
             # For very large speedup - use GFN-FF, though this is much less stable (especially for Lanthanides)
             # Or UFF
@@ -853,6 +854,12 @@ def inparse(inputDict):
             coreTypes = [x for x in newinpDict['coreTypes'] if x in core_geo_class.trans_geos]
             newinpDict['coreTypes'] = coreTypes
 
+        # FF-preoptimization shifts
+        if outparams['ff_preopt']:
+            outparams['assemble_method'] = 'GFN-FF'
+            outparams['assemble_sanity_checks'] = False # Allow for close/overlapping atoms 
+            outparams['fmax'] = 0.2 # Slightly decrease accuracy to encourage difficult convergence
+ 
         # # Load logger
         # if outparams['logg']
         newinpDict['parameters'] = outparams
