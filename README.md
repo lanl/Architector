@@ -24,9 +24,9 @@ pip install -e .
 1. See tutorials for basic introduction to capabilties and code examples: `documentation/tutorials/`
 2. Reference for core and ligand geometry labels see: `documentation/view_default_core_ligand_types.ipynb`
 3. Utility for aiding in determining ligand coordination sites see: `utils/ligand_viewing_coordinating_atom_selecting.ipynb`
-4. Reference for debugging cases where no structures are generated see: `utils/Debugging_Guide.ipynb`
+4. Reference for debugging cases where no structures are generated see: `documentation/Debugging_Guide.ipynb`
 
-* Note that ligands used in (3) can even be drawn in [Avogadro](https://avogadro.cc/) and copied as SMILES strings into this analysis.
+* Note that ligands used in (3) can even be drawn in [Avogadro](https://avogadro.cc/) and or most other 2D molecular editors (e.g. ChemDraw) and copied as SMILES strings into this analysis.
 * If other analyses are used to determine the coordinating atom indices we can't guarantee the generated structure will match what was input. If generating complexes with new ligands we HIGHLY recommend using the utility in (3)
 
 ## XTB (backend) Potentially Useful References:
