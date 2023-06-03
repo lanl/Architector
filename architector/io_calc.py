@@ -70,7 +70,7 @@ class CalcExecutor:
                 final_sanity_check=False, relax=False, assembly=False,
                 method='GFN2-xTB', xtb_solvent='none', xtb_accuracy=1.0,
                 xtb_electronic_temperature=300, xtb_max_iterations=250,
-                fmax=0.1, maxsteps=1000,
+                fmax=0.1, maxsteps=1000, ff_preopt_run=False,
                 detect_spin_charge=False, fix_m_neighbors=False,
                 default_params=params, ase_opt_method=None,
                 calculator=None):
@@ -107,6 +107,8 @@ class CalcExecutor:
             Max force in eV/Angstrom, by default 0.1
         maxsteps : int, optional
             Total number of optimization steps to take, by default 1000
+        ff_preopt_run : bool, optional
+            Perform forcefield pre-optimization?, by default False
         detect_spin_charge : bool, optional
             Detect the charge and spin with openbabel routines?, by default False
         fix_m_neighbors : bool, optional
@@ -130,6 +132,7 @@ class CalcExecutor:
         self.calculator = calculator
         self.relax = relax
         self.assembly = assembly
+        self.ff_preopt_run = ff_preopt_run
         self.xtb_solvent = xtb_solvent
         self.xtb_accuracy = xtb_accuracy
         self.xtb_electronic_temperature = xtb_electronic_temperature
@@ -148,7 +151,10 @@ class CalcExecutor:
                 self.relax = False
                 self.method = self.assemble_method
             else:
-                self.method = self.full_method
+                if self.ff_preopt_run:
+                    self.method = 'UFF'
+                else:
+                    self.method = self.full_method
         if ase_opt_method is None: # Default to LBFGSLineSearch
             self.opt_method = LBFGSLineSearch
         else:

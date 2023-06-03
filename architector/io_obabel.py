@@ -379,7 +379,8 @@ def build_3D(OBmol,addHydrogens=True):
 
 
 def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_cutoff=50.0, 
-        confab_verbose = False, output_format='mol2', neutralize=False, functionalizations=None):
+        confab_verbose = False, output_format='mol2', neutralize=False, functionalizations=None,
+        return_energies = False):
     """generate_obmol_conformers 
     generate conformers with openbabel for given smiles
     using confab conformer generation routine
@@ -405,11 +406,15 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
         neutralize smiles?, by default False
     functionalizations : dict, optional
         add functionalizations?, by default None
+    return_energies : bool, optional
+        return the FF energies in addition to the conformers generated
 
     Returns
     -------
     output_strings : list (str)
         list of conformers generated as whatever format desired
+    output_energies : list (float)
+        forcefield energies
     """
     obmol = get_obmol_smiles(smiles,
                              neutralize=neutralize,
@@ -419,18 +424,36 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
         FF = ob.OBForceField.FindForceField("MMFF94")
         FF.Setup(obmol) # Make sure setup works OK
     else:
-        FF = ob.OBForceField.FindForceField("MMFF94")
+        FF = ob.OBForceField.FindForceField("UFF")
         FF.Setup(obmol) # Make sure setup works OK
+    # Run Diverse conformer generation
     FF.DiverseConfGen(rmsd_cutoff, conf_cutoff, energy_cutoff, confab_verbose)
     FF.GetConformers(obmol)
     confs_to_write = obmol.NumConformers()
     obconversion = ob.OBConversion()
     obconversion.SetOutFormat(output_format)
     output_strings = []
+    output_energies = []
     for conf_num in range(confs_to_write):
         obmol.SetConformer(conf_num)
+        if return_energies: # Calculate FF energies
+            if mmff94_ok:
+                FF = ob.OBForceField.FindForceField("MMFF94")
+                FF.Setup(obmol) # Make sure setup works OK
+            else:
+                FF = ob.OBForceField.FindForceField("UFF")
+                FF.Setup(obmol) # Make sure setup works OK
+            energy = FF.Energy()
+            if mmff94_ok:
+                energy = energy * units.kcal / units.mol
+            else:
+                energy = energy * units.kJ / units.mol
+            output_energies.append(energy)
         output_strings.append(obconversion.WriteString(obmol))
-    return output_strings
+    if return_energies:
+        return output_strings,output_energies
+    else:
+        return output_strings
 
 
 def functionalize(OBmol,functional_group='C',smiles_inds=[0]):
