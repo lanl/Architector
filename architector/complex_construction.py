@@ -19,7 +19,6 @@ import architector.io_molecule as io_molecule
 import architector.io_align_mol as io_align_mol
 import architector.io_crest as io_crest
 import architector.io_symmetry as io_symmetry
-
 from architector.io_calc import CalcExecutor
 
 class Ligand:
@@ -240,11 +239,25 @@ class Complex:
         self.initMol.dist_sanity_checks(params=self.parameters,assembly=single_point)
         self.initMol.graph_sanity_checks(params=self.parameters,assembly=single_point)
         if self.assembled:
+            if self.parameters['ff_preopt'] and (not single_point):
+                if self.parameters['debug']:
+                    print('Doing UFF - pre-optimization before final evaluation.')
+                calculator = CalcExecutor(self.complexMol, parameters=self.parameters,
+                                final_sanity_check=False,
+                                relax=True, assembly=single_point, 
+                                ff_preopt_run=self.parameters['ff_preopt'])
+                if calculator:
+                    self.complexMol.ase_atoms.set_positions(calculator.mol.ase_atoms.get_positions())
             if self.parameters['debug']:
                 print("Final Evaluation - Opt Molecule/Single point")
-            self.calculator = CalcExecutor(self.complexMol,parameters=self.parameters,
-                                            final_sanity_check=self.parameters['full_sanity_checks'],
-                                            relax=single_point,assembly=single_point)
+            self.calculator = CalcExecutor(self.complexMol,
+                                           parameters=self.parameters,
+                                           final_sanity_check=self.parameters['full_sanity_checks'],
+                                           relax=single_point,
+                                           assembly=single_point)
+            if (self.parameters['debug']) and (self.calculator):
+                print('Finished method: {} {}.'.format(self.calculator.method,
+                                                    self.calculator.relax))
             if self.parameters['debug'] and (not self.calculator.successful):
                 print('Failed final relaxation. - Retrying with UFF/XTB')
                 print(self.initMol.write_mol2('cool.mol2', writestring=True))
