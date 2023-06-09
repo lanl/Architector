@@ -14,4 +14,4 @@ dependencies:
   - pynauty
   - tqdm
   - mendeleev
-  - sqlalchemy<2.0.0
+  - sqlalchemy
