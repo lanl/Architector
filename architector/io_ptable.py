@@ -432,7 +432,7 @@ solvents_dict = {
 'acetonitrile':'CC#N',
 'aniline':'C1=CC=C(C=C1)N',
 'benzaldehyde':'C1=CC=C(C=C1)C=O',
-'benzene':'C1=CC=CC=C1',
+'benzene':'c1ccccc1',
 'CH2Cl2':'C(Cl)Cl',
 'CHCl3':'C(Cl)(Cl)Cl',
 'CS2':'S=C=S',
@@ -448,7 +448,7 @@ solvents_dict = {
 'nitromethane':'C[N+](=O)[O-]',
 'octanol':'CCCCCCCCO', 
 'phenol':'Oc1ccccc1',
-'toluene':'CC1=CC=CC=C1',
+'toluene':'Cc1ccccc1',
 'thf':'C1CCCO1',
 'water':'O'
 }
