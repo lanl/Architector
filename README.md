@@ -40,6 +40,7 @@ pip install -e .
 * [Available Methods](https://xtb-python.readthedocs.io/en/latest/general-api.html)
 * [ASE Calculator](https://xtb-python.readthedocs.io/en/latest/ase-calculator.html)
 * [XTB Documentation](https://xtb-docs.readthedocs.io/en/latest/contents.html)
+* [CREST Documentation](https://crest-lab.github.io/crest-docs/)
 
 ## Basic Use of complex construction functionality:
 
