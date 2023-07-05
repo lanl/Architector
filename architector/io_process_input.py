@@ -798,7 +798,7 @@ def inparse(inputDict):
             outparams['full_graph_sanity_cutoff'] = 1.8
 
         # Push out full graph sanity for cp rings.
-        if any([True for x in newinpDict['ligands'] if (x['ligType'] == 'sandwich')]):
+        if any([True for x in newinpDict['ligands'] if (x['ligType'] == 'sandwich') or (x['ligType'] == 'haptic')]):
             outparams['full_graph_sanity_cutoff'] = 2.0
 
         # Convert fill ligands information into correct graph for default ligands
@@ -1177,7 +1177,7 @@ def inparse_2D(inputDict):
 
         nsand = np.sum([1 for x in newLigInputDicts if (x['ligType'] == 'sandwich')])
         if nsand > 0: # Currently sandwiches assigned to 3-denticity sites facial sites.
-            n_fill_ligs = tmp_cn - np.sum([len(x['coordList']) for x in newLigInputDicts if x['ligType'] != 'sandwich']) - 3*nsand
+            n_fill_ligs = tmp_cn - np.sum([len(x['coordList']) for x in newLigInputDicts if ((x['ligType'] != 'sandwich') and (x['ligType'] != 'haptic'))]) - 3*nsand
         else:
             n_fill_ligs = tmp_cn - np.sum([len(x['coordList']) for x in newLigInputDicts])
 
