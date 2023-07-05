@@ -202,7 +202,7 @@ def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     
 
 def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=None,
-              return_structures=False, rmsd_type='simple'): 
+              return_structures=False, rmsd_type='simple',override=False): 
     """calc_rmsd 
     Calculate the rmsd by different methods for this molecule compared to another.
 
@@ -224,6 +224,8 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         which atom types to consider for alignment - will default to full alignment, default None
     return_structures : bool, optional
         whether or not to return the rotated versions of the core and full structures, by defualt False
+    override : bool, optional
+        if no metals are present, use index 0 for comparison, default False
 
     Returns
     -------
@@ -247,6 +249,10 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         compareMol_metalind = compareMol.find_metal()
         compareMol_graph_depths = get_graph_depths(compareMol.graph)
 
+        if ((genMol_metalind is None) or (compareMol_metalind is None)) and override:
+            genMol_metalind = 0
+            compareMol_metalind = 0
+
         # Pull out center of molecule up to depth coresize graph hops for matching to reference.
         genMol_subset_component_inds = np.where(genMol_graph_depths[genMol_metalind] <= coresize)[0]
         compareMol_subset_component_inds = np.where(compareMol_graph_depths[compareMol_metalind] <= coresize)[0]
@@ -264,6 +270,10 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
 
         compareMol_metalind = compareMol.find_metal()
         compareMol_graph_depths = get_graph_depths(compareMol.graph)
+
+        if ((genMol_metalind is None) or (compareMol_metalind is None)) and override:
+            genMol_metalind = 0
+            compareMol_metalind = 0
 
         # Pull out center of molecule up to depth coresize graph hops for matching to reference.
         genMol_subset_component_inds = np.where(genMol_graph_depths[genMol_metalind] <= coresize)[0]

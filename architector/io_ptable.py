@@ -432,7 +432,7 @@ solvents_dict = {
 'acetonitrile':'CC#N',
 'aniline':'C1=CC=C(C=C1)N',
 'benzaldehyde':'C1=CC=C(C=C1)C=O',
-'benzene':'C1=CC=CC=C1 ',
+'benzene':'c1ccccc1',
 'CH2Cl2':'C(Cl)Cl',
 'CHCl3':'C(Cl)(Cl)Cl',
 'CS2':'S=C=S',
@@ -448,7 +448,7 @@ solvents_dict = {
 'nitromethane':'C[N+](=O)[O-]',
 'octanol':'CCCCCCCCO', 
 'phenol':'Oc1ccccc1',
-'toluene':'CC1=CC=CC=C1',
+'toluene':'Cc1ccccc1',
 'thf':'C1CCCO1',
 'water':'O'
 }
@@ -480,6 +480,7 @@ ligands_dict = {
 'thiocyanite':{'smiles':'[S-]C#N','coordList':[0],'ligType':'mono'},
 'isothiocyanite':{'smiles':'S=C=[N-]','coordList':[2],'ligType':'mono'},
 'azide':{'smiles':'[N-]=[N+]=[N-]','coordList':[0],'ligType':'mono'},
+'benzene':{'smiles':'c1ccccc1','coordList':[0,1,2,3,4,5],'ligType':'sandwich'},
 'benzoate':{'smiles':'C1=CC=C(C=C1)C(=O)[O-]','coordList':[7,8],'ligType':'bi_cis_chelating'}, 
 'benzoate_mono':{'smiles':'C1=CC=C(C=C1)C(=O)[O-]','coordList':[8],'ligType':'mono'},
 'benzoic_acid':{'smiles':'C1=CC=C(C=C1)C(=O)O','coordList':[7],'ligType':'mono'},

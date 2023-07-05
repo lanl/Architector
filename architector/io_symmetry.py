@@ -122,9 +122,9 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
     out_liglists = []
     newLigInputDicts = ligInputDicts.copy()
 
-    nsand = np.sum([1 for x in ligInputDicts if (x['ligType'] == 'sandwich')])
+    nsand = np.sum([1 for x in ligInputDicts if ((x['ligType'] == 'sandwich') or (x['ligType'] == 'haptic'))])
     if nsand > 0: # Currently sandwiches assigned to 3-denticity sites facial sites.
-        n_fill_ligs = tmp_cn - np.sum([len(x['coordList']) for x in ligInputDicts if x['ligType'] != 'sandwich']) - 3*nsand
+        n_fill_ligs = tmp_cn - np.sum([len(x['coordList']) for x in ligInputDicts if ((x['ligType'] != 'sandwich') and (x['ligType'] != 'haptic'))]) - 3*nsand
     else:
         n_fill_ligs = tmp_cn - np.sum([len(x['coordList']) for x in ligInputDicts])
 
@@ -234,7 +234,7 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
             ligLists = []
             for j,selected_con_list in enumerate(out_combo):
                 ligList = []
-                if newLigInputDicts[j]['ligType'] == 'sandwich':
+                if (newLigInputDicts[j]['ligType'] == 'sandwich') or (newLigInputDicts[j]['ligType'] == 'haptic'):
                     for i in newLigInputDicts[j]['coordList']:
                         ligList.append([i,list(selected_con_list)])
                 else:
@@ -310,7 +310,7 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
                         tligLists = []
                         for j,selected_con_list in enumerate(out_combo):
                             tligList = []
-                            if newLigInputDicts[j]['ligType'] == 'sandwich':
+                            if (newLigInputDicts[j]['ligType'] == 'sandwich') or (newLigInputDicts[j]['ligType'] == 'haptic'):
                                 for i in newLigInputDicts[j]['coordList']:
                                     tligList.append([i,list(selected_con_list)])
                             else:

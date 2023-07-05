@@ -347,8 +347,9 @@ class Geometries:
             outdict_rows.append(outdict)
 
         total_dict = dict(zip(labels, outdict_rows))
-        # Assign sandwich to tri_fac geometries!
+        # Assign sandwich/haptic ligands to tri_fac geometries!
         total_dict['sandwich'] = total_dict['tri_fac']
+        total_dict['haptic'] = total_dict['tri_fac']
         self.liglist_geo_map_dict = total_dict
 
 

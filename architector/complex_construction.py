@@ -604,11 +604,13 @@ def build_complex_driver(inputDict1,in_metal=False):
                     # if ('_init_only' in key) or ('_init_only' in keys[i]): # Do not do duplicate test on init_only structures.
                     #     continue
                     # else:
-                    _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'],coresize=10)
+                    _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
+                                                             coresize=10, override=True)
                     if (rmsd_full < 0.5):
                         iscopy = True
                         break
-                    rmsd_core, _, _ = io_align_mol.calc_rmsd(mol2strings[i],val['mol2string'])
+                    rmsd_core, _, _ = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
+                                                             override=True)
                     if (rmsd_core < 0.7) and np.isclose(val['energy'],xtb_energies[i],atol=0.1):
                         iscopy = True
                         break
