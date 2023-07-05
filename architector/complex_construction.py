@@ -728,8 +728,14 @@ def build_complex(inputDict):
             vals.append(val)
         order = np.argsort(xtb_energies)
         for j,i in enumerate(order):
-            if tmp_inputDict['parameters']['crest_sampling'] and (j == 0): # Run crest sampling on lowest energy isomer!
-                samples,energies = io_crest.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['xtb_solvent'])
+            # Run crest sampling on lowest N-energy isomer(s) - default is just 1!
+            if tmp_inputDict['parameters']['crest_sampling'] and (j < tmp_inputDict['parameters']['crest_sampling_n_conformers']): 
+                if tmp_inputDict['parameters']['debug']:
+                    print('Starting crest sampling on {} of {}!'.format(j+1,len(order)))
+                samples,energies = io_crest.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['xtb_solvent'],
+                                                             crest_options=tmp_inputDict['parameters']['crest_options'])
+                if tmp_inputDict['parameters']['debug']:
+                     print('Finished crest sampling on {} of {}!'.format(j+1,len(order)))
                 vals[i].update({'crest_conformers':samples,'crest_energies':energies})
                 vals[i].update({'energy':min(energies)})
                 tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
