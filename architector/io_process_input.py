@@ -681,7 +681,11 @@ def inparse(inputDict):
             "return_only_1":False, # Only return single relaxed conformer (do not test multiple conformations)
             "n_symmetries":10, # Total metal-center symmetrys to build, NSymmetries should be >= n_conformers
             # 'n_lig_combos':1, # Number of randomized ligand conformations to run/return for each conformer -> possibly add back
-            "crest_sampling":False, # Perform CREST sampling on lowest-energy conformer?
+            "crest_sampling":False, # Perform CREST sampling on lowest-energy conformer(s)?
+            "crest_sampling_n_conformers":1, # Number of lowest-energy Architector conformers on which to perform crest sampling.
+            "crest_options":"--gfn2//gfnff --noreftopo --nocross --quick", # Crest Additional commandline options 
+            # Charge/Spin/Solvent should not be added to crest_options 
+            # they will be used from the generated complexes and xtb_solvent flags below.
             "relax": True, # Perform xTB geomtetry relaxation of assembled complexes
             "debug": False, # Print out additional info for debugging purposes.
             "save_init_geos": False, # Save initial geometries before relaxations with xTB.

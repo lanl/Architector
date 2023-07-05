@@ -132,7 +132,11 @@ inputDict = {
     "n_symmetries": 10, # Total metal-center symmetrys to build, NSymmetries should be >= n_conformers
     "relax": True, # Perform final geomtetry relaxation of assembled complexes
     "save_init_geos": False, # Save initial geometries before relaxations.
-    "crest_sampling": False, # Perform CREST sampling on lowest-energy conformer before returning.
+    "crest_sampling": False, # Perform CREST sampling on lowest-energy conformer(s)?
+    "crest_sampling_n_conformers": 1, # Number of lowest-energy Architector conformers on which to perform crest sampling.
+    "crest_options": "--gfn2//gfnff --noreftopo --nocross --quick", # Crest Additional commandline options 
+    # Note that Charge/Spin/Solvent should NOT be added to crest_options 
+    # they will be used from the generated complexes and xtb_solvent flags above.
     "return_timings": True, # Return all intermediate and final timings.
     "skip_duplicate_tests": False, # Skip the duplicate tests (return all generated/relaxed configurations)
     "return_full_complex_class": False, # Return the complex class containing all ligand geometry and core information.

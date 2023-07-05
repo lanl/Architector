@@ -69,8 +69,9 @@ def read_conformers(fileName):
                 print('Warning - messed up!')
     return molList,xtb_energies
 
-def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
-                    solvent='none'):
+def crest_conformers(structure, charge=None, uhf=None,
+                    solvent='none',
+                    crest_options="--gfn2//gfnff --noreftopo --nocross --quick"):
     '''
     Find conformers of a given structure with CREST.
 
@@ -82,12 +83,10 @@ def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
         charge of the species, default None
     uhf : int, optional
         number of unpaired electrons in the system, default None
-    method : str, optional
-        which gfn family method to use, default GFN2/GFNFF
     solvent : str, optional
         whether to use a solvent for conformer evalulation, default 'none'
-    read_charge_spin : bool, optional
-        whether to read in the charge/spin from the structure (mol2), default False
+    crest_options : str, optional
+        string of crest_options to use in crest run.
 
     Returns
     ----------
@@ -145,28 +144,19 @@ def crest_conformers(structure, charge=None, uhf=None, method='GFN2/GFNFF',
         with open("structure.xyz",'w') as outFile:
             outFile.write(xyzstr)
 
-        if method == 'GFN2/GFNFF':
-            method_string = '--gfn2//gfnff'
-        elif method == 'GFN2-xTB':
-            method_string = '--gnf2'
-        elif method == 'GFN-FF':
-            method_string = '--gfnff'
-        else:
-            raise ValueError("This crest method is not recognized {}.".format(method))
-
         # Run CREST
         if (uhf == 0) and (solvent == 'none'):
-            execStr = "{} structure.xyz {} --chrg {} --notopo --quick > output.crest".format(
-                                                                            crestPath,method_string,mol_charge)
+            execStr = "{} structure.xyz --chrg {} {} > output.crest".format(
+                                                                            crestPath,mol_charge,crest_options)
         elif (uhf == 0) and (solvent != 'none'):
-            execStr = "{} structure.xyz {} --chrg {} --alpb {} --notopo --quick > output.crest".format(
-                                                                            crestPath,method_string,mol_charge,solvent)
+            execStr = "{} structure.xyz --chrg {} --alpb {} {} > output.crest".format(
+                                                                            crestPath,mol_charge,solvent,crest_options)
         elif (solvent == 'none'):
-            execStr = "{} structure.xyz {} --chrg {} --uhf {} --notopo --quick > output.crest".format(
-                                                                            crestPath,method_string,mol_charge,uhf)
+            execStr = "{} structure.xyz --chrg {} --uhf {} {} > output.crest".format(
+                                                                            crestPath,mol_charge,uhf,crest_options)
         else:
-            execStr = "{} structure.xyz {} --chrg {} --uhf {} --alpb {} --notopo --quick > output.crest".format(
-                                                                            crestPath,method_string,mol_charge,uhf,solvent)
+            execStr = "{} structure.xyz --chrg {} --uhf {} --alpb {} {} > output.crest".format(
+                                                                            crestPath,mol_charge,uhf,solvent,crest_options)
 
         sub.run(execStr,shell=True,check=True)
 
