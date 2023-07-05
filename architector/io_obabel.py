@@ -294,7 +294,7 @@ def get_obmol_smiles(smilesStr,
 
 
 def get_smiles_obmol(OBmol,canonicalize=False):
-    """get_obmol_smiles
+    """get_smiles_obmol
     convert smiles to OBmol instance
 
     Parameters
@@ -319,7 +319,7 @@ def get_smiles_obmol(OBmol,canonicalize=False):
 
 
 def canonicalize_smiles(insmiles):
-    """get_obmol_smiles
+    """canonicalize_smiles
     convert smiles to OBmol instance
 
     Parameters
