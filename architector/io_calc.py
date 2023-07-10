@@ -56,12 +56,15 @@ params={
 "full_charge": None, # Assign charge to the complex (overrides ligand charges and metal_ox)!
 "full_method":"GFN2-xTB", # Which xtb method to use for final cleaning/evaulating conformers.
 "assemble_method":"GFN2-xTB",
+"ff_preopt":False,
+"override_oxo_opt":False,
 "fmax":0.1,
 "maxsteps":1000,
 "vdwrad_metal":None,
 "covrad_metal":None,
 "scaled_radii_factor":None,
 "force_generation":False,
+"species_run":False,
 "debug":False,
 }
 
@@ -72,7 +75,7 @@ class CalcExecutor:
                 xtb_electronic_temperature=300, xtb_max_iterations=250,
                 fmax=0.1, maxsteps=1000, ff_preopt_run=False,
                 detect_spin_charge=False, fix_m_neighbors=False,
-                default_params=params, ase_opt_method=None,
+                default_params=params, ase_opt_method=None, species_run=False,
                 calculator=None):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
@@ -117,6 +120,8 @@ class CalcExecutor:
             default parameters to evaluate to, by default params
         ase_opt_method : ase.optimize Optimizer, optional
             Valid ase style optimizer if desired, by default None
+        species_run : bool, optional
+            Flag if this run is performed for a "species" to be added.
         calculator : ase.calculators Calculator, optional
             Valid ase style calculator if desired, by default None
         """
@@ -140,21 +145,32 @@ class CalcExecutor:
         self.fmax = fmax
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
+        self.species_run = species_run
         self.force_generation = False
         
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
             for key,val in parameters.items():
                 setattr(self,key,val)
-            if assembly:
-                self.init_sanity_check = True
-                self.relax = False
-                self.method = self.assemble_method
+
+        if assembly:
+            self.init_sanity_check = True
+            self.relax = False
+            self.method = self.assemble_method
+        elif species_run:
+            self.method = self.species_xtb_method
+            self.relax = self.species_relax
+        elif len(parameters) > 0:
+            if self.ff_preopt_run:
+                self.method = 'UFF'
+                self.relax=True
             else:
-                if self.ff_preopt_run:
-                    self.method = 'UFF'
-                else:
-                    self.method = self.full_method
+                self.method = self.full_method
+        else:
+            if self.ff_preopt_run:
+                self.method = 'UFF'
+                self.relax=True
+
         if ase_opt_method is None: # Default to LBFGSLineSearch
             self.opt_method = LBFGSLineSearch
         else:
@@ -198,8 +214,10 @@ class CalcExecutor:
                            max_iterations=self.xtb_max_iterations,
                            electronic_temperature=self.xtb_electronic_temperature,
                            accuracy=self.xtb_accuracy)
-                if np.abs(self.mol.xtb_charge - self.mol.charge) > 1: # Difference of more than 1.
-                    self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
+                # Difference of more than 1. Still perform a ff_preoptimization if requested.
+                if (np.abs(self.mol.xtb_charge - self.mol.charge) > 1):
+                    if (not self.override_oxo_opt) or (self.assembly):
+                        self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
                     if self.assembly: # FF more stable for highly charged assembly complexes.
                         self.method = 'GFN-FF'
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
