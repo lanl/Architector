@@ -160,6 +160,7 @@ inputDict = {
     "secondary_fill_ligand": "water",
     # or integer index in reference to the ligand list!!
     "force_trans_oxos":True, # Force trans configurations for oxos (Useful for actinyls)
+    # Will only be activated when actinides are present - otherwise will not force trans oxos.
     "override_oxo_opt":True, # Override no relaxation of oxo groups (not generally suggested)
     "lig_assignment":'bruteforce', # or "similarity" - How to automatically assign ligand types.
 
