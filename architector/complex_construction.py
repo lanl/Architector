@@ -239,22 +239,25 @@ class Complex:
         self.initMol.dist_sanity_checks(params=self.parameters,assembly=single_point)
         self.initMol.graph_sanity_checks(params=self.parameters,assembly=single_point)
         if self.assembled:
-            if self.parameters['ff_preopt'] and (not single_point):
+            if self.parameters['ff_preopt']:
                 if self.parameters['debug']:
                     print('Doing UFF - pre-optimization before final evaluation.')
                 calculator = CalcExecutor(self.complexMol, parameters=self.parameters,
                                 final_sanity_check=False,
-                                relax=True, assembly=single_point, 
-                                ff_preopt_run=self.parameters['ff_preopt'])
+                                relax=True, assembly=False, 
+                                ff_preopt_run=self.parameters['ff_preopt'],
+                                fix_m_neighbors=True)
                 if calculator:
                     self.complexMol.ase_atoms.set_positions(calculator.mol.ase_atoms.get_positions())
+                elif self.parameters['debug']:
+                    print('Pre-opt failed!')
             if self.parameters['debug']:
-                print("Final Evaluation - Opt Molecule/Single point")
+                print("Final Evaluation - Opt Molecule/Single point, Single Point? {}".format(single_point))
             self.calculator = CalcExecutor(self.complexMol,
                                            parameters=self.parameters,
                                            final_sanity_check=self.parameters['full_sanity_checks'],
-                                           relax=single_point,
-                                           assembly=single_point)
+                                           relax=(not single_point),
+                                           assembly=False)
             if (self.parameters['debug']) and (self.calculator):
                 print('Finished method: {} {}.'.format(self.calculator.method,
                                                     self.calculator.relax))
