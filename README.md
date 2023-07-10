@@ -159,7 +159,8 @@ inputDict = {
     # in case the fill_ligand and specified ligands list cannot fully map to the coordination environment.
     "secondary_fill_ligand": "water",
     # or integer index in reference to the ligand list!!
-    "force_trans_oxos":False, # Force trans configurations for oxos (Useful for actinyls)
+    "force_trans_oxos":True, # Force trans configurations for oxos (Useful for actinyls)
+    "override_oxo_opt":True, # Override no relaxation of oxo groups (not generally suggested)
     "lig_assignment":'bruteforce', # or "similarity" - How to automatically assign ligand types.
 
     ######### Sanity check parameters ########
