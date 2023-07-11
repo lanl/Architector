@@ -199,6 +199,7 @@ inputDict = {
     # Only other option is 'random' at the moment.
     "species_add_copies":1, # Number of species addition orientations to build 
     "species_xtb_method":'GFN2-xTB', # Right now only GFN2-xTB really works
+    'species_relax':True, # Whether or not to relax the generated "solvated" structures.
     } 
 }
 ```
