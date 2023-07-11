@@ -753,13 +753,30 @@ def inparse(inputDict):
             # In cases of XTB outright failure.
             # For very large speedup - use GFN-FF, though this is much less stable (especially for Lanthanides)
             # Or UFF
-
             "skip_duplicate_tests":False, # Skip the duplicate tests (return all generated/relaxed configurations)
             
             # Covalent radii and vdw radii of the metal if deviations requested.
             "vdwrad_metal":vdwrad_metal,
             "covrad_metal":covrad_metal,
             "scaled_radii_factor":None, # Bookeeping if scaled vdwrad/covrad passed.
+
+            # "Secondary Solvation Shell" parameters
+            "add_secondary_solv_species":False, # Whether or not to add "secondary solvation shell"  
+            "secondary_solv_n_conformers": 1, # Number of lowest-energy Architector conformers on which to add "secondary solvation shell"
+            'species_list':['water']*3, # Pass a list of species (preferred)
+            'species_smiles':'O', # Can also specify multiple copies of single species with this and next line
+            'n_species':3, # -->> this line!
+            'n_species_rotations':20, # Rotations in 3D of ligands to try
+            'n_species_conformers':1, # Number of conformers to try - right now only 1 will be tested.
+            'species_grid_pad':5, # How much to pad around the molecule species are being added to (in Angstroms)
+            'species_gridspec':0.3, # How large of steps in R3 the grid surrounding a molecule should be
+            # to which a species could be added. (in Angstroms)
+            'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
+            # to which the species could be added. (in Angstroms)
+            'species_add_method':'default', # Default attempts a basic colomb repulsion placement.
+            # Only other option is 'random' at the moment.
+            'species_xtb_method':'GFN2-xTB', # Right now only GFN2-xTB really works
+            'species_relax':True, # Whether or not to relax the generated "solvated" structures.
         } 
 
         outparams = dict()

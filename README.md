@@ -181,6 +181,23 @@ inputDict = {
     # full_graph_sanity_cutoff can be tightened to weed out distorted geometries (e.g. 1.5 for non-group1-metals) 
     "full_smallest_dist_cutoff":0.55,
     "full_min_dist_cutoff":3.5,
+
+    ######### "Secondary Solvation Shell" parameters #########
+    "add_secondary_solv_species":False, # Whether or not to add "secondary solvation shell"  
+    "secondary_solv_n_conformers": 1, # Number of lowest-energy Architector conformers on which add "secondary solvation shell"
+    "species_list":['water']*3, # Pass a list of species (preferred) - here 3 water will be added.
+    "species_smiles":'O', # Can also specify multiple copies of single species with this and next line:
+    "n_species":3, # ---->>> and this!
+    "n_species_rotations":20, # Rotations in 3D of ligands to try with "docking" 
+    "n_species_conformers":1, # Number of conformers to try - right now only 1 will be tested.
+    "species_grid_pad":5, # How much to pad around the molecule species are being added to (in Angstroms)
+    "species_gridspec":0.3, # How large of steps in R3 the grid surrounding a molecule should be
+    # to which a species could be added. (in Angstroms)
+    "species_skin":0.2, # How much buffer or "skin" should be added to around a molecule 
+    # to which the species could be added. (in Angstroms)
+    "species_add_method":'default', # Default attempts a basic Coulomb repulsion placement.
+    # Only other option is 'random' at the moment.
+    "species_xtb_method":'GFN2-xTB', # Right now only GFN2-xTB really works
     } 
 }
 ```

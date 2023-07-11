@@ -760,7 +760,7 @@ class Molecule:
         else:
             self.graph = []
 
-    def append_ligand(self, ligand=None):
+    def append_ligand(self, ligand=None, non_coordinating=False):
         """append_ligand Add ligand to the structure
         Account for charges on the ligand.
 
@@ -776,11 +776,15 @@ class Molecule:
         newligbodict = dict()
         for key,val in lig_bo_dict.items():
             newkey = [0,0]
-            if int(key[0]) > 1:
+            if non_coordinating:
+                newkey[0] = natoms + int(key[0])
+            elif (int(key[0]) > 1):
                 newkey[0] = natoms + int(key[0]) - 1
             else:
                 newkey[0] = 1
-            if int(key[1]) > 1:
+            if non_coordinating:
+                newkey[1] = natoms + int(key[1])
+            elif (int(key[1]) > 1):
                 newkey[1] = int(key[1]) + natoms - 1
             else:
                 newkey[1] = 1
@@ -837,9 +841,14 @@ class Molecule:
                 m_inds = [i for i,x in enumerate(self.ase_atoms.get_chemical_symbols()) if x in io_ptable.all_metals]
                 m_ind=None
                 if len(m_inds) > 1:
-                    raise ValueError('Sanity check only implemented for mononuclear so far.')
+                    if params.get('debug',False):
+                        print('Warning - Sanity check with custom covrad only for mononuclear so far. Setting Defaults for all metals.')
+                        multi=True
                 elif len(m_inds) == 1:
                     m_ind = m_inds[0]
+                    multi=False
+                else:
+                    multi=False
                 mrad = None
                 if isinstance(params['covrad_metal'],float):
                     mrad = params['covrad_metal']
@@ -849,7 +858,7 @@ class Molecule:
                 else:
                     all_dists = self.ase_atoms.get_all_distances()
                     cov_radii = np.array([io_ptable.rcov1[x] for x in self.ase_atoms.get_atomic_numbers()]) 
-                    if (not (m_ind is None)) and (not (mrad is None)):
+                    if (not (m_ind is None)) and (not (mrad is None)) and (not multi):
                         if mrad >= cov_radii[m_ind]:
                             cov_radii[m_ind] = mrad
                     for key, _ in self.BO_dict.items():
@@ -913,9 +922,14 @@ class Molecule:
                 m_inds = [i for i,x in enumerate(atoms.get_chemical_symbols()) if x in io_ptable.all_metals]
                 m_ind=None
                 if len(m_inds) > 1:
-                    raise ValueError('Sanity check only implemented for mononuclear so far.')
+                    if params.get('debug',False):
+                        print('Warning - Sanity check with custom covrad only for mononuclear so far. Setting Defaults for all metals.')
+                        multi=True
                 elif len(m_inds) == 1:
                     m_ind = m_inds[0]
+                    multi=False
+                else:
+                    multi=False
                 mrad = None
                 if isinstance(covrad_metal,float):
                     mrad = covrad_metal
@@ -929,7 +943,7 @@ class Molecule:
                 else:
                     all_dists = atoms.get_all_distances()
                     cov_radii = np.array([io_ptable.rcov1[x] for x in atoms.get_atomic_numbers()])
-                    if (not (m_ind is None)) and (not (mrad is None)):
+                    if (not (m_ind is None)) and (not (mrad is None)) and (not multi):
                         cov_radii[m_ind] = mrad
                     for i in range(0,len(atoms)):
                         j_list = list(range(0,len(atoms)))

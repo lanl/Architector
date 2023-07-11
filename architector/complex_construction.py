@@ -19,6 +19,7 @@ import architector.io_molecule as io_molecule
 import architector.io_align_mol as io_align_mol
 import architector.io_crest as io_crest
 import architector.io_symmetry as io_symmetry
+import architector.io_arch_dock as io_arch_dock
 from architector.io_calc import CalcExecutor
 
 class Ligand:
@@ -731,6 +732,31 @@ def build_complex(inputDict):
             vals.append(val)
         order = np.argsort(xtb_energies)
         for j,i in enumerate(order):
+            if tmp_inputDict['parameters']['add_secondary_solv_species'] and (j < tmp_inputDict['parameters']['secondary_solv_n_conformers']): 
+                if tmp_inputDict['parameters']['debug']:
+                    print('Starting secondary shell addition on {} of {}!'.format(j+1,len(order)))
+                    print('Normally adds a chunk of time (minutes) to generation.')
+                # Use the docking function to add species specified in inputDict/parameters
+                mol_plus_species = io_arch_dock.add_non_covbound_species(vals[i]['mol2string'],parameters=tmp_inputDict['parameters'])
+                # Do a final relaxation again with molecule + species.
+                calculator = CalcExecutor(mol_plus_species,
+                            parameters=tmp_inputDict['parameters'],
+                            final_sanity_check=tmp_inputDict['parameters']['full_sanity_checks'],
+                            relax=True,
+                            assembly=False)
+                if calculator.successful:
+                    mol_plus_species = calculator.mol
+                else:
+                    if tmp_inputDict['parameters']['debug']:
+                        print('Warning: Final calc after adding secondary solvation failed. Returning solvated species anyways!!!!')
+                # Add "docked" molecule to output.
+                vals[i].update({'mol2string':mol_plus_species.write_mol2('Mol_Plus_Species_Example_Energy', writestring=True),
+                                'energy':calculator.energy,
+                                'ase_atoms':mol_plus_species.ase_atoms,
+                                'total_charge':int(mol_plus_species.charge),
+                                'xtb_n_unpaired_electrons': mol_plus_species.xtb_uhf,
+                                'calc_n_unpaired_electrons': mol_plus_species.uhf,
+                                'xtb_total_charge':int(mol_plus_species.xtb_charge)})
             # Run crest sampling on lowest N-energy isomer(s) - default is just 1!
             if tmp_inputDict['parameters']['crest_sampling'] and (j < tmp_inputDict['parameters']['crest_sampling_n_conformers']): 
                 if tmp_inputDict['parameters']['debug']:
