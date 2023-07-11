@@ -197,6 +197,7 @@ inputDict = {
     # to which the species could be added. (in Angstroms)
     "species_add_method":'default', # Default attempts a basic Coulomb repulsion placement.
     # Only other option is 'random' at the moment.
+    "species_add_copies":1, # Number of species addition orientations to build 
     "species_xtb_method":'GFN2-xTB', # Right now only GFN2-xTB really works
     } 
 }

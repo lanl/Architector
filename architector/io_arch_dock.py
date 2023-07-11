@@ -133,6 +133,8 @@ def species_generate_get_ref_params(species_id,parameters={},main_molecule=False
     outdict['species_dipole'] = species.ase_atoms.get_dipole_moment()
     outdict['species_dipole_mag'] = np.linalg.norm(outdict['species_dipole'])
     outdict['species_charges'] = species.ase_atoms.get_charges()
+    outdict['energy'] = species.ase_atoms.get_total_energy()
+    outdict['forces'] = species.ase_atoms.get_forces()
     if not main_molecule:
         rotations_lst = []
         species.ase_atoms.calc = None
@@ -283,6 +285,7 @@ def add_non_covbound_species(mol, parameters={}):
             
             'species_add_method':'default', # Default attempts a basic colomb repulsion placement.
             # Only other option is 'random' at the moment.
+            'species_n_copies':1, # Copies of random species placement to use.
             'species_xtb_method':'GFN2-xTB', # Right now only GFN2-xTB really works
             
             'species_relax':True, # Whether or not to relax the generated "solvated" structures.
@@ -320,9 +323,16 @@ def add_non_covbound_species(mol, parameters={}):
     for spec in unique_specs:
         species = species_generate_get_ref_params(spec,parameters=parameters)
         species_dict[spec] = species
-    init_mol = species_generate_get_ref_params(mol,parameters=parameters,main_molecule=True)
-    for i,spec in enumerate(species_list):
-        if parameters['debug']:
-            print('Adding species {} of {}.'.format(i+1,len(species_list)))
-        init_mol = add_species(init_mol,species_dict[spec],parameters=parameters)
-    return init_mol
+    n = parameters.get("species_add_copies",1)
+    species_add_list = []
+    for j in range(n):
+        if parameters.get('debug',False):
+            print('Doing all species random addition {} of {}'.format(j+1,n))
+        init_mol = species_generate_get_ref_params(mol,parameters=parameters,main_molecule=True)
+        for i,spec in enumerate(species_list):
+            if parameters['debug']:
+                print('Adding species {} of {}.'.format(i+1,len(species_list)))
+            init_mol = add_species(init_mol,species_dict[spec],parameters=parameters)
+        species_add_list.append(init_mol)
+    outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
+    return outmol,species_add_list

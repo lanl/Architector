@@ -732,13 +732,16 @@ def build_complex(inputDict):
             vals.append(val)
         order = np.argsort(xtb_energies)
         for j,i in enumerate(order):
-            if tmp_inputDict['parameters']['add_secondary_solv_species'] and (j < tmp_inputDict['parameters']['secondary_solv_n_conformers']): 
+            if tmp_inputDict['parameters']['add_secondary_solv_species'] and \
+                  (j < tmp_inputDict['parameters']['secondary_solv_n_conformers']): 
                 if tmp_inputDict['parameters']['debug']:
                     print('Starting secondary shell addition on {} of {}!'.format(j+1,len(order)))
-                    print('Normally adds a chunk of time (minutes) to generation.')
+                    print('Normally adds a chunk of time to generation.')
                 # Use the docking function to add species specified in inputDict/parameters
-                mol_plus_species = io_arch_dock.add_non_covbound_species(vals[i]['mol2string'],parameters=tmp_inputDict['parameters'])
-                # Do a final relaxation again with molecule + species.
+                mol_plus_species,species_list = io_arch_dock.add_non_covbound_species(vals[i]['mol2string'],
+                                                                         parameters=tmp_inputDict['parameters'])
+                # Do a final relaxation again with molecule + species. Ensures matching level
+                # Of theory with other generated complexes.
                 calculator = CalcExecutor(mol_plus_species,
                             parameters=tmp_inputDict['parameters'],
                             final_sanity_check=tmp_inputDict['parameters']['full_sanity_checks'],
@@ -752,6 +755,7 @@ def build_complex(inputDict):
                 # Add "docked" molecule to output.
                 vals[i].update({'mol2string':mol_plus_species.write_mol2('Mol_Plus_Species_Example_Energy', writestring=True),
                                 'energy':calculator.energy,
+                                'sampled_solvation_shells':species_list,
                                 'ase_atoms':mol_plus_species.ase_atoms,
                                 'total_charge':int(mol_plus_species.charge),
                                 'xtb_n_unpaired_electrons': mol_plus_species.xtb_uhf,
