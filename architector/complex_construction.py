@@ -267,10 +267,12 @@ class Complex:
                 print(self.initMol.write_mol2('cool.mol2', writestring=True))
             # Retry with 2 step optimization -> first do UFF -> then do the requested method.
             if (not self.calculator.successful):
-                tmp_relax = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=single_point)
+                tmp_relax = CalcExecutor(self.complexMol,method='UFF',
+                                         fix_m_neighbors=False,
+                                         relax=(not single_point))
                 self.calculator = CalcExecutor(tmp_relax.mol,parameters=self.parameters,
                                                 final_sanity_check=self.parameters['full_sanity_checks'],
-                                                relax=single_point)
+                                                relax=(not single_point))
         else: # Ensure calculation object at least exists
             self.calculator = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=False)
             self.calculator.successful = False
