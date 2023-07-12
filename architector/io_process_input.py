@@ -426,7 +426,7 @@ def inparse(inputDict):
                             newdict.update({'smiles':ligDict['smiles']})
                             if (ligDict['smiles'] == '[H-]')or (ligDict['smiles'] == '[O-2]'): # Handle hydrides
                                 newinpDict['parameters']['relax'] = False
-                                newinpDict['parameters']['metal_spin'] = 0 # Set to low_spin
+                                # newinpDict['parameters']['metal_spin'] = 0 # Set to low_spin
                             if (ligDict['ligType'] in core_geo_class.liglist_geo_map_dict.keys()) or (ligDict['ligType'] == 'mono'):
                                 newdict.update({'ligType':ligDict['ligType']})
                             else:
@@ -444,7 +444,7 @@ def inparse(inputDict):
                             newdict.update({'smiles':ligDict['smiles']})
                             if (ligDict['smiles'] == '[H-]') or (ligDict['smiles'] == '[O-2]'): # Handle hydrides
                                 newinpDict['parameters']['relax'] = False
-                                newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
+                                # newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
                             if isinstance(ligDict['coordList'][0],list):
                                 newdict.update({'coordList':ligDict['coordList']})
                                 # Assign ligType arbitrarily -> will be ignored by io_symmetry if list of lists
@@ -598,7 +598,7 @@ def inparse(inputDict):
                     tligdict = {'smiles':lig_smiles,'coordList':coord_atoms[i]}
                     if (tligdict['smiles'] == '[H-]') or (tligdict['smiles'] == '[O-2]'): # Handle hydrides
                         newinpDict['parameters']['relax'] = False
-                        newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
+                        # newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
                         newinpDict['parameters']['full_spin'] = None
                         tligdict.update({'ligType':'mono'})
                     elif len(tligdict['coordList']) == 1: # Monodentate
@@ -709,7 +709,8 @@ def inparse(inputDict):
             # in case the fill_ligand and specified ligands list cannot fully map to the coordination environment.
             "secondary_fill_ligand": "water",
             # or integer index in reference to the ligand list!!
-            "force_trans_oxos":False, # Force trans configurations for oxos (Useful for actinyls)
+            "force_trans_oxos":True, # Force trans configurations for oxos (Useful for actinyls)
+            "override_oxo_opt":True, # Override no relaxation of oxo groups (not generally suggested)
             "lig_assignment":'bruteforce', # or "similarity" How to automatically assign ligand types.
 
             # Cutoff parameters
@@ -770,13 +771,18 @@ def inparse(inputDict):
         outparams.update(default_parameters) 
         # If acinide default to forcing trans oxos if 2 present (actinyls)
         # Can still be turned off if desired.
-        if newinpDict['parameters']['is_actinide']:
+        if (newinpDict['parameters']['is_actinide']) and \
+            (newinpDict['parameters'].get('force_trans_oxos',False)):
             count = 0 
             for lig in newinpDict['ligands']:
                 if lig['smiles'] == '[O-2]':
                     count += 1
-            if count == 2:
+            if (count == 2):
                 newinpDict['parameters']['force_trans_oxos'] = True
+            else:
+                newinpDict['parameters']['force_trans_oxos'] = False
+        else:
+            newinpDict['parameters']['force_trans_oxos'] = False
 
         if ('parameters' in newinpDict): # Load input parameters as changes to the defaults.
             if isinstance(newinpDict['parameters'],dict):
@@ -860,7 +866,7 @@ def inparse(inputDict):
 
         # FF-preoptimization shifts
         if outparams['ff_preopt']:
-            outparams['assemble_method'] = 'GFN-FF'
+            outparams['assemble_method'] = 'GFN-FF' # Less likely to crash with short interatomic distances.
             outparams['assemble_sanity_checks'] = False # Allow for close/overlapping atoms 
             outparams['fmax'] = 0.2 # Slightly decrease accuracy to encourage difficult convergence
  
@@ -871,6 +877,9 @@ def inparse(inputDict):
         # Initialize seed.
         if isinstance(newinpDict['parameters']['seed'],(int,float,np.float64,np.int64)):
             np.random.seed(int(newinpDict['parameters']['seed']))
+
+        if newinpDict['parameters']['debug']:
+            print(newinpDict)
     
         return newinpDict
     else:
@@ -1027,7 +1036,7 @@ def inparse_2D(inputDict):
                         newdict.update({'smiles':ligDict['smiles']})
                         if (ligDict['smiles'] == '[H-]')or (ligDict['smiles'] == '[O-2]'): # Handle hydrides
                             newinpDict['parameters']['relax'] = False
-                            newinpDict['parameters']['metal_spin'] = 0 # Set to low_spin
+                            # newinpDict['parameters']['metal_spin'] = 0 # Set to low_spin
                         if (ligDict['ligType'] == 'mono') or (isinstance(ligDict['ligType'],str)):
                             newdict.update({'ligType':ligDict['ligType']})
                         else:
@@ -1045,7 +1054,7 @@ def inparse_2D(inputDict):
                         newdict.update({'smiles':ligDict['smiles']})
                         if (ligDict['smiles'] == '[H-]') or (ligDict['smiles'] == '[O-2]'): # Handle hydrides
                             newinpDict['parameters']['relax'] = False
-                            newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
+                            # newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
                         if isinstance(ligDict['coordList'][0],list):
                             newdict.update({'coordList':ligDict['coordList']})
                             # Assign ligType arbitrarily -> will be ignored by io_symmetry if list of lists

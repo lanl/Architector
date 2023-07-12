@@ -19,6 +19,8 @@ With concepts from:
 """
 
 import numpy as np
+import os
+import pandas as pd
 import itertools
 import scipy
 import architector.io_ptable as io_ptable
@@ -41,6 +43,20 @@ from numba import jit
 import warnings
 
 warnings.filterwarnings('ignore') # Supress numpy warnings.
+
+def get_oxo_refdict():
+    """get_oxo_refdict
+    Pull the metal-oxo distance reference dictionary.
+
+    Returns
+    -------
+    ref_df : dict
+        dictionary with {'type':angles(List)}
+    """
+    filepath = os.path.abspath(os.path.join(__file__, "..", "data", "avg_m_oxo_dists_csd.csv"))
+    ref_df = pd.read_csv(filepath)
+    refdict = dict(zip(ref_df.metal, ref_df.avg))
+    return refdict
 
 def set_XTB_calc(ase_atoms):
     """set_XTB_calc 
@@ -817,6 +833,15 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
     fail = False
     # Set metal to zero
     metal_coords = (X[last_atom_index-1,0],X[last_atom_index-1,1],X[last_atom_index-1,2])
+    # Check if oxo
+    if (len(catoms) == 1) and (len(atomic_numbers) == 2) and (atomic_numbers[0] == 8):
+        msym = io_ptable.elements[atomic_numbers[1]]
+        refdict = get_oxo_refdict()
+        bondls = float(refdict.get(msym,refdict.get('Others',None)))
+        bondls = bondls * (io_ptable.rcov1[io_ptable.elements.index(msym)] + io_ptable.rcov1[8])
+        oxo = True
+    else:
+        oxo = False
     # set coordinates using OBMol to keep bonding info
     for i, atom in enumerate(openbabel.OBMolAtomIter(OBMol)):
         atom.SetVector(X[i, 0]-metal_coords[0], X[i, 1]-metal_coords[1], X[i, 2]-metal_coords[2])
@@ -825,6 +850,9 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
         constr = openbabel.OBFFConstraints()
         ff = openbabel.OBForceField.FindForceField('UFF')
         constr.AddAtomConstraint(int(last_atom_index))
+        # Oxo set distance based on CSD
+        if oxo:
+            constr.AddDistanceConstraint(1,2,bondls)
         s = ff.Setup(OBMol,constr)
         if not s:
             if debug:
@@ -840,6 +868,9 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
                 constr = openbabel.OBFFConstraints()
                 ff = openbabel.OBForceField.FindForceField('UFF')
                 constr.AddAtomConstraint(int(last_atom_index))
+                # Oxo set distance based on CSD
+                if oxo:
+                    constr.AddDistanceConstraint(1,2,bondls)
                 s = ff.Setup(OBMol,constr)
                 for i in range(100):
                     ff.SteepestDescent(10)
@@ -849,7 +880,7 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
             # Reorder the coordinating atom assignment to more closely match unconstrained
             # UFF relaxation to the desired geometry.
             tligcoordList, catoms = reorder_ligcoordList(coords, catoms, shape, ligcoordList, isCp=isCp)
-            if add_angle_constraints:
+            if add_angle_constraints and (len(atomic_numbers) > 2):
                 if debug:
                     print('Finished initial UFF relaxation without angle constraints.')
                 ff = openbabel.OBForceField.FindForceField('UFF')
@@ -1521,6 +1552,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         crowding_penalty = 1000
         if debug:
             print('Failed Relaxation!')
+    if ligsmiles == '[O-2]':
+        sane=True
     minval += crowding_penalty
     return outatoms, minval, sane, final_relax, bo_dict, atypes, tligcoordList
 
