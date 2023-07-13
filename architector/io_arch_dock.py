@@ -319,20 +319,27 @@ def add_non_covbound_species(mol, parameters={}):
     else:
         raise ValueError('Need either "species_list" specified OR "n_species" and "species_smiles" specified.')
     unique_specs = list(set(species_list))
-    species_dict = dict()
-    for spec in unique_specs:
-        species = species_generate_get_ref_params(spec,parameters=parameters)
-        species_dict[spec] = species
-    n = parameters.get("species_add_copies",1)
     species_add_list = []
+    n = parameters.get("species_add_copies",1)
     for j in range(n):
+        species_dict = dict()
+        for spec in unique_specs:
+            species = species_generate_get_ref_params(spec,
+                                                      parameters=parameters)
+            species_dict[spec] = species
         if parameters.get('debug',False):
             print('Doing all species random addition {} of {}'.format(j+1,n))
-        init_mol = species_generate_get_ref_params(mol,parameters=parameters,main_molecule=True)
+        init_mol = species_generate_get_ref_params(mol,
+                                                   parameters=parameters,
+                                                   main_molecule=True)
         for i,spec in enumerate(species_list):
             if parameters['debug']:
                 print('Adding species {} of {}.'.format(i+1,len(species_list)))
-            init_mol = add_species(init_mol,species_dict[spec],parameters=parameters)
+                print(species_dict[spec].write_mol2('cool_species',
+                                                    writestring=True))
+            init_mol = add_species(init_mol,
+                                   species_dict[spec],
+                                   parameters=parameters)
         species_add_list.append(init_mol)
     outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
     return outmol,species_add_list

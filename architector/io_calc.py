@@ -197,7 +197,10 @@ class CalcExecutor:
             self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
         if self.mol.dists_sane:
-            self.mol.calc_suggested_spin(params=self.parameters)
+            if (not self.species_run):
+                self.mol.calc_suggested_spin(params=self.parameters)
+            else:
+                self.mol.calc_suggested_spin()
             obabel_ff_requested = False
             if self.calculator is not None: # If ASE calculator passed use that by default
                 calc = self.calculator
