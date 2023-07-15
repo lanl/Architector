@@ -183,8 +183,8 @@ inputDict = {
     "full_min_dist_cutoff":3.5,
 
     ######### "Secondary Solvation Shell" parameters #########
-    "add_secondary_solv_species":False, # Whether or not to add "secondary solvation shell"  
-    "secondary_solv_n_conformers": 1, # Number of lowest-energy Architector conformers on which add "secondary solvation shell"
+    "add_secondary_shell_species":False, # Whether or not to add "secondary solvation shell"  
+    "secondary_shell_n_conformers": 1, # Number of lowest-energy Architector conformers on which add "secondary solvation shell"
     "species_list":['water']*3, # Pass a list of species (preferred) - here 3 water will be added.
     "species_smiles":'O', # Can also specify multiple copies of single species with this and next line:
     "n_species":3, # ---->>> and this!
@@ -195,11 +195,13 @@ inputDict = {
     # to which a species could be added. (in Angstroms)
     "species_skin":0.2, # How much buffer or "skin" should be added to around a molecule 
     # to which the species could be added. (in Angstroms)
-    "species_add_method":'default', # Default attempts a basic Coulomb repulsion placement.
+    "species_location_method":'default', # Default attempts a basic Coulomb repulsion placement.
     # Only other option is 'random' at the moment.
-    "species_add_copies":1, # Number of species addition orientations to build 
-    "species_xtb_method":'GFN2-xTB', # Right now only GFN2-xTB really works
-    'species_relax':True, # Whether or not to relax the generated "solvated" structures.
+    "species_add_copies":1, # Number of full "species_list" orientations to build (from scratch)
+    "species_method":'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
+    "species_relax":True, # Whether or not to relax the generated secondary solvation structures.
+    "species_intermediate_method":'GFN-FF', # Method to use for intermediate species orientation screening - Suggested GFN-FF
+    "species_intermediate_relax":True, # Whether to perform the relaxation only after all secondary species are added
     } 
 }
 ```

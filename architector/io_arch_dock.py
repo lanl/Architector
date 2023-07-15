@@ -85,7 +85,9 @@ def get_rad_effective(mol):
     out = (np.mean(dists),np.max(dists))
     return out
 
-def species_generate_get_ref_params(species_id,parameters={},main_molecule=False):
+def species_generate_get_ref_params(species_id,parameters={},
+                                    main_molecule=False,
+                                    intermediate=False):
     """species_generate_get_ref_params
     Get charges and species information for the generated species.
 
@@ -98,6 +100,8 @@ def species_generate_get_ref_params(species_id,parameters={},main_molecule=False
         parameters to generate, by default {}
     main_molecule : bool, optional
         Whether this is the central molecule to add other molecules to, by default False
+    intermediate : bool, optional
+        Whether this is an intermediate calculation or not.
 
     Returns
     -------
@@ -121,14 +125,13 @@ def species_generate_get_ref_params(species_id,parameters={},main_molecule=False
     else: # Otherwise these should be assigned to the molecule
         outdict = {'charge':species.charge,'uhf':species.uhf}
     mean_rad,max_rad = get_rad_effective(species)
-    outdict.update({'mean_rad':mean_rad,'max_rad':max_rad})
-    charges = np.zeros(len(species.ase_atoms))
-    charges[0] = outdict['charge']
-    uhf = np.zeros(len(species.ase_atoms))
-    uhf[0] = outdict['uhf']
-    species.ase_atoms.set_initial_charges(charges)
-    species.ase_atoms.set_initial_magnetic_moments(uhf)
-    calc = CalcExecutor(species,parameters=parameters,species_run=True)
+    species.calc_suggested_spin() # Use molecule spin/charge detection.
+    outdict.update({'mean_rad':mean_rad,
+                    'max_rad':max_rad})
+    calc = CalcExecutor(species,
+                        parameters=parameters,
+                        species_run=True,
+                        intermediate=intermediate)
     species = calc.mol
     outdict['species_dipole'] = species.ase_atoms.get_dipole_moment()
     outdict['species_dipole_mag'] = np.linalg.norm(outdict['species_dipole'])
@@ -151,7 +154,7 @@ def species_generate_get_ref_params(species_id,parameters={},main_molecule=False
 def decide_new_species_location(mol, species, parameters={}):
     """decide_new_species_location 
     Select where the species should be added.
-    Method can be changed with parameters['species_add_method'].
+    Method can be changed with parameters['species_location_method'].
     Current options are only:
     1. "default" which does a basic colomb approximation.
     2. "random" which selects a random "valid" position.
@@ -186,10 +189,10 @@ def decide_new_species_location(mol, species, parameters={}):
     upper_inds = np.where(np.any(np.less_equal(dist_grid_molecule, upper_radvect), axis=0))[0]
     lower_inds = np.where(np.any(np.less_equal(dist_grid_molecule, lower_radvect), axis=0))[0]
     shared_inds = np.setdiff1d(upper_inds,lower_inds)
-    if parameters['species_add_method'] == 'random':
+    if parameters['species_location_method'] == 'random':
         sel_ind = np.random.choice(shared_inds,size=1)
         out_location = grid[sel_ind]
-    elif parameters['species_add_method'] == 'default':
+    elif parameters['species_location_method'] == 'default':
         if parameters['debug']:
             print('Shape Check on Viable inds, All gridpoints , and All griddists.')
             print(shared_inds.shape,grid.shape,dist_grid_molecule.T.shape)
@@ -243,9 +246,6 @@ def add_species(init_mol,species,parameters={}):
     rotations = tmp_spec.param_dict['rotations_list']
     best_energy = np.inf
     out_rotation = None
-    tmp_params = copy.deepcopy(parameters)
-    tmp_params['species_relax'] = False # Do not relax
-    tmp_params['species_xtb_method'] = 'GFN-FF' # Use GFN-FF
     for i,r in enumerate(rotations): # Test all rotations using 'GFN-FF'
         if parameters['debug']:
             print('Trying rotation {}'.format(i))
@@ -253,16 +253,28 @@ def add_species(init_mol,species,parameters={}):
         tmp_spec.ase_atoms.set_positions(spec_loc - r.get_positions())
         spec_dict = {'bo_dict':tmp_spec.BO_dict,
                      'ase_atoms':tmp_spec.ase_atoms,
-                     'atom_types':tmp_spec.atom_types}
-        tmp_mol.append_ligand(spec_dict, non_coordinating=True)
+                     'atom_types':tmp_spec.atom_types,
+                     'uhf':tmp_spec.uhf,
+                     'xtb_uhf':tmp_spec.xtb_uhf,
+                     'charge':tmp_spec.charge,
+                     'xtb_charge':tmp_spec.xtb_charge}
+        tmp_mol.append_ligand(spec_dict, 
+                              non_coordinating=True)
         tmp_mol.dist_sanity_checks()
         if tmp_mol.dists_sane:
             calc = CalcExecutor(tmp_mol,
-                                parameters=tmp_params,
-                                species_run=True)
+                                parameters=parameters,
+                                species_run=True,
+                                intermediate='rotation')
             if calc.energy < best_energy:
                 out_rotation = calc.mol
-    newmol = species_generate_get_ref_params(out_rotation,parameters=parameters,main_molecule=True)
+    if out_rotation is not None:
+        newmol = species_generate_get_ref_params(out_rotation,
+                                                 parameters=parameters,
+                                                 main_molecule=True,
+                                                 intermediate='main')
+    else:
+        raise ValueError('None of the Ligands passed the calculator addition.')
     return newmol
 
 def add_non_covbound_species(mol, parameters={}):
@@ -283,13 +295,14 @@ def add_non_covbound_species(mol, parameters={}):
             'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
             # to which the species could be added. (in Angstroms)
             
-            'species_add_method':'default', # Default attempts a basic colomb repulsion placement.
+            'species_location_method':'default', # Default attempts a basic colomb repulsion placement.
             # Only other option is 'random' at the moment.
             'species_n_copies':1, # Copies of random species placement to use.
-            'species_xtb_method':'GFN2-xTB', # Right now only GFN2-xTB really works
-            
-            'species_relax':True, # Whether or not to relax the generated "solvated" structures.
-            'debug':True,
+            'species_add_copies':1, # Number of full "species_list" orientations to build (from scratch)
+            'species_method':'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
+            'species_relax':True, # Whether or not to relax the generated secondary solvation structures.
+            'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
+            'species_intermediate_relax':False, # Whether to perform the relaxation only after all secondary species are added
              }
     
     Parameters
@@ -320,7 +333,7 @@ def add_non_covbound_species(mol, parameters={}):
         raise ValueError('Need either "species_list" specified OR "n_species" and "species_smiles" specified.')
     unique_specs = list(set(species_list))
     species_add_list = []
-    n = parameters.get("species_add_copies",1)
+    n = parameters.get("species_add_copies", 1)
     for j in range(n):
         species_dict = dict()
         for spec in unique_specs:
@@ -340,6 +353,13 @@ def add_non_covbound_species(mol, parameters={}):
             init_mol = add_species(init_mol,
                                    species_dict[spec],
                                    parameters=parameters)
-        species_add_list.append(init_mol)
+        # Ensure the last configuration is relaxed if requested.
+        if parameters.get('species_relax',True) and (not parameters.get('species_intermediate_relax',False)): 
+            out_mol = species_generate_get_ref_params(init_mol,
+                                                parameters=parameters,
+                                                main_molecule=True)
+        else: # Just return final molecule.
+            out_mol = init_mol
+        species_add_list.append(out_mol)
     outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
     return outmol,species_add_list

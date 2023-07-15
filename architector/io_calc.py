@@ -76,7 +76,8 @@ class CalcExecutor:
                 fmax=0.1, maxsteps=1000, ff_preopt_run=False,
                 detect_spin_charge=False, fix_m_neighbors=False,
                 default_params=params, ase_opt_method=None, species_run=False,
-                calculator=None):
+                intermediate=False,skip_spin_assign=False,
+                calculator=None, debug=False):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
         Parameters
@@ -122,14 +123,21 @@ class CalcExecutor:
             Valid ase style optimizer if desired, by default None
         species_run : bool, optional
             Flag if this run is performed for a "species" to be added.
+        intermediate : bool, optional
+            If this is an "intermediate" calculation or not, by default False
+        skip_spin_assign : bool, optional
+            Skip the re-assignment of spin to a molcule during the calculation, by default False
         calculator : ase.calculators Calculator, optional
             Valid ase style calculator if desired, by default None
+        debug : bool, optional 
+            Whether to debug print or not, defualt False
         """
 
         self.in_struct = structure
         self.mol = io_molecule.convert_io_molecule(structure)
         self.method = method
         default_params = params.copy()
+        default_params['debug'] = debug
         default_params.update(parameters)
         self.parameters = default_params
         self.init_sanity_check = init_sanity_check
@@ -146,6 +154,7 @@ class CalcExecutor:
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
         self.species_run = species_run
+        self.skip_spin_assign = skip_spin_assign
         self.force_generation = False
         
         self.detect_spin_charge = detect_spin_charge
@@ -158,8 +167,16 @@ class CalcExecutor:
             self.relax = False
             self.method = self.assemble_method
         elif species_run:
-            self.method = self.species_xtb_method
-            self.relax = self.species_relax
+            if isinstance(intermediate,str):
+                if intermediate == 'rotation':
+                    self.method = self.species_intermediate_method
+                    self.relax = False
+                elif intermediate == 'main':
+                    self.method = self.species_method
+                    self.relax = self.species_intermediate_relax
+            else:
+                self.method = self.species_method
+                self.relax = self.species_relax
         elif len(parameters) > 0:
             if self.ff_preopt_run:
                 self.method = 'UFF'
@@ -197,10 +214,8 @@ class CalcExecutor:
             self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
         if self.mol.dists_sane:
-            if (not self.species_run):
+            if (not self.species_run) and (not self.skip_spin_assign):
                 self.mol.calc_suggested_spin(params=self.parameters)
-            else:
-                self.mol.calc_suggested_spin()
             obabel_ff_requested = False
             if self.calculator is not None: # If ASE calculator passed use that by default
                 calc = self.calculator
@@ -224,9 +239,11 @@ class CalcExecutor:
                     if self.assembly: # FF more stable for highly charged assembly complexes.
                         self.method = 'GFN-FF'
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
-                uhf_vect[0] = self.mol.xtb_uhf
+                if self.method != 'GFN-FF':
+                    uhf_vect[0] = self.mol.xtb_uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
-                charge_vect[0] = self.mol.xtb_charge
+                if self.method != 'GFN-FF':
+                    charge_vect[0] = self.mol.xtb_charge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif ('uff' in self.method.lower()) or ('mmff' in self.method.lower()):
@@ -267,7 +284,9 @@ class CalcExecutor:
                             self.errors.append(e)
                             if self.parameters['debug']:
                                 print('Warning - method did not converge!',e)
-                                print('Charge {} Spin {}\n'.format(self.mol.charge,self.mol.xtb_uhf))
+                                print('Mol XTB Charge {} Spin {}\n'.format(self.mol.xtb_charge,self.mol.xtb_uhf))
+                                print('Mol ase Charge {} Spin {}\n'.format(self.mol.ase_atoms.get_initial_charges().sum(),
+                                                                           self.mol.ase_atoms.get_initial_magnetic_moments().sum()))
                             self.energy = 10000
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
@@ -282,7 +301,9 @@ class CalcExecutor:
                             self.errors.append(e)
                             if self.parameters['debug']:
                                 print('Warning - method did not converge!',e)
-                                print('Charge {} Spin {}\n'.format(self.mol.charge,self.mol.xtb_uhf))
+                                print('Mol XTB Charge {} Spin {}\n'.format(self.mol.xtb_charge,self.mol.xtb_uhf))
+                                print('Mol ase Charge {} Spin {}\n'.format(self.mol.ase_atoms.get_initial_charges().sum(),
+                                            self.mol.ase_atoms.get_initial_magnetic_moments().sum()))
                             self.energy = 10000
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time

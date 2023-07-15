@@ -734,8 +734,8 @@ def build_complex(inputDict):
             vals.append(val)
         order = np.argsort(xtb_energies)
         for j,i in enumerate(order):
-            if tmp_inputDict['parameters']['add_secondary_solv_species'] and \
-                  (j < tmp_inputDict['parameters']['secondary_solv_n_conformers']): 
+            if tmp_inputDict['parameters']['add_secondary_shell_species'] and \
+                  (j < tmp_inputDict['parameters']['secondary_shell_n_conformers']): 
                 if tmp_inputDict['parameters']['debug']:
                     print('Starting secondary shell addition on {} of {}!'.format(j+1,len(order)))
                     print('Normally adds a chunk of time to generation.')
@@ -748,7 +748,8 @@ def build_complex(inputDict):
                             parameters=tmp_inputDict['parameters'],
                             final_sanity_check=tmp_inputDict['parameters']['full_sanity_checks'],
                             relax=True,
-                            assembly=False)
+                            assembly=False,
+                            skip_spin_assign=True) # Skip spin-reassignment after generation.
                 if calculator.successful:
                     mol_plus_species = calculator.mol
                 else:

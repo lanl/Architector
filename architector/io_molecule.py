@@ -791,11 +791,17 @@ class Molecule:
             newkey = tuple(newkey)
             newligbodict.update({newkey:val})
         self.BO_dict.update(newligbodict)
-        lcs = lig_ase_atoms.get_initial_charges().sum()
-        self.charge += lcs
-        self.xtb_charge += lcs
         self.ase_atoms += lig_ase_atoms
         self.atom_types += lig_atom_types
+        if non_coordinating: # Assume all these are additive without covalent bonds!
+            self.uhf += ligand['uhf']
+            self.charge += ligand['charge']
+            self.xtb_uhf += ligand['xtb_uhf']
+            self.xtb_charge += ligand['xtb_charge']
+        else:
+            lcs = lig_ase_atoms.get_initial_charges().sum()
+            self.charge += lcs
+            self.xtb_charge += lcs
         self.create_graph_from_bo_dict()
 
     def graph_sanity_checks(self, factor=1.45, params={}, assembly=False):
@@ -998,7 +1004,7 @@ class Molecule:
             safedet = str(det)[0:10]
         return safedet
 
-    def calc_suggested_spin(self,params={}):
+    def calc_suggested_spin(self, params={}):
         """calc_suggested_spin calculate the suggested spin using electron counting and given information.
 
         Parameters
