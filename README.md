@@ -183,6 +183,7 @@ inputDict = {
     "full_min_dist_cutoff":3.5,
 
     ######### "Secondary Solvation Shell" parameters #########
+    #### Note that this will not currently function for actinides #### This is under development.
     "add_secondary_shell_species":False, # Whether or not to add "secondary solvation shell"  
     "secondary_shell_n_conformers": 1, # Number of lowest-energy Architector conformers on which add "secondary solvation shell"
     "species_list":['water']*3, # Pass a list of species (preferred) - here 3 water will be added.
