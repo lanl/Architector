@@ -161,7 +161,7 @@ inputDict = {
     # or integer index in reference to the ligand list!!
     "force_trans_oxos":True, # Force trans configurations for oxos (Useful for actinyls)
     # Will only be activated when actinides are present - otherwise will not force trans oxos.
-    "override_oxo_opt":True, # Override no relaxation of oxo groups (not generally suggested)
+    "override_oxo_opt":False, # Override no relaxation of oxo groups (not generally suggested)
     "lig_assignment":'bruteforce', # or "similarity" - How to automatically assign ligand types.
 
     ######### Sanity check parameters ########
@@ -203,6 +203,8 @@ inputDict = {
     "species_relax":True, # Whether or not to relax the generated secondary solvation structures.
     "species_intermediate_method":'GFN-FF', # Method to use for intermediate species orientation screening - Suggested GFN-FF
     "species_intermediate_relax":True, # Whether to perform the relaxation only after all secondary species are added
+    "freeze_molecule_add_species":False, # Whether to free the original moleucule during all secondary
+    # shell relaxations, default False.
     } 
 }
 ```
