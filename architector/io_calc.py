@@ -16,6 +16,7 @@ import architector.arch_context_manage as arch_context_manage
 import architector.io_molecule as io_molecule
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
+from ase.constraints import FixAtoms
 
 ### Add any other ASE calculator here.
 # To extend to other methods.
@@ -156,6 +157,7 @@ class CalcExecutor:
         self.species_run = species_run
         self.skip_spin_assign = skip_spin_assign
         self.force_generation = False
+        self.force_oxo_relax = False
         
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
@@ -174,6 +176,7 @@ class CalcExecutor:
                 elif intermediate == 'main':
                     self.method = self.species_method
                     self.relax = self.species_intermediate_relax
+                    self.force_oxo_relax = True
             else:
                 self.method = self.species_method
                 self.relax = self.species_relax
@@ -234,9 +237,9 @@ class CalcExecutor:
                            accuracy=self.xtb_accuracy)
                 # Difference of more than 1. Still perform a ff_preoptimization if requested.
                 if (np.abs(self.mol.xtb_charge - self.mol.charge) > 1):
-                    if (not self.override_oxo_opt) or (self.assembly):
+                    if ((not self.override_oxo_opt) or (self.assembly)) and (not self.force_oxo_relax):
                         self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
-                    if self.assembly: # FF more stable for highly charged assembly complexes.
+                    elif self.assembly: # FF more stable for highly charged assembly complexes.
                         self.method = 'GFN-FF'
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 if self.method != 'GFN-FF':
@@ -253,6 +256,12 @@ class CalcExecutor:
             if not obabel_ff_requested:
                 self.mol.ase_atoms.calc = calc
                 if self.relax:
+                    if self.parameters.get("freeze_molecule_add_species",False):
+                        if self.parameters['debug']:
+                            print('Fixing first component!')
+                        fix_inds = self.mol.find_component_indices(component=0)
+                        c = FixAtoms(indices=fix_inds.tolist())
+                        self.mol.ase_atoms.set_constraint(c)
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
                         try:
@@ -290,6 +299,11 @@ class CalcExecutor:
                             self.energy = 10000
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
+                    # Remove constraint
+                    if self.parameters.get("freeze_molecule_add_species",False):
+                        if self.parameters['debug']:
+                            print('Removing fixing first component!')
+                        self.mol.ase_atoms.set_constraint() 
                 else:
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
