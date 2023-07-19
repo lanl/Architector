@@ -784,7 +784,8 @@ def reorder_ligcoordList(coords, catoms, shape, ligcoordList, isCp=False):
     return new_ligcoordList, new_catoms
 
 def clean_conformation_ff(X, OBMol, catoms, shape, graph, 
-                          atomic_numbers, ligcoordList, add_angle_constraints=True,
+                          atomic_numbers, ligcoordList, original_metal='Fe',
+                          add_angle_constraints=True,
                           isCp=False, cp_catoms=[], skip_mff=False,add_hydrogens=True,
                           debug=False
                           ):
@@ -806,6 +807,8 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
     atomic_numbers : np.ndarray
         N array containing the atomic numbers -> used for flagging hydrogens as 
         second-nearest neighbors to the metal.
+    original_metal : str, optional
+        Atomic symbol of original metal, by default 'Fe'
     add_angle_constraints : bool
         Whether or not to add angle constraints to force ligand into position, default False
     isCp : bool, optional
@@ -835,7 +838,7 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
     metal_coords = (X[last_atom_index-1,0],X[last_atom_index-1,1],X[last_atom_index-1,2])
     # Check if oxo
     if (len(catoms) == 1) and (len(atomic_numbers) == 2) and (atomic_numbers[0] == 8):
-        msym = io_ptable.elements[atomic_numbers[1]]
+        msym = original_metal
         refdict = get_oxo_refdict()
         bondls = float(refdict.get(msym,refdict.get('Others',None)))
         bondls = bondls * (io_ptable.rcov1[io_ptable.elements.index(msym)] + io_ptable.rcov1[8])
@@ -852,6 +855,8 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
         constr.AddAtomConstraint(int(last_atom_index))
         # Oxo set distance based on CSD
         if oxo:
+            if debug:
+                print('Adding oxo constraints to ligand generation!',bondls)
             constr.AddDistanceConstraint(1,2,bondls)
         s = ff.Setup(OBMol,constr)
         if not s:
@@ -870,6 +875,8 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
                 constr.AddAtomConstraint(int(last_atom_index))
                 # Oxo set distance based on CSD
                 if oxo:
+                    if debug:
+                        print('Adding oxo constraints to ligand generation!',bondls)
                     constr.AddDistanceConstraint(1,2,bondls)
                 s = ff.Setup(OBMol,constr)
                 for i in range(100):
@@ -1202,6 +1209,7 @@ def set_position_align(ase_atoms, ligcoordList, corecoordList, isCp=False, debug
     return (rotatedConformer, minval, sane)
 
 def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe', 
+                          original_metal='Fe',
                           add_angle_constraints=True, non_triangle=False,
                           rot_coord_vect=False, rot_angle=0, skip_mmff=False,
                           covrad_metal=None, vdwrad_metal=None, no_ff=False,
@@ -1219,6 +1227,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         List of lists inidicated connection sites by geometry 
     metal : str, optional
         Metal to be calculated -> by default, Fe
+    original_metal : str, optional
+        Original Metal to be calculated (useful for actinide switches)-> by default, Fe
     covrad_metal : float, optional
         covalent radii of the metal, default None
     vdwrad_metal : float, optional
@@ -1501,6 +1511,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 Conf3D_out, fail, final_relax, tligcoordList = clean_conformation_ff(X, 
                                                 Conf3D, catoms, shape, 
                                                 graph, anums, ligcoordList,
+                                                original_metal=original_metal,
                                                 add_angle_constraints=add_angle_constraints,
                                                 isCp=isCp,
                                                 cp_catoms=cp_catoms,
@@ -1557,8 +1568,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
     minval += crowding_penalty
     return outatoms, minval, sane, final_relax, bo_dict, atypes, tligcoordList
 
-def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconformers=3,
-                    ligtype=None, skip_mmff=False, covrad_metal=None, vdwrad_metal=None,
+def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', originalMetal='Fe',
+                    nconformers=3, ligtype=None, skip_mmff=False, covrad_metal=None, vdwrad_metal=None,
                     no_ff=False, debug=False
                     ):
     """find_conformers 
@@ -1574,6 +1585,8 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         core coord list
     metal : str, optional
         metal identity, by default 'Fe'
+    originalMetal :  str, optional
+        original metal identity, by default 'Fe'
     nconformers : int, optional
         number of conformers to test, by default 5
     ligtype : str, optional
@@ -1614,6 +1627,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
                                          metal=metal,
+                                         original_metal=originalMetal,
                                          skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1630,6 +1644,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
                                          metal=metal,
+                                         original_metal=originalMetal,
                                          skip_mmff=skip_mmff,covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1645,6 +1660,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
                                          metal=metal,
+                                         original_metal=originalMetal,
                                          skip_mmff=True, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1661,6 +1677,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                         corecoordList, 
                                         metal=metal, 
+                                        original_metal=originalMetal,
                                         skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1676,6 +1693,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, _ , _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
@@ -1689,6 +1707,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            original_metal=originalMetal,
                                             add_angle_constraints=True,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1703,6 +1722,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal,  
+                                            original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1717,6 +1737,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
             conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            original_metal=originalMetal,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
             if sane:
@@ -1732,6 +1753,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, _ , _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
@@ -1745,6 +1767,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
                                          metal=metal, 
+                                         original_metal=originalMetal,
                                          skip_mmff=True, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
@@ -1759,7 +1782,8 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         # Add N+2 with the triangle angle constraint for metal (encouraging different conformers for multidentate)
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
-                                            metal=metal, 
+                                            metal=metal,
+                                            original_metal=originalMetal, 
                                             add_angle_constraints=True,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1774,6 +1798,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', nconform
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             non_triangle=True,
                                             skip_mmff=skip_mmff, 
