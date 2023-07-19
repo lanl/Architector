@@ -170,9 +170,10 @@ def convert_xyz_ase(structure_str):
 class Molecule:
 
     def __init__(self, in_ase=False, BO_dict={}, atom_types=[], cell=[], charge=None,
-                uhf=None, xtb_uhf=None, xtb_charge=None):
+                uhf=None, xtb_uhf=None, xtb_charge=None, actinides=None):
         self.dists_sane = True
         self.sanity_check_dict = {}
+        self.actinides_swapped = False
         if isinstance(in_ase,ase.atoms.Atoms):
             self.ase_atoms = in_ase.copy()
             self.BO_dict = BO_dict
@@ -181,6 +182,7 @@ class Molecule:
             self.xtb_uhf = xtb_uhf
             self.xtb_charge = xtb_charge
             self.atom_types = atom_types
+            self.actinides = actinides
             self.cell = cell
             if len(BO_dict) > 0:
                 self.graph = np.zeros((len(self.ase_atoms),len(self.ase_atoms)))
@@ -211,8 +213,10 @@ class Molecule:
                 self.graph = []
         elif isinstance(in_ase,str) and (in_ase[-5:] == '.mol2'):
             self.read_mol2(in_ase)
+            self.actinides = [i for i,x in enumerate(self.ase_atoms.get_chemical_symbols()) if x in io_ptable.actinides]
         elif isinstance(in_ase,bool):
             self.ase_atoms = None
+            self.actinides = None
         else:
             raise ValueError('Need ase.atoms.Atoms/xyz/mol2 as input for molecule class!')
 
@@ -248,6 +252,7 @@ class Molecule:
             raise ValueError('Need ase.atoms.Atoms as input for molecule class!')
         self.BO_dict = BO_dict.copy()
         self.atom_types = atom_types
+        self.actinides = [i for i,x in enumerate(self.ase_atoms.get_chemical_symbols()) if x in io_ptable.actinides]
         self.cell = cell
         if charge is not None:
             self.charge = charge
@@ -321,6 +326,7 @@ class Molecule:
             self.ase_atoms = read(filename,format='xyz',parallel=False)
         else:
             self.ase_atoms = read(filename,parallel=False)
+        self.actinides = [i for i,x in enumerate(self.ase_atoms.get_chemical_symbols()) if x in io_ptable.actinides]
         self.graph = []
         self.BO_dict = {}
         self.charge = None
@@ -359,6 +365,7 @@ class Molecule:
                 else:
                     atoms.append(Atom(symbol,coords))
         self.ase_atoms = atoms
+        self.actinides = [i for i,x in enumerate(self.ase_atoms.get_chemical_symbols()) if x in io_ptable.actinides]
         self.graph = []
         self.charge = None
         self.uhf = None
@@ -578,6 +585,7 @@ class Molecule:
         else:
             self.graph = []
             self.BO_dict = {}
+        self.actinides = [i for i,x in enumerate(self.ase_atoms.get_chemical_symbols()) if x in io_ptable.actinides]
         self.charge = charge
         self.uhf = spin
         self.xtb_uhf = xtb_spin
@@ -1088,3 +1096,63 @@ class Molecule:
         self.uhf = uhf
         self.xtb_uhf = xtb_uhf
         self.xtb_charge = xtb_charge
+
+    def swap_actinide(self,debug=False,skip=False):
+        """swap_actinide swap actinides for lanthanides or reverse
+
+        Parameters
+        ----------
+        debug : bool, optional
+            print debug statements, by default False
+        skip : bool, optional
+            skip swapping back, by default False
+        """
+        if skip:
+            if debug:
+                print('Skipping swapping')
+            pass
+        elif (self.actinides_swapped) and (len(self.actinides) > 0):
+            if debug:
+                print('Swapping substituted lanthanides back to actinides.')
+            syms = self.ase_atoms.get_chemical_symbols()
+            ln_symbols = [syms[x] for x in self.actinides]
+            an_symbols = [io_ptable.actinides[io_ptable.lanthanides.index(x)] for x in ln_symbols]
+            for i,j in enumerate(self.actinides):
+                syms[j] = an_symbols[i]
+                self.atom_types[j] = an_symbols[i]
+            self.actinides_swapped = False
+            self.ase_atoms.set_chemical_symbols(syms)
+        elif (len(self.actinides)):
+            if debug:
+                print('Swapping actinides to lanthanides.')
+            syms = self.ase_atoms.get_chemical_symbols()
+            an_symbols = [syms[x] for x in self.actinides]
+            ln_symbols = [io_ptable.lanthanides[io_ptable.actinides.index(x)] for x in an_symbols]
+            for i,j in enumerate(self.actinides):
+                syms[j] = ln_symbols[i]
+                self.atom_types[j] = ln_symbols[i]
+            self.actinides_swapped = True
+            self.ase_atoms.set_chemical_symbols(syms)
+        else:
+            if debug:
+                print('No actinides present to swap.')
+
+    def find_component_indices(self, component=0):
+        """find_component_indices pull out the i'th disjoint component
+        Useful for freezing atoms
+
+        Parameters
+        ----------
+        component : int, optional
+            index of component to extract, by default 0
+
+        Returns
+        -------
+        indices, np.ndarray
+            Indices of the ith component.
+        """
+
+        csg = csgraph_from_dense(self.graph)
+        disjoint_components = connected_components(csg)
+        indices = np.where(disjoint_components[1] == component)[0]
+        return indices
