@@ -87,7 +87,8 @@ def get_rad_effective(mol):
 
 def species_generate_get_ref_params(species_id,parameters={},
                                     main_molecule=False,
-                                    intermediate=False):
+                                    intermediate=False,
+                                    skip_act_swap=False):
     """species_generate_get_ref_params
     Get charges and species information for the generated species.
 
@@ -101,7 +102,9 @@ def species_generate_get_ref_params(species_id,parameters={},
     main_molecule : bool, optional
         Whether this is the central molecule to add other molecules to, by default False
     intermediate : bool, optional
-        Whether this is an intermediate calculation or not.
+        Whether this is an intermediate calculation or not, by default False
+    skip_act_swap : bool, optional
+        Whether to skip actinide swapping, by default False
 
     Returns
     -------
@@ -109,6 +112,7 @@ def species_generate_get_ref_params(species_id,parameters={},
         Architector molecule object with species with attached .param_dict[] object.
     """
     species = io_molecule.convert_io_molecule(species_id)
+    species.swap_actinide(debug=parameters.get('debug',False),skip=skip_act_swap)
     ## Possibly generate a bunch more conformers from a SMILES?
     ## species_confs = io_obabel.generate_obmol_conformers(solvent_smi)
     if isinstance(species_id,str):
@@ -124,8 +128,12 @@ def species_generate_get_ref_params(species_id,parameters={},
                 outdict = {'charge':species.charge,'uhf':species.uhf}
     else: # Otherwise these should be assigned to the molecule
         outdict = {'charge':species.charge,'uhf':species.uhf}
-    mean_rad,max_rad = get_rad_effective(species)
-    species.calc_suggested_spin() # Use molecule spin/charge detection.
+    mean_rad, max_rad = get_rad_effective(species)
+    if any([(species.charge is None),
+        (species.uhf is None),
+        (species.xtb_charge is None),
+        (species.xtb_uhf is None)]):
+        species.calc_suggested_spin() # Use molecule spin/charge detection.
     outdict.update({'mean_rad':mean_rad,
                     'max_rad':max_rad})
     calc = CalcExecutor(species,
@@ -240,7 +248,9 @@ def add_species(init_mol,species,parameters={}):
     newmol : architector.io_molecule.Molecule
         Molecule with species added.
     """
-    spec_loc = decide_new_species_location(init_mol,species,parameters=parameters)
+    spec_loc = decide_new_species_location(init_mol,
+                                           species,
+                                           parameters=parameters)
     tmp_spec = copy.deepcopy(species)
     init_mol.ase_atoms.calc = None
     rotations = tmp_spec.param_dict['rotations_list']
@@ -272,7 +282,8 @@ def add_species(init_mol,species,parameters={}):
         newmol = species_generate_get_ref_params(out_rotation,
                                                  parameters=parameters,
                                                  main_molecule=True,
-                                                 intermediate='main')
+                                                 intermediate='main',
+                                                 skip_act_swap=True)
     else:
         raise ValueError('None of the Ligands passed the calculator addition.')
     return newmol
@@ -357,9 +368,11 @@ def add_non_covbound_species(mol, parameters={}):
         if parameters.get('species_relax',True) and (not parameters.get('species_intermediate_relax',False)): 
             out_mol = species_generate_get_ref_params(init_mol,
                                                 parameters=parameters,
-                                                main_molecule=True)
+                                                main_molecule=True,
+                                                skip_act_swap=True)
         else: # Just return final molecule.
             out_mol = init_mol
+        out_mol.swap_actinide(debug=parameters.get('debug',False))
         species_add_list.append(out_mol)
     outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
     return outmol,species_add_list
