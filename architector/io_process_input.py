@@ -710,7 +710,7 @@ def inparse(inputDict):
             "secondary_fill_ligand": "water",
             # or integer index in reference to the ligand list!!
             "force_trans_oxos":True, # Force trans configurations for oxos (Useful for actinyls)
-            "override_oxo_opt":True, # Override no relaxation of oxo groups (not generally suggested)
+            "override_oxo_opt":False, # Override no relaxation of oxo groups (not generally suggested)
             "lig_assignment":'bruteforce', # or "similarity" How to automatically assign ligand types.
 
             # Cutoff parameters
@@ -764,6 +764,8 @@ def inparse(inputDict):
             "add_secondary_shell_species":False, # Whether or not to add "secondary solvation shell"  
             "secondary_shell_n_conformers": 1, # Number of lowest-energy Architector conformers on which to add "secondary solvation shell"
             'species_list':['water']*3, # Pass a list of species (preferred)
+            "freeze_molecule_add_species":False, # Whether to free the original moleucule during all secondary
+            # shell relaxations, default False.
             'species_smiles':'O', # Can also specify multiple copies of single species with this and next line
             'n_species':3, # -->> this line!
             'n_species_rotations':20, # Rotations in 3D of ligands to try
@@ -789,25 +791,36 @@ def inparse(inputDict):
         #     default_parameters['assemble_method'] = 'GFN-FF'
 
         outparams.update(default_parameters) 
-        # If acinide default to forcing trans oxos if 2 present (actinyls)
-        # Can still be turned off if desired.
-        if (newinpDict['parameters']['is_actinide']) and \
-            (newinpDict['parameters'].get('force_trans_oxos',False)):
-            count = 0 
-            for lig in newinpDict['ligands']:
-                if lig['smiles'] == '[O-2]':
-                    count += 1
-            if (count == 2):
-                newinpDict['parameters']['force_trans_oxos'] = True
-            else:
-                newinpDict['parameters']['force_trans_oxos'] = False
-        else:
-            newinpDict['parameters']['force_trans_oxos'] = False
 
         if ('parameters' in newinpDict): # Load input parameters as changes to the defaults.
             if isinstance(newinpDict['parameters'],dict):
                 outparams.update(newinpDict['parameters'])
+        
+        # If actinide default to forcing trans oxos if 2 present (actinyls)
+        # Can still be turned off if desired.
+        count = 0 
+        for lig in newinpDict['ligands']:
+            if lig['smiles'] == '[O-2]':
+                count += 1
+        if outparams.get('debug',False):
+            print('Number of oxos: ',count)
+        if (outparams['is_actinide']) and \
+            (outparams.get('force_trans_oxos',False)):
+            if (count == 2):
+                outparams['force_trans_oxos'] = True
+            else:
+                outparams['force_trans_oxos'] = False
+        else:
+            outparams['force_trans_oxos'] = False
+        # Switch to not relax
+        if (count > 0) and (not outparams['override_oxo_opt']):
+            outparams['relax'] = False
+            if outparams.get('is_actinide',False): # Use ff preoptimization by default.
+                outparams['ff_preopt'] = True
 
+        if (outparams['is_actinide']):
+            outparams['freeze_molecule_add_species'] = True
+            
         if outparams['n_conformers'] < 1:
             print('Defaulting to 1 conformer')
             outparams['n_conformers'] = 1
