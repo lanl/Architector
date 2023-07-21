@@ -136,16 +136,23 @@ def species_generate_get_ref_params(species_id,parameters={},
         species.calc_suggested_spin() # Use molecule spin/charge detection.
     outdict.update({'mean_rad':mean_rad,
                     'max_rad':max_rad})
-    calc = CalcExecutor(species,
-                        parameters=parameters,
-                        species_run=True,
-                        intermediate=intermediate)
-    species = calc.mol
-    outdict['species_dipole'] = species.ase_atoms.get_dipole_moment()
-    outdict['species_dipole_mag'] = np.linalg.norm(outdict['species_dipole'])
-    outdict['species_charges'] = species.ase_atoms.get_charges()
-    outdict['energy'] = species.ase_atoms.get_total_energy()
-    outdict['forces'] = species.ase_atoms.get_forces()
+    if parameters.get('species_location_method','default') != 'random':
+        calc = CalcExecutor(species,
+                            parameters=parameters,
+                            species_run=True,
+                            intermediate=intermediate)
+        species = calc.mol
+        outdict['species_dipole'] = species.ase_atoms.get_dipole_moment()
+        outdict['species_dipole_mag'] = np.linalg.norm(outdict['species_dipole'])
+        outdict['species_charges'] = species.ase_atoms.get_charges()
+        outdict['energy'] = species.ase_atoms.get_total_energy()
+        outdict['forces'] = species.ase_atoms.get_forces()
+    else:
+        calc = CalcExecutor(species,
+                            parameters=parameters,
+                            species_run=True,
+                            intermediate=intermediate)
+        outdict['energy'] = calc.energy
     if not main_molecule:
         rotations_lst = []
         species.ase_atoms.calc = None
@@ -267,7 +274,9 @@ def add_species(init_mol,species,parameters={}):
                      'uhf':tmp_spec.uhf,
                      'xtb_uhf':tmp_spec.xtb_uhf,
                      'charge':tmp_spec.charge,
-                     'xtb_charge':tmp_spec.xtb_charge}
+                     'xtb_charge':tmp_spec.xtb_charge,
+                     'actinides_swapped':tmp_spec.actinides_swapped,
+                     'actinides':tmp_spec.actinides}
         tmp_mol.append_ligand(spec_dict, 
                               non_coordinating=True)
         tmp_mol.dist_sanity_checks()
