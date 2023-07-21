@@ -775,6 +775,8 @@ def inparse(inputDict):
             # to which a species could be added. (in Angstroms)
             'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
             # to which the species could be added. (in Angstroms)
+            'species_grid_rad_scale':1, # Factor to multiply molecule+species vdw by to set molecules.
+    # e.g. Reduce to allow for closer molecule-species distances
             'species_location_method':'default', # Default attempts a basic colomb repulsion placement.
             # Only other option is 'random' at the moment.
             'species_add_copies':1, # Number of species addition orientations to build 

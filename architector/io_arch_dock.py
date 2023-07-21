@@ -197,8 +197,9 @@ def decide_new_species_location(mol, species, parameters={}):
     upper_radvect = []
     lower_radvect = []
     for z in mol.ase_atoms.get_atomic_numbers():
-        upper_radvect.append(io_ptable.rvdw[z]+spec_rad+parameters['species_skin'])
-        lower_radvect.append(io_ptable.rvdw[z]+spec_rad)
+        grid_radii = parameters.get('species_grid_rad_scale',1)*(io_ptable.rvdw[z]+spec_rad)
+        upper_radvect.append(grid_radii+parameters['species_skin'])
+        lower_radvect.append(grid_radii)
     upper_radvect = np.array(upper_radvect).reshape(-1,1)
     lower_radvect = np.array(lower_radvect).reshape(-1,1)
     upper_inds = np.where(np.any(np.less_equal(dist_grid_molecule, upper_radvect), axis=0))[0]

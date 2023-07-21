@@ -194,6 +194,8 @@ inputDict = {
     "species_grid_pad":5, # How much to pad around the molecule species are being added to (in Angstroms)
     "species_gridspec":0.3, # How large of steps in R3 the grid surrounding a molecule should be
     # to which a species could be added. (in Angstroms)
+    "species_grid_rad_scale":1, # Factor to multiply molecule+species vdw by to set molecules.
+    # e.g. Reduce to allow for closer molecule-species distances.
     "species_skin":0.2, # How much buffer or "skin" should be added to around a molecule 
     # to which the species could be added. (in Angstroms)
     "species_location_method":'default', # Default attempts a basic Coulomb repulsion placement.
