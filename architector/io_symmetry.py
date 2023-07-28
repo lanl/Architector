@@ -225,8 +225,33 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
     newLigInputDicts = ordered_newLigInputDicts
     selected_con_lists = ordered_sel_con_lists
 
+    uligs,_ = np.unique([str(x) for x in ordered_newLigInputDicts],
+                        return_counts=True)
+    maxdent = max(denticities)
+
     # Only one ligand passed with monodentate fill_ligand - generate only one valid combination
     if (len(ligInputDicts) == 1) and (params['n_conformers'] == 1) and (len(params['fill_ligand']['coordList']) == 1): 
+        if all(goods):
+            out_combo = [selected_con_lists[0][0]]
+            remaining = [[x] for x in range(tmp_cn) if x not in selected_con_lists[0][0]]
+            out_combo += remaining
+            ligLists = []
+            for j,selected_con_list in enumerate(out_combo):
+                ligList = []
+                if (newLigInputDicts[j]['ligType'] == 'sandwich') or (newLigInputDicts[j]['ligType'] == 'haptic'):
+                    for i in newLigInputDicts[j]['coordList']:
+                        ligList.append([i,list(selected_con_list)])
+                else:
+                    for i,x in enumerate(selected_con_list):
+                        ligList.append([newLigInputDicts[j]['coordList'][i],int(x)])
+                ligLists.append(ligList)
+            good = True
+            out_liglists.append(ligLists)
+        else:
+            good = False
+    elif (len(uligs) == 1) and (maxdent == 1):
+        if params['debug']:
+            print('DETERMINING SYMMETRIES - only 1 unique monodentate ligand, symmetries assumed identical.')
         if all(goods):
             out_combo = [selected_con_lists[0][0]]
             remaining = [[x] for x in range(tmp_cn) if x not in selected_con_lists[0][0]]
