@@ -837,7 +837,8 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
     # Set metal to zero
     metal_coords = (X[last_atom_index-1,0],X[last_atom_index-1,1],X[last_atom_index-1,2])
     # Check if oxo
-    if (len(catoms) == 1) and (len(atomic_numbers) == 2) and (atomic_numbers[0] == 8):
+    if (len(catoms) == 1) and (len(atomic_numbers) == 2) and \
+        (atomic_numbers[0] == 8) and (OBMol.GetTotalCharge() == -2):
         msym = original_metal
         refdict = get_oxo_refdict()
         bondls = float(refdict.get(msym,refdict.get('Others',None)))
