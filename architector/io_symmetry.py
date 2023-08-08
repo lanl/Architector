@@ -115,7 +115,7 @@ def map_repeat_to_highdent(sel_con_list,nlig,denticity):
     all_combos = [x for x in itertools.combinations(sel_con_list,nlig)]
     highdents = np.array(all_combos)
     out = highdents.flatten()
-    out = out.reshape(np.int(out.shape[0]/(nlig*denticity)),
+    out = out.reshape(int(out.shape[0]/(nlig*denticity)),
                       nlig*denticity)
     highdents = highdents.tolist()
     reshape_out = []
