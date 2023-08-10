@@ -12,6 +12,7 @@ import itertools
 import numpy as np
 import pandas as pd
 import os
+import copy
 import architector.io_ptable as io_ptable
 import architector.geometries as geo
 import warnings
@@ -350,7 +351,10 @@ class Geometries:
         # Assign sandwich/haptic ligands to tri_fac geometries!
         total_dict['sandwich'] = total_dict['tri_fac']
         total_dict['haptic'] = total_dict['tri_fac']
-        self.liglist_geo_map_dict = total_dict
+        outdict = copy.deepcopy(total_dict)
+        for key,val in total_dict.items(): # Add in "edge" versions of the ligands
+            outdict['edge_'+key] = val
+        self.liglist_geo_map_dict = outdict
 
 
 def calc_all_coord_atom_angles(core_geo):

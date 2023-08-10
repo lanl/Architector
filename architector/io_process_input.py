@@ -75,10 +75,23 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
     for ring in rings:
         if all(ring.IsInRing(x+1) for x in ligcoords) and (len(ligcoords) > 2) and (ring.IsAromatic()):
             is_cp = True
+    total_edge_bound = 0 # Check for coordination atoms that are neighbors of each other.
+    for i,ca1 in enumerate(ligcoords[:-1]):
+        at1 = OBmol.GetAtom(int(ca1+1))
+        for ca2 in ligcoords[i+1:]:
+            at2 = OBmol.GetAtom(int(ca2+1))
+            if at1.GetBond(at2) is not None:
+                total_edge_bound += 1
     if is_cp:
         return 'sandwich'
     elif len(ligcoords) > 9: # 10-12 are saved under these monikers.
         return str(len(ligcoords))
+    elif len(ligcoords) == 1:
+        return 'mono'
+    elif total_edge_bound > 1:
+        raise ValueError('Error: Edge ligands with more than 2 coordination sites are yet-unsupported in Architector.')
+    elif total_edge_bound == 1:
+        return 'edge_bi_cis'
     else:
         lig_denticity = len(ligcoords)
         possible_Ligtypes = core_geo_class.cn_ligType_dict[lig_denticity]
@@ -209,6 +222,13 @@ def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_
     for ring in rings:
         if all(ring.IsInRing(x+1) for x in ligcoords) and (len(ligcoords) > 2) and (ring.IsAromatic()):
             is_cp = True
+    total_edge_bound = 0 # Check for coordination atoms that are neighbors of each other.
+    for i,ca1 in enumerate(ligcoords[:-1]):
+        at1 = OBmol.GetAtom(int(ca1+1))
+        for ca2 in ligcoords[i+1:]:
+            at2 = OBmol.GetAtom(int(ca2+1))
+            if at1.GetBond(at2) is not None:
+                total_edge_bound += 1
     ligtype = None
     ligmol2 = None
     if is_cp:
@@ -217,6 +237,10 @@ def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_
         ligtype = 'mono'
     elif len(ligcoords) > 9:
         ligtype = str(len(ligcoords))
+    elif total_edge_bound > 1:
+        raise ValueError('Error: Edge ligands with more than 2 coordination sites are yet-unsupported in Architector.')
+    elif total_edge_bound == 1:
+        return 'edge_bi_cis'
     else:
         arch_path = '/'.join(architector.__file__.split('/')[0:-1])
         data_path = arch_path + '/data/angle_stats_datasource.csv'
@@ -429,10 +453,18 @@ def inparse(inputDict):
                                 # newinpDict['parameters']['metal_spin'] = 0 # Set to low_spin
                             if (ligDict['ligType'] in core_geo_class.liglist_geo_map_dict.keys()) or (ligDict['ligType'] == 'mono'):
                                 newdict.update({'ligType':ligDict['ligType']})
+                            elif ('edge' in ligDict['ligType']):
+                                lt = assign_ligType_bruteforce(core_geo_class, ligDict['smiles'], ligDict['coordList'], 
+                                                                tmetal, covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
+                                newdict.update({'ligType':lt})
                             else:
                                 print('Error: {} ligand type not recognized!'.format(ligDict['ligType']))
                                 print('Valid ligand types: ', core_geo_class.liglist_geo_map_dict.keys(), ' + mono')
                                 raise ValueError
+                            if ('edge' in newdict['ligType']): # Duplicate test of edge type ligands in case somethin unsuppored requested.
+                                lt = assign_ligType_bruteforce(core_geo_class, ligDict['smiles'], ligDict['coordList'], 
+                                                                tmetal, covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
+                                newdict.update({'ligType':lt})
                             if isinstance(ligDict['coordList'][0],(int,float)):
                                 newdict.update({'coordList':[int(x) for x in ligDict['coordList']]})
                             elif isinstance(ligDict['coordList'][0],list):

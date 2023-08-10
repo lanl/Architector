@@ -151,7 +151,7 @@ def symmetricize(arr1D):
 def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwradii, anums,
                       isCp=False, cp_catoms=[], bond_tol=0.1, angle_tol=0.1, ca_bond_tol=0.2,
                       ca_angle_tol=0.1,h_bond_tol=0,h_angle_tol=0,metal_center_lb_multiplier=1,
-                      add_angle_constraints=True):
+                      add_angle_constraints=True, edge_ligand=False):
     """get_bounds_matrix
     Generate distance bounds matrices. The basic idea is outlined in ref [1].
     Bond constraints from mmff64-relaxed conformer used for organic section.
@@ -195,6 +195,8 @@ def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwr
             Lower bound multiplier for the metal center distances, default 1. 
         add_angle_constraints : bool, optional
             add angle constraints for Ca-M-Ca bonds or not, default True
+        edge_ligand : bool, optional
+            Whether or not a ligand is edge_bound
 
     Returns
     -------
@@ -266,86 +268,139 @@ def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwr
     UB[i1z2_inds] = 100
 
     # Set constraints for atoms bonded to the dummy metal atom
-    for i,catom in enumerate(catoms):
-        # Set 1-2 constraints
-        UB[catom,dummy_idx] = ml_dists[i] * (1 + ca_bond_tol)
-        UB[dummy_idx,catom] = ml_dists[i] * (1 + ca_bond_tol)
-        LB[catom,dummy_idx] = ml_dists[i] * (1 - ca_bond_tol)
-        LB[dummy_idx,catom] = ml_dists[i] * (1 - ca_bond_tol)
+    if not edge_ligand:
+        for i,catom in enumerate(catoms):
+            # Set 1-2 constraints
+            UB[catom,dummy_idx] = ml_dists[i] * (1 + ca_bond_tol)
+            UB[dummy_idx,catom] = ml_dists[i] * (1 + ca_bond_tol)
+            LB[catom,dummy_idx] = ml_dists[i] * (1 - ca_bond_tol)
+            LB[dummy_idx,catom] = ml_dists[i] * (1 - ca_bond_tol)
 
-    if (len(catoms) > 1) and (add_angle_constraints):
-        # Set 1-3 contraints for ligating atoms -> Cosine rule
-        for i in range(len(catoms[:-1])):
-            for j in range(i+1, len(catoms)):
-                angle = shape[i,j]
-                theta = np.pi*angle/180
-                lig_distance = np.sqrt(ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
-                UB[catoms[i],catoms[j]] = lig_distance * (1 + ca_angle_tol)
-                UB[catoms[j],catoms[i]] = lig_distance * (1 + ca_angle_tol)
-                LB[catoms[i],catoms[j]] = lig_distance * (1 - ca_angle_tol)
-                LB[catoms[j],catoms[i]] = lig_distance * (1 - ca_angle_tol)
-    elif (len(catoms) > 1): # Set to broad range
-        for i in range(len(catoms[:-1])):
-            for j in range(i+1, len(catoms)):
-                angle = shape[i,j]
-                theta = np.pi*angle/180
-                lig_distance = np.sqrt(ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
-                UB[catoms[i],catoms[j]] = vdwradii[-1] * 3
-                UB[catoms[j],catoms[i]] = vdwradii[-1] * 3
-                LB[catoms[i],catoms[j]] = vdw_summat[catoms[i],catoms[j]] * 0.7
-                LB[catoms[j],catoms[i]] = vdw_summat[catoms[i],catoms[j]] * 0.7
+        if (len(catoms) > 1) and (add_angle_constraints):
+            # Set 1-3 contraints for ligating atoms -> Cosine rule
+            for i in range(len(catoms[:-1])):
+                for j in range(i+1, len(catoms)):
+                    angle = shape[i,j]
+                    theta = np.pi*angle/180
+                    lig_distance = np.sqrt(ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
+                    UB[catoms[i],catoms[j]] = lig_distance * (1 + ca_angle_tol)
+                    UB[catoms[j],catoms[i]] = lig_distance * (1 + ca_angle_tol)
+                    LB[catoms[i],catoms[j]] = lig_distance * (1 - ca_angle_tol)
+                    LB[catoms[j],catoms[i]] = lig_distance * (1 - ca_angle_tol)
+        elif (len(catoms) > 1): # Set to broad range
+            for i in range(len(catoms[:-1])):
+                for j in range(i+1, len(catoms)):
+                    angle = shape[i,j]
+                    theta = np.pi*angle/180
+                    lig_distance = np.sqrt(ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
+                    UB[catoms[i],catoms[j]] = vdwradii[-1] * 3
+                    UB[catoms[j],catoms[i]] = vdwradii[-1] * 3
+                    LB[catoms[i],catoms[j]] = vdw_summat[catoms[i],catoms[j]] * 0.7
+                    LB[catoms[j],catoms[i]] = vdw_summat[catoms[i],catoms[j]] * 0.7
 
-    # Adding depth (graph distance) from the metal constraints!
-    m_depth = depth[-1]
+        # Adding depth (graph distance) from the metal constraints!
+        m_depth = depth[-1]
 
-    for i in range(natoms-1): # Iterate through and assign M-atom bounds
-        j = dummy_idx
-        if (i in cpneighs): # Don't force nearest neighbors quite so far away for cp ligands
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
-            UB[i,j] = 10
-            UB[j,i] = 10
-        elif (i in next_neighs) and (anums[i] != 1): # Make next nearest neighbors longer than vdwrad sum.
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-            UB[i,j] = 20
-            UB[j,i] = 20
-        elif (i in next_neighs) and (anums[i] == 1): # Make next nearest hydrogen neighbors a little closer
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-            UB[i,j] = 20
-            UB[j,i] = 20
-        elif (m_depth[i] < 3):
-            continue
-        elif (m_depth[i] < 4) and (anums[i] != 1): # Encourage further away conformers.
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-            UB[i,j] = 50
-            UB[j,i] = 50
-        elif (m_depth[i] < 4) and (anums[i] == 1): # Encourage further away conformers.
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-            UB[i,j] = 50
-            UB[j,i] = 50
-        # Allow closer atoms for huge lanthanides
-        elif (m_depth[i] >= 4) and (anums[j] > 56):
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-            UB[i,j] = 100
-            UB[j,i] = 100 # Set upper bound very high
-        # Force non-hydrogens further away at greater graph depths
-        elif (m_depth[i] >= 4) and (anums[i] != 1):
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
-            UB[i,j] = 100
-            UB[j,i] = 100 # Set upper bound very high
-        # Force hydrogens not so far away for greater graph depths
-        elif (m_depth[i] >= 4) and (anums[i] == 1):
-            LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-            LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-            UB[i,j] = 100
-            UB[j,i] = 100 # Set upper bound very high
+        for i in range(natoms-1): # Iterate through and assign M-atom bounds
+            j = dummy_idx
+            if (i in cpneighs): # Don't force nearest neighbors quite so far away for cp ligands
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
+                UB[i,j] = 10
+                UB[j,i] = 10
+            elif (i in next_neighs) and (anums[i] != 1): # Make next nearest neighbors longer than vdwrad sum.
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                UB[i,j] = 20
+                UB[j,i] = 20
+            elif (i in next_neighs) and (anums[i] == 1): # Make next nearest hydrogen neighbors a little closer
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i,j] = 20
+                UB[j,i] = 20
+            elif (m_depth[i] < 3):
+                continue
+            elif (m_depth[i] < 4) and (anums[i] != 1): # Encourage further away conformers.
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                UB[i,j] = 50
+                UB[j,i] = 50
+            elif (m_depth[i] < 4) and (anums[i] == 1): # Encourage further away conformers.
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i,j] = 50
+                UB[j,i] = 50
+            # Allow closer atoms for huge lanthanides
+            elif (m_depth[i] >= 4) and (anums[j] > 56):
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                UB[i,j] = 100
+                UB[j,i] = 100 # Set upper bound very high
+            # Force non-hydrogens further away at greater graph depths
+            elif (m_depth[i] >= 4) and (anums[i] != 1):
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                UB[i,j] = 100
+                UB[j,i] = 100 # Set upper bound very high
+            # Force hydrogens not so far away for greater graph depths
+            elif (m_depth[i] >= 4) and (anums[i] == 1):
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                UB[i,j] = 100
+                UB[j,i] = 100 # Set upper bound very high
+    else: #edge_ligands
+        for i,catom in enumerate(catoms):
+            # Set 1-2 constraints
+            UB[catom,dummy_idx] = ml_dists[i] * (1 + ca_angle_tol)
+            UB[dummy_idx,catom] = ml_dists[i] * (1 + ca_angle_tol)
+            LB[catom,dummy_idx] = ml_dists[i] * (1 - ca_bond_tol)
+            LB[dummy_idx,catom] = ml_dists[i] * (1 - ca_bond_tol)
+        # 1-3 contraints for ligating atoms already set -> same as input structure for "edge" bound ligands
+         # Adding depth (graph distance) from the metal constraints!
+        m_depth = depth[-1]
 
+        for i in range(natoms-1): # Iterate through and assign M-atom bounds
+            j = dummy_idx
+            if (i in next_neighs) and (anums[i] != 1): # Make next nearest neighbors longer than vdwrad sum.
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                UB[i,j] = 20
+                UB[j,i] = 20
+            elif (i in next_neighs) and (anums[i] == 1): # Make next nearest hydrogen neighbors a little closer
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                UB[i,j] = 20
+                UB[j,i] = 20
+            elif (m_depth[i] < 3):
+                continue
+            elif (m_depth[i] < 4) and (anums[i] != 1): # Encourage further away conformers.
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i,j] = 50
+                UB[j,i] = 50
+            elif (m_depth[i] < 4) and (anums[i] == 1): # Encourage further away conformers.
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i,j] = 50
+                UB[j,i] = 50
+            # Allow closer atoms for huge lanthanides
+            elif (m_depth[i] >= 4) and (anums[j] > 56):
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                UB[i,j] = 100
+                UB[j,i] = 100 # Set upper bound very high
+            # Force non-hydrogens further away at greater graph depths
+            elif (m_depth[i] >= 4) and (anums[i] != 1):
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                UB[i,j] = 100
+                UB[j,i] = 100 # Set upper bound very high
+            # Force hydrogens not so far away for greater graph depths
+            elif (m_depth[i] >= 4) and (anums[i] == 1):
+                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                UB[i,j] = 100
+                UB[j,i] = 100 # Set upper bound very high
     return LB, UB
 
 @conditional_decorator(jit(nopython=True),has_numba)
@@ -818,6 +873,7 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
                           atomic_numbers, ligcoordList, original_metal='Fe',
                           add_angle_constraints=True,
                           isCp=False, cp_catoms=[], skip_mff=False,add_hydrogens=True,
+                          edge_ligand=False,
                           debug=False
                           ):
     """clean_conformation_ff
@@ -848,6 +904,8 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
         wheter to skip the mmff94 intermediate relaxatino, default False
     add_hydrogens : bool, optional
         Whether hydrogens need to be added to the structure, default True
+    edge_ligand : bool, optional
+        Whether this is an "edge" bound ligand.
     debug : bool, optional
         Whether to print debug messages.
         
@@ -890,6 +948,11 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
             if debug:
                 print('Adding oxo constraints to ligand generation!',bondls)
             constr.AddDistanceConstraint(1,2,bondls)
+        if edge_ligand:
+            if debug:
+                print('Edge-ligand, freezing Coordinating Atoms from DG!')
+            for ca in catoms:
+                constr.AddAtomConstraint(int(ca+1)) # Freeze coordinating atoms
         s = ff.Setup(OBMol,constr)
         if not s:
             if debug:
@@ -910,6 +973,9 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
                     if debug:
                         print('Adding oxo constraints to ligand generation!',bondls)
                     constr.AddDistanceConstraint(1,2,bondls)
+                if edge_ligand:
+                    for ca in catoms:
+                        constr.AddAtomConstraint(int(ca+1)) # Freeze coordinating atoms
                 s = ff.Setup(OBMol,constr)
                 for i in range(100):
                     ff.SteepestDescent(10)
@@ -919,7 +985,7 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
             # Reorder the coordinating atom assignment to more closely match unconstrained
             # UFF relaxation to the desired geometry.
             tligcoordList, catoms = reorder_ligcoordList(coords, catoms, shape, ligcoordList, isCp=isCp)
-            if add_angle_constraints and (len(atomic_numbers) > 2):
+            if (add_angle_constraints) and (len(atomic_numbers) > 2) and (not edge_ligand):
                 if debug:
                     print('Finished initial UFF relaxation without angle constraints.')
                 ff = openbabel.OBForceField.FindForceField('UFF')
@@ -1085,7 +1151,7 @@ def nonclean_conformation_ff(X, OBMol, catoms, shape, graph,
     #Delete the dummy metal atom that we added earlier
     metal_atom = OBMol.GetAtom(last_atom_index)
     OBMol.DeleteAtom(metal_atom)
-    ase_atoms_tmp = io_obabel.convert_obmol_ase(OBMol,add_hydrogens=add_hydrogens,relax=False)
+    ase_atoms_tmp = io_obabel.convert_obmol_ase(OBMol,add_hydrogens=add_hydrogens)
     fail = False
     final_relax = True
     return ase_atoms_tmp, fail, final_relax, tligcoordList
@@ -1245,6 +1311,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                           add_angle_constraints=True, non_triangle=False,
                           rot_coord_vect=False, rot_angle=0, skip_mmff=False,
                           covrad_metal=None, vdwrad_metal=None, no_ff=False,
+                          ligtype=None,
                           debug=False
                           ):
     """Uses distance geometry to get a random conformer.
@@ -1267,6 +1334,8 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         vdw radii of the metal, default None
     no_ff : bool, optional
         Whether to do any ff cleaning at all.
+    ligtype : None/str
+        Ligand type if given.
     debug : bool, optional
         Print out debug messages, default False
         
@@ -1277,6 +1346,10 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
     minval : float
         rotational loss for the ligand atoms to the coordination sites.
     """
+    edge_ligand=False
+    if isinstance(ligtype,str):
+        if 'edge' in ligtype:
+            edge_ligand=True
     Conf3D =  io_obabel.get_obmol_smiles(ligsmiles, addHydrogens=True)
     # Detect Cp rings - move before adding metal center.
     isCp, cp_rings, shared_coords = detect_cps(Conf3D, ligcoordList)
@@ -1340,7 +1413,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
     LB, UB = get_bounds_matrix(allcoords, graph, natoms, 
                         catoms, shape, 
                         ml_dists, vdwrad, anums,
-                        isCp=isCp, cp_catoms=cp_catoms,
+                        isCp=isCp, cp_catoms=cp_catoms, edge_ligand=edge_ligand,
                         add_angle_constraints=add_angle_constraints)
     while not status:
         try:
@@ -1371,7 +1444,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                         catoms, shape, 
                         ml_dists, vdwrad, anums, bond_tol=0.2, metal_center_lb_multiplier=0.9,
                         h_bond_tol=0.0, h_angle_tol=0.1,
-                        isCp=isCp, cp_catoms=cp_catoms,
+                        isCp=isCp, cp_catoms=cp_catoms, edge_ligand=edge_ligand,
                         add_angle_constraints=add_angle_constraints)
         while not status:
             try:
@@ -1409,7 +1482,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                         ml_dists, vdwrad, anums, bond_tol=0.2,angle_tol=0.2, 
                         metal_center_lb_multiplier=0.8,
                         h_bond_tol=0.1, h_angle_tol=0.1,
-                        isCp=isCp, cp_catoms=cp_catoms,
+                        isCp=isCp, cp_catoms=cp_catoms, edge_ligand=edge_ligand,
                         add_angle_constraints=add_angle_constraints)
         while not status:
             try:
@@ -1445,7 +1518,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 ml_dists, vdwrad, anums, bond_tol=0.3,angle_tol=0.2, 
                 metal_center_lb_multiplier=0.8, ca_angle_tol=0.2,
                 h_bond_tol=0.1, h_angle_tol=0.2,
-                isCp=isCp, cp_catoms=cp_catoms,
+                isCp=isCp, cp_catoms=cp_catoms, edge_ligand=edge_ligand,
                 add_angle_constraints=add_angle_constraints)
         status = False
         count = 0
@@ -1483,7 +1556,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                                     ml_dists, vdwrad, anums, bond_tol=0.3,angle_tol=0.3, 
                                     metal_center_lb_multiplier=0.6, ca_angle_tol=0.3,
                                     h_bond_tol=0.1, h_angle_tol=0.3,
-                                    isCp=isCp, cp_catoms=cp_catoms,
+                                    isCp=isCp, cp_catoms=cp_catoms, edge_ligand=edge_ligand,
                                     add_angle_constraints=add_angle_constraints)
         status = False
         count = 0
@@ -1546,6 +1619,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                                                 original_metal=original_metal,
                                                 add_angle_constraints=add_angle_constraints,
                                                 isCp=isCp,
+                                                edge_ligand=edge_ligand,
                                                 cp_catoms=cp_catoms,
                                                 skip_mff=skip_mmff,add_hydrogens=add_hydrogens,
                                                 debug=debug
@@ -1661,7 +1735,9 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
                                          metal=metal,
                                          original_metal=originalMetal,
                                          skip_mmff=skip_mmff, covrad_metal=covrad_metal,
-                                         vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
+                                         vdwrad_metal=vdwrad_metal,no_ff=no_ff,
+                                         ligtype=ligtype,
+                                         debug=debug)
         if sane:
             conf_list.append(conf)
             val_list.append(val)
@@ -1678,6 +1754,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
                                          metal=metal,
                                          original_metal=originalMetal,
                                          skip_mmff=skip_mmff,covrad_metal=covrad_metal,
+                                         ligtype=ligtype,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
             conf_list.append(conf)
@@ -1694,6 +1771,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
                                          metal=metal,
                                          original_metal=originalMetal,
                                          skip_mmff=True, covrad_metal=covrad_metal,
+                                         ligtype=ligtype,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
             conf_list.append(conf)
@@ -1710,8 +1788,9 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
                                         corecoordList, 
                                         metal=metal, 
                                         original_metal=originalMetal,
+                                        ligtype=ligtype,
                                         skip_mmff=skip_mmff, covrad_metal=covrad_metal,
-                                         vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
+                                        vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
         if sane:
             conf_list.append(conf)
             val_list.append(val)
@@ -1725,6 +1804,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
         conf, val, sane, final_relax, _ , _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            ligtype=ligtype,
                                             original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1739,6 +1819,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            ligtype=ligtype,
                                             original_metal=originalMetal,
                                             add_angle_constraints=True,
                                             non_triangle=True,
@@ -1754,6 +1835,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal,  
+                                            ligtype=ligtype,
                                             original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             non_triangle=True,
@@ -1769,6 +1851,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
             conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            ligtype=ligtype,
                                             original_metal=originalMetal,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
@@ -1785,6 +1868,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
         conf, val, sane, final_relax, _ , _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal, 
+                                            ligtype=ligtype,
                                             original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             skip_mmff=skip_mmff, covrad_metal=covrad_metal,
@@ -1799,6 +1883,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
         conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                          corecoordList, 
                                          metal=metal, 
+                                         ligtype=ligtype,
                                          original_metal=originalMetal,
                                          skip_mmff=True, covrad_metal=covrad_metal,
                                          vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
@@ -1815,6 +1900,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
         conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(ligsmiles, ligcoordList, 
                                             corecoordList, 
                                             metal=metal,
+                                            ligtype=ligtype,
                                             original_metal=originalMetal, 
                                             add_angle_constraints=True,
                                             non_triangle=True,
@@ -1833,6 +1919,7 @@ def find_conformers(ligsmiles, ligcoordList, corecoordList, metal='Fe', original
                                             original_metal=originalMetal,
                                             add_angle_constraints=False,
                                             non_triangle=True,
+                                            ligtype=ligtype,
                                             skip_mmff=skip_mmff, 
                                             covrad_metal=covrad_metal,
                                             vdwrad_metal=vdwrad_metal,no_ff=no_ff,debug=debug)
