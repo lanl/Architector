@@ -12,7 +12,6 @@ https://pypi.org/project/rmsd/
 
 Developed by Michael Taylor
 """
-from multiprocessing.sharedctypes import Value
 import numpy as np
 import scipy
 import copy

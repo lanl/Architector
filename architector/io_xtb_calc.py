@@ -9,6 +9,7 @@
 import numpy as np
 
 from xtb.ase.calculator import XTB
+# from tblite.ase import TBLite -> No GFN-FF support yet
 
 from architector import arch_context_manage, io_molecule
 import architector.io_ptable as io_ptable
@@ -35,7 +36,7 @@ def set_XTB_calc(ase_atoms, parameters=dict(), assembly=False, isCp_lig=False):
     if isCp_lig:
         ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
         ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
-        calc = XTB(method="GFN-FF") # Defaul to only GFN-FF for ligand conformer relaxation.
+        calc = XTB(method="GFN-FF")#,verbosity=0) # Defaul to only GFN-FF for ligand conformer relaxation.
     else:
         # Charge -> charges already assigned to components during assembly
         if (parameters['full_charge'] is not None) and (not assembly):
@@ -94,11 +95,13 @@ def set_XTB_calc(ase_atoms, parameters=dict(), assembly=False, isCp_lig=False):
                 ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
                 ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
             calc = XTB(method=parameters['assemble_method'], solvent=parameters['solvent'])
+                        # verbosity=0)
         else:
             if parameters['full_method'] == 'GFN-FF': # Need to turn off charges for GFN-FF evaluation. Probably an XTB-end bug.
                 ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
                 ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
-            calc = XTB(method=parameters['full_method'], solvent=parameters['solvent'])
+            calc = XTB(method=parameters['full_method'], solvent=parameters['solvent']) 
+                    #    verbosity=0)
 
     #########################################################
     ########### Calculator Now Set! #########################
@@ -168,7 +171,7 @@ def set_XTB_calc_lig(ase_atoms, charge=None, uhf=None, method='GFN2-xTB',solvent
     if method == 'GFN-FF': # Need to turn off charges for GFN-FF evaluation. Probably an XTB-end bug.
         ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
         ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
-    calc = XTB(method=method, solvent=solvent)
+    calc = TBLite(method=method, solvent=solvent, verbosity=0)
 
     #########################################################
     ########### Calculator Now Set! #########################
@@ -209,6 +212,7 @@ def set_XTB_calc_straight(ase_atoms, charge=None, uhf=None, method='GFN2-xTB',so
         ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
         ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
     calc = XTB(method=method, solvent=solvent)
+            #    verbosity=0)
 
     #########################################################
     ########### Calculator Now Set! #########################

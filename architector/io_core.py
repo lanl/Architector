@@ -22,7 +22,6 @@ warnings.filterwarnings('error')
 
 np.seterr(all='warn')
 
-
 def get_lig_ref_df():
     """get_lig_ref_df 
     Pull the ligand angle references.

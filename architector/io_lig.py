@@ -38,6 +38,7 @@ from ase import Atom
 from ase.optimize.bfgslinesearch import BFGSLineSearch
 import ase.constraints as ase_con
 from xtb.ase.calculator import XTB
+# from tblite.ase import TBLite -> No GFN-FF support yet.
 import warnings
 
 warnings.filterwarnings('ignore') # Supress numpy warnings.
@@ -100,7 +101,7 @@ def set_XTB_calc(ase_atoms):
     """
     ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
     ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
-    calc = XTB(method="GFN-FF") # Default to only GFN-FF for ligand conformer relaxation.
+    calc = XTB(method="GFN-FF")#,verbosity=0) # Default to only GFN-FF for ligand conformer relaxation.
     #########################################################
     ########### Calculator Now Set! #########################
     #########################################################

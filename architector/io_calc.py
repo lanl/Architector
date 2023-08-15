@@ -21,6 +21,7 @@ from ase.constraints import FixAtoms
 ### Add any other ASE calculator here.
 # To extend to other methods.
 from xtb.ase.calculator import XTB
+# from tblite.ase import TBLite -> No GFN-FF support yet
 
 params={
 "save_trajectories": False, # Only on XTB methods
@@ -235,6 +236,7 @@ class CalcExecutor:
                            max_iterations=self.xtb_max_iterations,
                            electronic_temperature=self.xtb_electronic_temperature,
                            accuracy=self.xtb_accuracy)
+                        #    verbosity=0)
                 # Difference of more than 1. Still perform a ff_preoptimization if requested.
                 if (np.abs(self.mol.xtb_charge - self.mol.charge) > 1):
                     if ((not self.override_oxo_opt) or (self.assembly)) and (not self.force_oxo_relax):
