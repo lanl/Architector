@@ -381,6 +381,10 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
                                                                                       selected_con_lists)
 
     inverse_needed = np.any(ucounts > 1)
+    if not (len(selected_con_lists[0]) > 0):
+        goods.append(False) # Flag as bad.
+        if params['debug']:
+            print('Cannot map this ligand combination to core {} - Not generating.'.format(coreType))
     # Save all selected con_lists -> test for existance of mutually exclusive sets of selected con atoms.
     # Minimize colomb energy between coordination sites, steric repulsion, and ranked order loss.
     if params['debug']:
