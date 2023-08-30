@@ -56,6 +56,7 @@ defaults = {
             'species_relax':True, # Whether or not to relax the generated secondary solvation structures.
             'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
             'species_intermediate_relax':True, # Whether to perform the relaxation only after all secondary species are added
+            'debug':False # Debug
 }
 
 def center_molecule_gen_grid(mol, parameters={}):
