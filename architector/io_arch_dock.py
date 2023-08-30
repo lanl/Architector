@@ -33,6 +33,31 @@ from scipy.spatial.transform import Rotation as Rot
 from architector.io_calc import CalcExecutor
 from ase import units
 
+defaults = {
+            # "Secondary Solvation Shell" parameters
+            'species_list':['water']*3, # Pass a list of species (preferred)
+            "freeze_molecule_add_species":False, # Whether to free the original moleucule during all secondary
+            # shell relaxations, default False.
+            'species_smiles':'O', # Can also specify multiple copies of single species with this and next line
+            'n_species':3, # -->> this line!
+            'n_species_rotations':20, # Rotations in 3D of ligands to try
+            'n_species_conformers':1, # Number of conformers to try - right now only 1 will be tested.
+            'species_grid_pad':5, # How much to pad around the molecule species are being added to (in Angstroms)
+            'species_gridspec':0.3, # How large of steps in R3 the grid surrounding a molecule should be
+            # to which a species could be added. (in Angstroms)
+            'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
+            # to which the species could be added. (in Angstroms)
+            'species_grid_rad_scale':1, # Factor to multiply molecule+species vdw by to set molecules.
+    # e.g. Reduce to allow for closer molecule-species distances
+            'species_location_method':'default', # Default attempts a basic colomb repulsion placement.
+            # Only other option is 'random' at the moment.
+            'species_add_copies':1, # Number of species addition orientations to build 
+            'species_method':'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
+            'species_relax':True, # Whether or not to relax the generated secondary solvation structures.
+            'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
+            'species_intermediate_relax':True, # Whether to perform the relaxation only after all secondary species are added
+}
+
 def center_molecule_gen_grid(mol, parameters={}):
     """center_molecule_gen_grid
     Put the molecule in the center of a box by with N angstroms of padding on each max/min xyz.
@@ -343,9 +368,11 @@ def add_non_covbound_species(mol, parameters={}):
     ValueError
         Needs either "species_list" or "n_species"/"species_smiles" specified.
     """
-    species_list = parameters.get('species_list',None)
-    n_species = parameters.get('n_species',None)
-    species_smiles = parameters.get('species_smiles',None)
+    params = copy.deepcopy(defaults)
+    params.update(parameters)
+    species_list = params.get('species_list',None)
+    n_species = params.get('n_species',None)
+    species_smiles = params.get('species_smiles',None)
     if (species_list is not None):
         species_list = [io_ptable.ligands_dict.get(x,{'smiles':x})['smiles'] for x in species_list]
     elif (species_smiles is not None) and (n_species is not None):
@@ -354,35 +381,35 @@ def add_non_covbound_species(mol, parameters={}):
         raise ValueError('Need either "species_list" specified OR "n_species" and "species_smiles" specified.')
     unique_specs = list(set(species_list))
     species_add_list = []
-    n = parameters.get("species_add_copies", 1)
+    n = params.get("species_add_copies", 1)
     for j in range(n):
         species_dict = dict()
         for spec in unique_specs:
             species = species_generate_get_ref_params(spec,
-                                                      parameters=parameters)
+                                                      parameters=params)
             species_dict[spec] = species
-        if parameters.get('debug',False):
+        if params.get('debug',False):
             print('Doing all species random addition {} of {}'.format(j+1,n))
         init_mol = species_generate_get_ref_params(mol,
-                                                   parameters=parameters,
+                                                   parameters=params,
                                                    main_molecule=True)
         for i,spec in enumerate(species_list):
-            if parameters['debug']:
+            if params['debug']:
                 print('Adding species {} of {}.'.format(i+1,len(species_list)))
                 print(species_dict[spec].write_mol2('cool_species',
                                                     writestring=True))
             init_mol = add_species(init_mol,
                                    species_dict[spec],
-                                   parameters=parameters)
+                                   parameters=params)
         # Ensure the last configuration is relaxed if requested.
-        if parameters.get('species_relax',True) and (not parameters.get('species_intermediate_relax',False)): 
+        if params.get('species_relax',True) and (not params.get('species_intermediate_relax',False)): 
             out_mol = species_generate_get_ref_params(init_mol,
-                                                parameters=parameters,
+                                                parameters=params,
                                                 main_molecule=True,
                                                 skip_act_swap=True)
         else: # Just return final molecule.
             out_mol = init_mol
-        out_mol.swap_actinide(debug=parameters.get('debug',False))
+        out_mol.swap_actinide(debug=params.get('debug',False))
         species_add_list.append(out_mol)
     outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
     return outmol,species_add_list
