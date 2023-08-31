@@ -16,7 +16,6 @@ import copy
 import architector.io_ptable as io_ptable
 import architector.geometries as geo
 import warnings
-import architector.io_molecule as io_molecule
 
 warnings.filterwarnings('error')
 
@@ -120,39 +119,6 @@ def check_intercalation(coordat_list, all_coordats):
     return intercalating
 
 denticity_combinations_dict = {0:1, 1:2, 3:3, 6:4, 10:5, 15:6, 21:7, 28:8, 36:9}
-
-def calc_angles_struct(structure):
-    """ Read in structure to assign ligand to right shape
-
-    structure : mol2string
-    """
-    if isinstance(structure,list):
-        lig_angles = np.array(structure)[np.argsort(angs)[::-1]]
-    else:
-        mol = io_molecule.convert_io_molecule(structure)
-        if len(mol.graph) == 0:
-            print('Creating imputed molecular graph! May be untrustworthy.')
-            mol.create_BO_dict()
-        mets = mol.find_metals()
-        lig_angles = []
-        if len(mets) == 1:
-            coordats = np.nonzero(mol.graph[mets[0]])[0]
-            if len(coordats) == 1:
-                lig_angles = []
-            else:
-                coords = mol.ase_atoms.get_positions()
-                angs = [
-                    get_angle(coords[x[0]],coords[mets[0]],coords[x[1]]) for x in itertools.combinations(coordats,2)
-                    ]
-                angs = np.array(angs)[np.argsort(angs)[::-1]] # Add angles
-                lig_angles += angs.tolist() # Add sorted angles as features
-        else:
-            print('Warning: User ligand input without metal for refernce on interatomic angles. \
-                    Please pass a structure with a metal for user ligand generation.')
-    lig_angles += [0.0] * (36-len(lig_angles)) # Pad with zeros
-    n_ca_m_ca_angles = len(np.nonzero(lig_angles)[0])
-    denticity = denticity_combinations_dict[n_ca_m_ca_angles]
-    return {'user_lig':np.array(lig_angles)}, denticity
 
 class Geometries:
     """ geometries Dataclass containing information and corecoordLists for all
@@ -272,14 +238,21 @@ class Geometries:
         self.rescale_refgeos(core_atom,rcovmetal=rcovmetal)
         # Add userlig information here - handle either reference ligand/metal geometry
         if not isinstance(userlig,bool):
-            userlig, denticities = calc_angles_struct(userlig)
+            if isinstance(userlig,(np.ndarray,list)):
+                lig_angles = np.array(userlig)[np.argsort(angs)[::-1]].tolist()
+                lig_angles += [0.0] * (36-len(lig_angles)) # Pad with zeros
+                n_ca_m_ca_angles = len(np.nonzero(lig_angles)[0])
+                denticity = denticity_combinations_dict[n_ca_m_ca_angles]
+                userlig, denticity = {'user_lig':np.array(lig_angles)}, denticity
+            else:
+                userlig, denticity = userlig.calc_lig_angles_struct()
             count = 0
             for key,val in userlig.items():
                 df.loc[len(df),:] = list(val)
-                self.ligType_cn_dict.update({'user_lig'+str(count):denticities[count]})
-                tlist = self.cn_ligType_dict[denticities[count]]
+                self.ligType_cn_dict.update({'user_lig'+str(count):denticity})
+                tlist = self.cn_ligType_dict[denticity]
                 tlist.append('user_lig'+str(count))
-                self.cn_ligType_dict.update({denticities[count]:tlist})
+                self.cn_ligType_dict.update({denticity:tlist})
                 count += 1
         mean_angle_labels = [x for x in df.columns.values if '_mean' in x]  # Mean angle!
         metal_coords = [0.0, 0.0, 0.0]
@@ -375,85 +348,3 @@ def calc_all_coord_atom_angles(core_geo):
     for a,b in itertools.combinations(core_geo,2):
         angles.append(get_angle(a,origin,b))
     return np.array(sorted(angles))
-        
-
-def classify_metal_geo_type(mol2string,metal_ind=None):
-    """classify_metal_geo_type calculate the actual geometry of the metal centers
-
-    Parameters
-    ----------
-    mol2string : str
-        mol2string with metals
-    metal_ind : int or list, optional
-        the metal indices, by default None
-
-    Returns
-    -------
-    metal_center_geos : dict or list
-        metal center geometries present in the mol2string.
-    """
-    molecule = io_molecule.convert_io_molecule(mol2string)
-    if metal_ind is None:
-        metal_ind = [i for i,x in enumerate(molecule.ase_atoms.get_chemical_symbols()) if (x in io_ptable.all_metals)]
-    elif isinstance(metal_ind,int):
-        metal_ind = [metal_ind]
-    elif isinstance(metal_ind,(np.ndarray,list)):
-        metal_ind = metal_ind 
-    else:
-        raise ValueError('Unrecognized type for metal_ind')
-    geo_dict = Geometries()
-    if len(metal_ind) == 0:
-        raise ValueError('No metal or ind passed in this molecule.')
-    elif len(metal_ind) > 1: # Look at every metal center
-        metal_center_geos = []
-        for metal_indx in metal_ind: 
-            tmpdict = dict()
-            neighs = np.nonzero(np.ravel(molecule.graph[metal_indx]))[0]
-            if (len(neighs) < 13) and (len(neighs) != 11):
-                coord_at_positions = molecule.ase_atoms.positions[neighs] - molecule.ase_atoms.positions[metal_indx]
-                act_geo_vect = calc_all_coord_atom_angles(coord_at_positions)
-                ref_geo_labels = geo_dict.cn_geo_dict[len(neighs)]
-                ref_geos = [calc_all_coord_atom_angles(geo_dict.geometry_dict[x]) for x in ref_geo_labels]
-                mae_losses = [np.mean(np.abs(act_geo_vect - x)) for x in ref_geos] # Calc MAE loss between interatomic angles
-                sort_order = np.argsort(mae_losses)
-                m_geo_type = ref_geo_labels[np.argmin(mae_losses)]
-                tmpdict['metal'] = molecule.ase_atoms.get_chemical_symbols()[metal_indx]
-                tmpdict['metal_ind'] = metal_indx
-                tmpdict['metal_geo_type'] = m_geo_type
-                tmpdict['mae_angle_loss'] = mae_losses[np.argmin(mae_losses)]
-                if len(sort_order) > 1:
-                    tmpdict['confidence'] = 1 - tmpdict['mae_angle_loss'] / mae_losses[sort_order[1]]
-                else:
-                    tmpdict['confidence'] = 1
-                tmpdict['classification_dict'] = {ref_geo_labels[i]:mae_losses[i] for i in sort_order}
-            else: 
-                tmpdict['metal'] = molecule.ase_atoms.get_chemical_symbols()[metal_indx]
-                tmpdict['metal_ind'] = metal_indx
-                tmpdict['metal_geo_type'] = len(neighs)
-            metal_center_geos.append(tmpdict)
-    else: # Just calculate geometry for one metal center.
-        metal_center_geos = dict()
-        metal_indx = metal_ind[0]
-        neighs = np.nonzero(np.ravel(molecule.graph[metal_indx]))[0]
-        if len(neighs) < 13 and (len(neighs) != 11):
-            coord_at_positions = molecule.ase_atoms.positions[neighs] - molecule.ase_atoms.positions[metal_indx]
-            act_geo_vect = calc_all_coord_atom_angles(coord_at_positions)
-            ref_geo_labels = geo_dict.cn_geo_dict[len(neighs)]
-            ref_geos = [calc_all_coord_atom_angles(geo_dict.geometry_dict[x]) for x in ref_geo_labels]
-            mae_losses = [np.mean(np.abs(act_geo_vect - x)) for x in ref_geos]
-            sort_order = np.argsort(mae_losses)
-            m_geo_type = ref_geo_labels[np.argmin(mae_losses)]
-            metal_center_geos['metal'] = molecule.ase_atoms.get_chemical_symbols()[metal_indx]
-            metal_center_geos['metal_ind'] = metal_indx
-            metal_center_geos['metal_geo_type'] = m_geo_type
-            metal_center_geos['mae_angle_loss'] = mae_losses[np.argmin(mae_losses)]
-            if len(sort_order) > 1:
-                metal_center_geos['confidence'] = (mae_losses[sort_order[1]]-metal_center_geos['mae_angle_loss'])/metal_center_geos['mae_angle_loss']
-            else:
-                metal_center_geos['confidence'] = 1
-            metal_center_geos['classification_dict'] = {ref_geo_labels[i]:mae_losses[i] for i in sort_order}
-        else: 
-            metal_center_geos['metal'] = molecule.ase_atoms.get_chemical_symbols()[metal_indx]
-            metal_center_geos['metal_ind'] = metal_indx
-            metal_center_geos['metal_geo_type'] = len(neighs)
-    return metal_center_geos
