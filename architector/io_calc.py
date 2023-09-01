@@ -14,6 +14,7 @@ import architector.io_obabel as io_obabel
 from architector.io_align_mol import rmsd_align
 import architector.arch_context_manage as arch_context_manage
 import architector.io_molecule as io_molecule
+import architector.io_ptable as io_ptable
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
 from ase.constraints import FixAtoms
@@ -221,16 +222,19 @@ class CalcExecutor:
             if (not self.species_run) and (not self.skip_spin_assign):
                 self.mol.calc_suggested_spin(params=self.parameters)
             obabel_ff_requested = False
-            if self.calculator is not None: # If ASE calculator passed use that by default
+            if (self.calculator is not None) and ('custom' in self.method): # If ASE calculator passed use that by default
                 calc = self.calculator
                 # Here, if a calculator needs spin/charge information in another way we can assign.
                 # Or handle as a different use case.
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 uhf_vect[0] = self.mol.uhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
-                charge_vect[0] = self.mol.xtb_charge
+                charge_vect[0] = self.mol.charge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
+                self.mol.actinides = [i for i,x in enumerate(self.mol.get_chemical_symbols()) if (x in io_ptable.lanthanides)]
+                self.mol.actinides_swapped = True
+                self.mol.swap_actinides()
             elif 'gfn' in self.method.lower():
                 calc = XTB(method=self.method, solvent=self.xtb_solvent,
                            max_iterations=self.xtb_max_iterations,
@@ -364,6 +368,7 @@ class CalcExecutor:
         else:
             self.errors.append('Min dist checks failed. Not evaluated')
         # Check after done
+        self.mol.swap_actinides()
         if self.final_sanity_check:
             self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
