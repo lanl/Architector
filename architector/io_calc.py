@@ -232,9 +232,12 @@ class CalcExecutor:
                 charge_vect[0] = self.mol.charge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
-                self.mol.actinides = [i for i,x in enumerate(self.mol.get_chemical_symbols()) if (x in io_ptable.lanthanides)]
+                ##### TODO ######
+                # This is currently a bit hack-y. Need better workaround for handling actinide potentials.
+                self.mol.actinides = [i for i,x in enumerate(self.mol.ase_atoms.get_chemical_symbols()) if (x in io_ptable.lanthanides)]
                 self.mol.actinides_swapped = True
                 self.mol.swap_actinide()
+                ##### TODO ######
             elif 'gfn' in self.method.lower():
                 calc = XTB(method=self.method, solvent=self.xtb_solvent,
                            max_iterations=self.xtb_max_iterations,
@@ -262,7 +265,7 @@ class CalcExecutor:
             if not obabel_ff_requested:
                 self.mol.ase_atoms.calc = calc
                 if self.relax:
-                    if self.parameters.get("freeze_molecule_add_species",False):
+                    if self.parameters.get("freeze_molecule_add_species",False) and ('custom' not in self.method):
                         if self.parameters['debug']:
                             print('Fixing first component!')
                         fix_inds = self.mol.find_component_indices(component=0)
