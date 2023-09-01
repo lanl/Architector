@@ -234,7 +234,7 @@ class CalcExecutor:
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
                 self.mol.actinides = [i for i,x in enumerate(self.mol.get_chemical_symbols()) if (x in io_ptable.lanthanides)]
                 self.mol.actinides_swapped = True
-                self.mol.swap_actinides()
+                self.mol.swap_actinide()
             elif 'gfn' in self.method.lower():
                 calc = XTB(method=self.method, solvent=self.xtb_solvent,
                            max_iterations=self.xtb_max_iterations,
@@ -368,7 +368,7 @@ class CalcExecutor:
         else:
             self.errors.append('Min dist checks failed. Not evaluated')
         # Check after done
-        self.mol.swap_actinides()
+        self.mol.swap_actinide()
         if self.final_sanity_check:
             self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
