@@ -174,6 +174,7 @@ class Molecule:
                 uhf=None, xtb_uhf=None, xtb_charge=None, actinides=None):
         self.dists_sane = True
         self.sanity_check_dict = {}
+        self.ase_constraints = {} ### Add distance constraints here.
         self.actinides_swapped = False
         if isinstance(in_ase,ase.atoms.Atoms):
             self.ase_atoms = in_ase.copy()

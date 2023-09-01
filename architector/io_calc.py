@@ -17,7 +17,7 @@ import architector.io_molecule as io_molecule
 import architector.io_ptable as io_ptable
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
-from ase.constraints import FixAtoms
+from ase.constraints import (FixAtoms, FixBondLengths)
 
 ### Add any other ASE calculator here.
 # To extend to other methods.

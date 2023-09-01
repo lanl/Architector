@@ -25,7 +25,7 @@ from architector.io_calc import CalcExecutor
 class Ligand:
     """Class to contain all information about a ligand including conformers."""
 
-    def __init__(self, smiles, ligcoordList, corecoordList, core, ligGeo, ligcharge,
+    def __init__(self, smiles, ligcoordList, corecoordList, core, ligGeo, ligcharge, ca_metal_dist_constraints,
                 covrad_metal=None, vdwrad_metal=None, originalMetal=None, debug=False):
         """Set up initial variables for ligand and run conformer generation routines.
 
@@ -43,6 +43,8 @@ class Ligand:
             The binned ligand geometry
         ligcharge : float
             Ligand charge if determined
+        ca_metal_dist_constraints : dict/None
+            Coordinating atom-metal distance constraint.
         covrad_metal : float, optional
             Covalent radii of the metal, default values from io_ptable.rcov1
         vdwrad_metal : float, optional
@@ -58,6 +60,7 @@ class Ligand:
         self.corecoordList = corecoordList
         self.metal = core
         self.original_metal = originalMetal
+        self.ca_metal_dist_constraints = ca_metal_dist_constraints
         self.geo = ligGeo 
         self.BO_dict = None
         self.atom_types = None
@@ -73,6 +76,7 @@ class Ligand:
                                                         metal=self.metal,
                                                         originalMetal=self.original_metal,
                                                         ligtype=self.geo,
+                                                        ca_metal_dist_constraints=self.ca_metal_dist_constraints,
                                                         covrad_metal=covrad_metal,
                                                         vdwrad_metal=vdwrad_metal,
                                                         debug=debug
@@ -360,8 +364,9 @@ def gen_aligned_complex(newLigInputDicts,
         ligandSmiles = ligand["smiles"]
         ligGeo = ligand['ligType']
         ligCharge = ligand['ligCharge']
+        lig_ca_metal_dist_constraints = ligand.get('ca_metal_dist_constraints',None)
         ligcons = '_'.join(sorted([str(x[0]) for x in ligLists[i]]))
-        ligid = ligandSmiles + ligcons
+        ligid = ligandSmiles + ligcons + str(lig_ca_metal_dist_constraints)
 
         # Generate conformations if not already done
         if (ligid not in ligandDict):
@@ -372,6 +377,7 @@ def gen_aligned_complex(newLigInputDicts,
                                 inputDict["core"]["smiles"].strip('[').strip(']'),
                                 ligGeo,
                                 ligCharge,
+                                lig_ca_metal_dist_constraints,
                                 covrad_metal = inputDict['parameters']['covrad_metal'],
                                 vdwrad_metal = inputDict['parameters']['vdwrad_metal'],
                                 originalMetal = original_metal,

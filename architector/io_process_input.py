@@ -549,6 +549,8 @@ def inparse(inputDict):
                             tmpOBmol = io_obabel.get_obmol_smiles(newdict['smiles'],functionalizations=ligDict['functionalizations'])
                             newsmi = io_obabel.get_smiles_obmol(tmpOBmol)
                             newdict.update({'smiles':newsmi})
+                        if ('ca_metal_dist_constraints' in ligDict):
+                            newdict.update({'ca_metal_dist_constraints':ligDict['ca_metal_dist_constraints']})
                     newliglist.append(newdict)
             else:
                 raise ValueError("inputDict['ligands'] must be a list of dictionaries currently.")
