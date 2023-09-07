@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python
   - xtb-python
+  - crest
   - ase
   - numpy
   - py3Dmol
