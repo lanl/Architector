@@ -147,6 +147,7 @@ class CalcExecutor:
         self.final_sanity_check = final_sanity_check
         self.calculator = calculator
         self.relax = relax
+        self.ase_opt_method = ase_opt_method
         self.assembly = assembly
         self.ff_preopt_run = ff_preopt_run
         self.xtb_solvent = xtb_solvent
@@ -193,10 +194,10 @@ class CalcExecutor:
                 self.method = 'UFF'
                 self.relax=True
 
-        if ase_opt_method is None: # Default to LBFGSLineSearch
+        if self.ase_opt_method is None: # Default to LBFGSLineSearch
             self.opt_method = LBFGSLineSearch
         else:
-            self.opt_method = ase_opt_method
+            self.opt_method = self.ase_opt_method
         # Temporary logfile or not for ase optimizer
         if self.parameters['debug']: # Set logfile to suppress stdout output.
             self.logfile = None
