@@ -18,6 +18,12 @@ import architector.io_ptable as io_ptable
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
 from ase.constraints import (FixAtoms, FixBondLengths)
+has_sella = True
+try:
+    from sella import Internals
+except:
+    has_sella = False
+
 
 ### Add any other ASE calculator here.
 # To extend to other methods.
@@ -163,6 +169,7 @@ class CalcExecutor:
         self.skip_spin_assign = skip_spin_assign
         self.force_generation = False
         self.force_oxo_relax = False
+        self.replace_trics = False
         
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
@@ -276,6 +283,16 @@ class CalcExecutor:
                         self.mol.ase_atoms.set_constraint(c)
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
+                        if has_sella and self.ase_opt_kwargs.get('sella_internal_trics',False):
+                            if self.debug:
+                                print('Adding Internals....')
+                            ints = Internals(self.mol.ase_atoms,allow_fragments=True)
+                            del self.ase_opt_kwargs['sella_internal_trics']
+                            self.replace_trics = True
+                            ints.find_all_bonds()
+                            ints.find_all_angles()
+                            ints.find_all_dihedrals()
+                            self.ase_opt_kwargs['internal'] = ints # Add internals with TRICs
                         try:
                             self.init_energy = copy.deepcopy(self.mol.ase_atoms.get_total_energy())
                             if self.parameters['save_trajectories']:
@@ -387,6 +404,9 @@ class CalcExecutor:
         if np.any(np.isnan(self.mol.ase_atoms.get_positions())):
             self.mol = io_molecule.convert_io_molecule(self.in_struct)
             self.mol.calc_suggested_spin(params=self.parameters)
+
+        if self.replace_trics:
+            self.ase_opt_kwargs['sella_internal_trics'] = True
         
         if self.parameters['save_trajectories'] and (self.trajectory is not None):
             self.dump_traj()
