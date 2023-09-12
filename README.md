@@ -105,11 +105,19 @@ inputDict = {
     "full_charge": None, # Assign charge to the complex (overrides ligand charges and metal_ox)!
         
     # Method parameters.
+    "calculator":None, # ASE calculator class input for usage during construction or for optimization.
+    "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+    "fmax":0.1, # eV/Angstrom maximum force to optimize to with ASE optimizer.
+    "maxsteps":1000, # Maxmimum number of steps for ASE otpimizer to take.
+    # Note that charge and multiplicity (uhf) are tracked by ase.Atoms.initial_charges and ase.Atoms.initial_magnetic_moments
+    # In the background by Architector. Make sure your ASE calculator either 1. uses these vectors for setting spin/charge or
+    # 2. has these quantities pre-specified for the spin/charge you'd like to run.
     "full_method": "GFN2-xTB", # Which  method to use for final cleaning/evaulating conformers. 
     "assemble_method": "GFN2-xTB", # Which method to use for assembling conformers. 
     # For very large speedup - use "GFN-FF", though this is much less stable (especially for Lanthanides)
     # Additionaly, it is possible to use "UFF" - which is extremely fast. Though it is recommend to perform an XTB-level optimization
     # for the "full_method", or turn "relaxation" off.
+    # To use "calculator" specified above set "full_method" and/or "assemble_method" to "custom".
     "xtb_solvent": 'none', # Add any named XTB solvent!
     "xtb_accuracy": 1.0, # Numerical Accuracy for XTB calculations
     "xtb_electronic_temperature": 300, # In K -> fermi smearing - increase for convergence on harder systems
