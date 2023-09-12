@@ -52,6 +52,8 @@ params={
 "metal_ox": None, # Oxidation State
 "metal_spin": None, # Spin State
 "xtb_solvent": 'none', # Add any named XTB solvent!
+"calculator_kwargs":dict(), # ASE calculator kwargs.
+"ase_opt_kwargs":dict(), # ASE optimizer kwargs.
 "xtb_accuracy":1.0, # Numerical Accuracy for XTB calculations
 "xtb_electronic_temperature":300, # In K -> fermi smearing - increase for convergence on harder systems
 "xtb_max_iterations":250, # Max iterations for xtb SCF.
@@ -224,7 +226,7 @@ class CalcExecutor:
                 self.mol.calc_suggested_spin(params=self.parameters)
             obabel_ff_requested = False
             if (self.calculator is not None) and ('custom' in self.method): # If ASE calculator passed use that by default
-                calc = self.calculator
+                calc = self.calculator(**self.calculator_kwargs)
                 # Here, if a calculator needs spin/charge information in another way we can assign.
                 # Or handle as a different use case.
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
@@ -280,16 +282,20 @@ class CalcExecutor:
                                 if self.logfile is not None:
                                     dyn = self.opt_method(self.mol.ase_atoms, 
                                                         trajectory='temp.traj',
-                                                        logfile=self.logfile)
+                                                        logfile=self.logfile,
+                                                        **self.ase_opt_kwargs)
                                 else:
                                     dyn = self.opt_method(self.mol.ase_atoms, 
-                                                        trajectory='temp.traj')
+                                                        trajectory='temp.traj',
+                                                        **self.ase_opt_kwargs)
                             else:
                                 if self.logfile is not None:
                                     dyn = self.opt_method(self.mol.ase_atoms,
-                                                        logfile=self.logfile)
+                                                        logfile=self.logfile,
+                                                        **self.ase_opt_kwargs)
                                 else:
-                                    dyn = self.opt_method(self.mol.ase_atoms)
+                                    dyn = self.opt_method(self.mol.ase_atoms,
+                                                          **self.ase_opt_kwargs)
                             dyn.run(fmax=self.fmax,steps=self.maxsteps)
                             if self.parameters['save_trajectories']:
                                 self.read_traj()
