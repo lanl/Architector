@@ -281,6 +281,10 @@ class CalcExecutor:
                         fix_inds = self.mol.find_component_indices(component=0)
                         c = FixAtoms(indices=fix_inds.tolist())
                         self.mol.ase_atoms.set_constraint(c)
+                    if len(self.mol.ase_constraints) > 0:
+                        fix_list = [[x[0],x[1]] for x in self.mol.ase_constraints]
+                        c = FixBondLengths(fix_list)
+                        self.mol.ase_atoms.set_constraint(c)
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
                         if has_sella and self.ase_opt_kwargs.get('sella_internal_trics',False):

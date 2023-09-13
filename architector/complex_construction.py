@@ -178,9 +178,11 @@ class Complex:
                                                                 ligand)
             if assembled:
                 self.complexMol.append_ligand({'ase_atoms':bestConformer,'bo_dict':ligand.BO_dict, 
-                                            'atom_types':ligand.atom_types})
+                                            'atom_types':ligand.atom_types,
+                                            'ca_metal_dist_constraints':ligand.ca_metal_dist_constraints})
                 self.initMol.append_ligand({'ase_atoms':bestConformer,'bo_dict':ligand.BO_dict, 
-                                            'atom_types':ligand.atom_types})
+                                            'atom_types':ligand.atom_types,
+                                            'ca_metal_dist_constraints':ligand.ca_metal_dist_constraints})
             else: # Check for failures - do not evaluate.
                 self.allLigandsGood = False
                 if self.parameters['debug']:
@@ -218,7 +220,8 @@ class Complex:
         for i,conformer in enumerate(conformerList):# Try and use XTB
             tmp_molecule = io_molecule.convert_io_molecule(self.initMol)
             tmp_molecule.append_ligand({'ase_atoms':conformer,'bo_dict':ligand.BO_dict, 
-                            'atom_types':ligand.atom_types})
+                            'atom_types':ligand.atom_types,
+                            'ca_metal_dist_constraints':ligand.ca_metal_dist_constraints})
             if self.parameters['debug']:
                 print(tmp_molecule.write_mol2('cool{}.mol2'.format(i),writestring=True))
             out_eval = CalcExecutor(tmp_molecule,assembly=True, 
@@ -843,7 +846,7 @@ def build_complex_2D(inputDict):
         bo_dict, atypes = io_obabel.get_OBMol_bo_dict_atom_types(obmollig)
 
         mol.append_ligand({'ase_atoms':bestConformer,'bo_dict':bo_dict, 
-                                    'atom_types':atypes})
+                                    'atom_types':atypes,'ca_metal_dist_constraints':ligand.get('ca_metal_dist_constraints',None)})
     
     # Charge -> charges already assigned to components during assembly
     if (inputDict['parameters']['full_charge'] is not None):

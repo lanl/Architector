@@ -782,6 +782,7 @@ class Molecule:
         lig_bo_dict = ligand['bo_dict']
         lig_ase_atoms = ligand['ase_atoms']
         lig_atom_types = ligand['atom_types']
+        lig_constraints = ligand.get('ca_metal_dist_constraints',None)
         natoms = len(self.ase_atoms)
         newligbodict = dict()
         for key,val in lig_bo_dict.items():
@@ -800,6 +801,15 @@ class Molecule:
                 newkey[1] = 1
             newkey = tuple(newkey)
             newligbodict.update({newkey:val})
+        if lig_constraints is not None:
+            for ind,dist in lig_constraints.items():
+                if non_coordinating:
+                    newind = natoms + ind
+                elif ind > 1:
+                    newind = natoms + ind - 1
+                else:
+                    newind = 1
+                self.ase_constraints.update({(0,newind):dist})
         self.BO_dict.update(newligbodict)
         self.ase_atoms += lig_ase_atoms
         self.atom_types += lig_atom_types
