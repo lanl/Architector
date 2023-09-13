@@ -198,6 +198,36 @@ def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     srcmol_tmp.set_positions(newposits)
     rmsd, outr, msrcmol = permute_align(tarmol,srcmol_tmp,maxiter=maxiter,tol=tol)
     return rmsd, outr, msrcmol
+
+
+def neb_align(tarmol, srcmol, maxiter=1, tol=1e-6):
+    """neb_align 
+    Align for NEB including mirror images.
+
+    Parameters
+    ----------
+    tarmol : ase.atoms.Atoms
+        target molecule
+    srcmol : ase.atoms.Atoms
+        source molecule
+    maxiter : int, optional
+        how many times to try, by default 10
+    tol : float, optional
+        tolerance for convergence, by default 1e-2
+
+    Returns
+    -------
+    out : ase.atoms.Atoms
+        mirrored rotated version of the molecule.
+    """
+    normal, _, out = permute_align(tarmol, srcmol,
+                                     maxiter=maxiter, tol=tol, in_place=False)
+    mirror, _, out2 = mirror_align(tarmol, srcmol,
+                                     maxiter=maxiter, tol=tol)
+    if mirror < normal:
+        out = out2
+    
+    return out
     
 
 def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=None,
