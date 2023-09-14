@@ -171,7 +171,7 @@ def set_XTB_calc_lig(ase_atoms, charge=None, uhf=None, method='GFN2-xTB',solvent
     if method == 'GFN-FF': # Need to turn off charges for GFN-FF evaluation. Probably an XTB-end bug.
         ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
         ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
-    calc = TBLite(method=method, solvent=solvent, verbosity=0)
+    calc = XTB(method=method, solvent=solvent, verbosity=0)
 
     #########################################################
     ########### Calculator Now Set! #########################
