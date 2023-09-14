@@ -166,7 +166,9 @@ def bond_length_sampler(relaxed_mol, n=10, seed=42, max_dev=0.4, smallest_dist_c
                     _,rmsd = reorder_align(relaxed_atoms,out.mol.ase_atoms,return_rmsd=True)
                     rmsds.append(rmsd)
                     energies.append(out.energy)
-                    displaced_structures.append(out.mol)
+                    tmpmol = convert_io_molecule(mol2)
+                    tmpmol.ase_atoms = out.mol.ase_atoms
+                    displaced_structures.append(tmpmol)
                     total_out += 1
     if good and return_energies:
         return displaced_structures,energies,rmsds
@@ -219,7 +221,6 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.4,
     relaxed_atoms = relaxed_mol.ase_atoms
     calc = relaxed_atoms.get_calculator()
     mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
-    tmpmol = convert_io_molecule(mol2)
     if seed:
         np.random.seed(seed)
     na = len(relaxed_atoms)
@@ -235,6 +236,7 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.4,
                                                      high=max_dist,
                                                      size=(na, 3))
         out_atoms.set_positions(newcoords)
+        tmpmol = convert_io_molecule(mol2)
         tmpmol.dists_sane = True
         tmpmol.ase_atoms = out_atoms
         _,rmsd = reorder_align(relaxed_atoms,out_atoms,return_rmsd=True)
@@ -244,7 +246,7 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.4,
             if out.successful:
                 rmsds.append(rmsd)
                 energies.append(out.energy)
-                displaced_structures.append(out.mol)
+                displaced_structures.append(tmpmol)
                 total_out += 1
     if good and return_energies:
         return displaced_structures,energies,rmsds
