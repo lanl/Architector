@@ -6,9 +6,78 @@ from ase.constraints import FixBondLengths
 from scipy.stats import bernoulli
 from openbabel import openbabel
 from architector.io_calc import CalcExecutor
+from ase.md.langevin import Langevin
+from ase.io.trajectory import Trajectory
 import architector.arch_context_manage as arch_context_manage
 from architector.io_molecule import convert_io_molecule
 from architector.io_obabel import (convert_mol2_obmol,convert_obmol_ase)
+
+def md_sampler(relaxed_mol, temp=298.15, interval=50, n=50, warm_up=1000, 
+               timestep=1.0, friction=0.02, debug=False, return_energies=False):
+    """md_sampler
+    Use langevin dynamics and specified temperature to sample structures.
+
+    Parameters
+    ----------
+    relaxed_mol : architector.io_molecule.Molecule
+        relaxed molcule
+    temp : float, optional
+        temperature, by default 298.15
+    interval : int, optional
+        time interval to save sampled structures, by default 50
+    n : int, optional
+        Number of samples to save, by default 50
+    warm_up : int, optional
+       Warm-up interval from 0K, by default 1000
+    timestep : float, optional
+        timestep in fs, by default 1.0
+    friction : float, optional
+        langevin friction, by default 0.02
+    debug : bool, optional
+        Print out stuff, by default False
+    return_energies : bool, optional
+       give back energies and rmsds, by default False
+    """
+    # Friction increased to get to convergence faster.
+    mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
+    init_ase = convert_io_molecule(mol2).ase_atoms
+    relaxed_atoms = relaxed_mol.ase_atoms
+    skip_n = int(warm_up/interval) 
+    good = True
+    with arch_context_manage.make_temp_directory() as _:
+        dyn = Langevin(relaxed_atoms, timestep * ase.units.fs, temp* ase.units.kB, friction=friction)
+        def printenergy(a=relaxed_atoms):  # store a reference to atoms in the definition.
+            """Function to print the potential, kinetic and total energy."""
+            epot = a.get_potential_energy() / len(a)
+            ekin = a.get_kinetic_energy() / len(a)
+            print('Energy per atom: Epot = %.3feV  Ekin = %.3feV (T=%3.0fK)  '
+                'Etot = %.3feV' % (epot, ekin, ekin / (1.5 * ase.units.kB), epot + ekin))
+        if debug:
+            dyn.attach(printenergy, interval=interval)
+        traj = Trajectory('moldyn3.traj', 'w', relaxed_atoms)
+        dyn.attach(traj.write, interval=interval)
+        # Now run the dynamics
+        dyn.run(warm_up + n*interval)
+        traj = Trajectory('moldyn3.traj')
+        trunc_traj = traj[skip_n:]
+        displaced_structures = []
+        energies = []
+        rmsds = []
+        for image in trunc_traj:
+            tmpmol = convert_io_molecule(mol2)
+            tmpmol.ase_atoms = image
+            displaced_structures.append(tmpmol)
+            _,rmsd = reorder_align(init_ase,image,return_rmsd=True)
+            energies.append(image.calc.results['energy'])
+            rmsds.append(rmsd)
+    if good and return_energies:
+        return displaced_structures,energies,rmsds
+    elif return_energies:
+        return [],energies,rmsds
+    elif good:
+        return displaced_structures
+    else:
+        return []
 
 
 def bond_length_sampler(relaxed_mol, n=10, seed=42, max_dev=0.4, smallest_dist_cutoff=0.55,
