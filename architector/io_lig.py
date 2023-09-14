@@ -42,6 +42,7 @@ from xtb.ase.calculator import XTB
 import warnings
 
 warnings.filterwarnings('ignore') # Supress numpy warnings.
+warnings.simplefilter("ignore", UserWarning) # Supress SciPy warnings.
 
 # Conditional Numba import
 has_numba = True
