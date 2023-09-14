@@ -818,8 +818,6 @@ class Molecule:
             self.charge += ligand['charge']
             self.xtb_uhf += ligand['xtb_uhf']
             self.xtb_charge += ligand['xtb_charge']
-            self.actinides += (np.array(ligand['actinides']) + natoms).tolist()
-            self.actinides_swapped = (self.actinides_swapped or ligand['actinides_swapped'])
         else:
             lcs = lig_ase_atoms.get_initial_charges().sum()
             self.charge += lcs

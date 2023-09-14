@@ -14,7 +14,6 @@ import architector.io_obabel as io_obabel
 from architector.io_align_mol import rmsd_align
 import architector.arch_context_manage as arch_context_manage
 import architector.io_molecule as io_molecule
-import architector.io_ptable as io_ptable
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
 from ase.constraints import (FixAtoms, FixBondLengths)
@@ -77,6 +76,8 @@ params={
 "force_generation":False,
 "species_run":False,
 "debug":False,
+"ase_opt_kwargs":{},
+"calculator_kwargs":{}
 }
 
 class CalcExecutor:
@@ -86,7 +87,7 @@ class CalcExecutor:
                 xtb_electronic_temperature=300, xtb_max_iterations=250,
                 fmax=0.1, maxsteps=1000, ff_preopt_run=False,
                 detect_spin_charge=False, fix_m_neighbors=False,
-                default_params=params, ase_opt_method=None, species_run=False,
+                default_params=params, ase_opt_method=None, ase_opt_kwargs={}, species_run=False,
                 intermediate=False,skip_spin_assign=False,
                 calculator=None, debug=False):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
@@ -166,6 +167,7 @@ class CalcExecutor:
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
         self.species_run = species_run
+        self.ase_opt_kwargs = ase_opt_kwargs
         self.skip_spin_assign = skip_spin_assign
         self.force_generation = False
         self.force_oxo_relax = False
@@ -202,7 +204,6 @@ class CalcExecutor:
             if self.ff_preopt_run:
                 self.method = 'UFF'
                 self.relax=True
-
         if self.ase_opt_method is None: # Default to LBFGSLineSearch
             self.opt_method = LBFGSLineSearch
         else:
@@ -212,6 +213,18 @@ class CalcExecutor:
             self.logfile = None
         else:
             self.logfile = 'tmp.log'
+
+        if ('xtb' in self.method.lower()) or ('uff' in self.method.lower()):
+            self.mol.swap_actinide(debug=self.parameters['debug'])
+
+        self.calc_instantiated = False
+
+        if (self.calculator is not None) and ('custom' in self.method): # Check if input calculator is XTB.
+            if hasattr(self.calculator,'name'): # Check if instantiated already
+                self.calc_instantiated = True
+                if 'xtb' in self.calculator.name:
+                    self.mol.swap_actinide(debug=self.parameters['debug'])
+                    self.method += '_xtb'
 
         # Output properties
         self.energy = None
@@ -233,21 +246,24 @@ class CalcExecutor:
                 self.mol.calc_suggested_spin(params=self.parameters)
             obabel_ff_requested = False
             if (self.calculator is not None) and ('custom' in self.method): # If ASE calculator passed use that by default
-                calc = self.calculator(**self.calculator_kwargs)
+                if not self.calc_instantiated:
+                    calc = self.calculator(**self.calculator_kwargs)
+                else:
+                    calc = self.calculator
                 # Here, if a calculator needs spin/charge information in another way we can assign.
                 # Or handle as a different use case.
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
-                uhf_vect[0] = self.mol.uhf
+                tuhf = self.mol.uhf
+                if '_xtb' in self.method:
+                    tuhf = self.mol.xtb_uhf
+                uhf_vect[0] = tuhf
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
-                charge_vect[0] = self.mol.charge
+                tcharge = self.mol.charge
+                if '_xtb' in self.method:
+                    tcharge = self.mol.xtb_charge
+                charge_vect[0] = tcharge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
-                ##### TODO ######
-                # This is currently a bit hack-y. Need better workaround for handling actinide potentials.
-                self.mol.actinides = [i for i,x in enumerate(self.mol.ase_atoms.get_chemical_symbols()) if (x in io_ptable.lanthanides)]
-                self.mol.actinides_swapped = True
-                self.mol.swap_actinide()
-                ##### TODO ######
             elif 'gfn' in self.method.lower():
                 calc = XTB(method=self.method, solvent=self.xtb_solvent,
                            max_iterations=self.xtb_max_iterations,
@@ -275,7 +291,7 @@ class CalcExecutor:
             if not obabel_ff_requested:
                 self.mol.ase_atoms.calc = calc
                 if self.relax:
-                    if self.parameters.get("freeze_molecule_add_species",False) and ('custom' not in self.method):
+                    if self.parameters.get("freeze_molecule_add_species",False) and self.species_run:
                         if self.parameters['debug']:
                             print('Fixing first component!')
                         fix_inds = self.mol.find_component_indices(component=0)
@@ -337,7 +353,7 @@ class CalcExecutor:
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
                     # Remove constraint
-                    if self.parameters.get("freeze_molecule_add_species",False):
+                    if self.parameters.get("freeze_molecule_add_species",False) and (self.species_run):
                         if self.parameters['debug']:
                             print('Removing fixing first component!')
                         self.mol.ase_atoms.set_constraint() 
@@ -399,7 +415,9 @@ class CalcExecutor:
         else:
             self.errors.append('Min dist checks failed. Not evaluated')
         # Check after done
-        self.mol.swap_actinide()
+        if ('xtb' in self.method.lower()) or ('uff' in self.method.lower()):
+            self.mol.swap_actinide(debug=self.parameters['debug'])
+
         if self.final_sanity_check:
             self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)

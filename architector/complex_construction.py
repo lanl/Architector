@@ -26,7 +26,7 @@ class Ligand:
     """Class to contain all information about a ligand including conformers."""
 
     def __init__(self, smiles, ligcoordList, corecoordList, core, ligGeo, ligcharge, ca_metal_dist_constraints,
-                covrad_metal=None, vdwrad_metal=None, originalMetal=None, debug=False):
+                covrad_metal=None, vdwrad_metal=None, debug=False):
         """Set up initial variables for ligand and run conformer generation routines.
 
         Parameters
@@ -49,8 +49,6 @@ class Ligand:
             Covalent radii of the metal, default values from io_ptable.rcov1
         vdwrad_metal : float, optional
             VDW radii of the metal, default values from io_ptable.rvdw
-        originalMetal : str
-            Original metal identity
         debug: bool, optional
             debug turns on/off output text/comments.
         """
@@ -59,7 +57,6 @@ class Ligand:
         self.ligcoordList = ligcoordList
         self.corecoordList = corecoordList
         self.metal = core
-        self.original_metal = originalMetal
         self.ca_metal_dist_constraints = ca_metal_dist_constraints
         self.geo = ligGeo 
         self.BO_dict = None
@@ -74,7 +71,6 @@ class Ligand:
                                                         self.ligcoordList, 
                                                         self.corecoordList, 
                                                         metal=self.metal,
-                                                        originalMetal=self.original_metal,
                                                         ligtype=self.geo,
                                                         ca_metal_dist_constraints=self.ca_metal_dist_constraints,
                                                         covrad_metal=covrad_metal,
@@ -296,35 +292,6 @@ class Complex:
         if self.calculator:
             self.complexMol = self.calculator.mol
     
-    def swap_metals_back(self,in_metal=None):
-        """swap_metals_back function to swap the metals back to original states.
-
-        Parameters
-        ----------
-        in_metal : str, optional
-            if an metal was passed in, by default None
-        """
-        self.initMol.ase_atoms[0].symbol = copy.deepcopy(self.complexMol.ase_atoms.symbols[0])
-        self.initMol.atom_types[0] = copy.deepcopy(self.complexMol.ase_atoms.symbols[0])
-        if (self.parameters.get('full_spin_nonxtb',None) is not None):
-            self.initMol.uhf = self.parameters['full_spin_nonxtb']
-        string = self.initMol.write_mol2('init_geo', writestring=True)
-        self.init_geo_swapped_metal = copy.deepcopy(string)
-        if in_metal: # Switch to the original metal.
-            self.initMol.ase_atoms[0].symbol = in_metal
-            self.initMol.atom_types[0] = in_metal
-            self.complexMol.ase_atoms[0].symbol = in_metal
-            self.complexMol.atom_types[0] = in_metal
-        elif self.parameters['in_metal']: # Switch to the original metal.
-            self.initMol.ase_atoms[0].symbol = self.parameters['in_metal']
-            self.initMol.atom_types[0] = self.parameters['in_metal']
-            self.complexMol.ase_atoms[0].symbol = self.parameters['in_metal']
-            self.complexMol.atom_types[0] = self.parameters['in_metal']
-        elif self.parameters['is_actinide']: # Convert back to actinide if needed
-            self.initMol.ase_atoms[0].symbol = self.parameters['original_metal']
-            self.initMol.atom_types[0] = self.parameters['original_metal']
-            self.complexMol.ase_atoms[0].symbol = self.parameters['original_metal']
-            self.complexMol.atom_types[0] = self.parameters['original_metal']
 
 
 def gen_aligned_complex(newLigInputDicts, 
@@ -358,10 +325,6 @@ def gen_aligned_complex(newLigInputDicts,
         output ligand geometries and conformers for this structure for use in future structures generated.
     """
     ligandList = []
-    if isinstance(inputDict['parameters'].get('in_metal',False),str): # Switch to the original metal.
-        original_metal = inputDict['parameters'].get('in_metal')
-    else:
-        original_metal = inputDict['parameters'].get('original_metal')
     for i,ligand in enumerate(newLigInputDicts):
         # Get ligand smiles
         ligandSmiles = ligand["smiles"]
@@ -383,7 +346,6 @@ def gen_aligned_complex(newLigInputDicts,
                                 lig_ca_metal_dist_constraints,
                                 covrad_metal = inputDict['parameters']['covrad_metal'],
                                 vdwrad_metal = inputDict['parameters']['vdwrad_metal'],
-                                originalMetal = original_metal,
                                 debug = inputDict['parameters']['debug']
                                 )
             # Store results
@@ -439,15 +401,13 @@ def gen_aligned_complex(newLigInputDicts,
     return complexClass, ligandDict
 
 # Functions
-def complex_driver(inputDict1, in_metal=False):
+def complex_driver(inputDict1):
     """complex_driver Driver function for complex construction.
 
     Parameters
     ----------
     inputDict1 : dict
         inputDictionary directly from the user.
-    in_metal : bool, optional
-        if a metal was swapped, by default False
 
     Returns
     -------
@@ -465,7 +425,6 @@ def complex_driver(inputDict1, in_metal=False):
     # Process input Dictionary
     start_time0 = time.time()
     inputDict = io_process_input.inparse(inputDict1)
-    inputDict['parameters']['in_metal'] = in_metal
     fin_time0 = time.time()
     core_preprocess_time = fin_time0 - start_time0
     
@@ -577,23 +536,20 @@ def complex_driver(inputDict1, in_metal=False):
     else:
         return {},inputDict,0,0,0
     
-def build_complex_driver(inputDict1, 
-                         in_metal=False):
+def build_complex_driver(inputDict1): 
     """build_complex_driver overall driver building of the complex
 
     Parameters
     ----------
     inputDict1 : dict
         inputDictionary directly from the user.
-    in_metal : bool, optional
-        if a metal was swapped, by default False
 
     Returns
     -------
     ordered_conf_dict : dict
         Conformer dictionary with stored values if generation successful.
     """
-    conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1 = complex_driver(inputDict1=inputDict1,in_metal=in_metal)
+    conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1 = complex_driver(inputDict1=inputDict1)
     if len(conf_dict) == 0:
         if inputDict['parameters']['debug']:
             print('No possible geometries for the input ligand/coreType(s) combination.')
@@ -609,7 +565,6 @@ def build_complex_driver(inputDict1,
         for key,val in conf_dict.items():
             xtb_energies.append(val.calculator.energy)
             keys.append(key)
-            val.swap_metals_back(in_metal=in_metal)
             structs.append(val)
             if inputDict['parameters']['save_init_geos']:
                 if (inputDict['parameters'].get('full_spin_nonxtb',None) is not None):
@@ -707,23 +662,12 @@ def build_complex(inputDict):
     ordered_conf_dict,tmp_inputDict = build_complex_driver(inputDict)
     # Try larger radii generation for multidentate complexes if no complexes generated in an attempt to get at high-spin
     # > Covalent radii typically understimated for higher spin conformations
-    in_metal = inputDict['parameters']['original_metal']
-    # if inputDict['parameters'].get('debug',False):
-    #     print('Interim1 inputdict:',tmp_inputDict1)
-    # if 'mol2string' in inputDict:
-    #     tmp_inputDict = io_process_input.inparse(inputDict)
-    # else:
-    #     tmp_inputDict = io_process_input.inparse(inputDict)
-    # tmp_inputDict['parameters'].update(tmp_inputDict1['parameters'])
-    # if inputDict['parameters'].get('debug',False):
-    #     print('Interim2 inputdict:',tmp_inputDict)
     if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) == 0) and \
        (max([len(x['coordList']) for x in tmp_inputDict['ligands']]) > 2):
         newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=True) # Run with larger radii
         if tmp_inputDict['parameters']['debug']:
             print('Trying with larger scaled metal radii.')
-        temp_ordered_conf_dict = build_complex_driver(newinpdict,
-                                                      in_metal=in_metal)
+        temp_ordered_conf_dict = build_complex_driver(newinpdict)
         newdict_append = dict()
         for key,val in temp_ordered_conf_dict.items():
             newdict_append[key+'_larger_scaled'] = val
@@ -740,7 +684,7 @@ def build_complex(inputDict):
             if tmp_inputDict['parameters']['debug']:
                 print('Trying with smaller scaled metal radii.')
             newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=False)
-            temp_ordered_conf_dict = build_complex_driver(newinpdict,in_metal=in_metal)
+            temp_ordered_conf_dict = build_complex_driver(newinpdict)
             newdict_append = dict()
             for key,val in temp_ordered_conf_dict.items():
                 newdict_append[key+'_smaller_scaled'] = val
@@ -772,8 +716,6 @@ def build_complex(inputDict):
                 mol_plus_species,species_list = io_arch_dock.add_non_covbound_species(vals[i]['mol2string'],
                                                                          parameters=tmp_inputDict['parameters'])
                 # Do a final relaxation again with molecule + species. Ensures matching level
-                # Of theory with other generated complexes.
-                mol_plus_species.swap_actinide(debug=tmp_inputDict['parameters']['debug'])
                 calculator = CalcExecutor(mol_plus_species,
                             parameters=tmp_inputDict['parameters'],
                             final_sanity_check=tmp_inputDict['parameters']['full_sanity_checks'],
@@ -786,7 +728,6 @@ def build_complex(inputDict):
                     if tmp_inputDict['parameters']['debug']:
                         print('Warning: Final calc after adding secondary solvation failed. Returning solvated species anyways!!!!')
                 # Add "docked" molecule to output.
-                mol_plus_species.swap_actinide(debug=tmp_inputDict['parameters']['debug'])
                 vals[i].update({'mol2string':mol_plus_species.write_mol2('Mol_Plus_Species_Example_Energy', writestring=True),
                                 'energy':calculator.energy,
                                 'sampled_solvation_shells':species_list,

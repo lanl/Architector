@@ -56,6 +56,11 @@ defaults = {
             'species_relax':True, # Whether or not to relax the generated secondary solvation structures.
             'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
             'species_intermediate_relax':True, # Whether to perform the relaxation only after all secondary species are added
+            "calculator":None, # ASE calculator class input for usage during construction or for optimization.
+            "calculator_kwargs":dict(), # ASE calculator kwargs.
+            "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+            "ase_opt_kwargs":dict(), # ASE optimizer kwargs.
+            'ase_opt_kwargs':{}, # ASE optimizer
             'debug':False # Debug
 }
 
@@ -113,8 +118,7 @@ def get_rad_effective(mol):
 
 def species_generate_get_ref_params(species_id,parameters={},
                                     main_molecule=False,
-                                    intermediate=False,
-                                    skip_act_swap=False):
+                                    intermediate=False):
     """species_generate_get_ref_params
     Get charges and species information for the generated species.
 
@@ -129,8 +133,7 @@ def species_generate_get_ref_params(species_id,parameters={},
         Whether this is the central molecule to add other molecules to, by default False
     intermediate : bool, optional
         Whether this is an intermediate calculation or not, by default False
-    skip_act_swap : bool, optional
-        Whether to skip actinide swapping, by default False
+
 
     Returns
     -------
@@ -138,7 +141,6 @@ def species_generate_get_ref_params(species_id,parameters={},
         Architector molecule object with species with attached .param_dict[] object.
     """
     species = io_molecule.convert_io_molecule(species_id)
-    species.swap_actinide(debug=parameters.get('debug',False),skip=skip_act_swap)
     ## Possibly generate a bunch more conformers from a SMILES?
     ## species_confs = io_obabel.generate_obmol_conformers(solvent_smi)
     if isinstance(species_id,str):
@@ -168,16 +170,17 @@ def species_generate_get_ref_params(species_id,parameters={},
                             species_run=True,
                             intermediate=intermediate)
         species = calc.mol
-        outdict['species_dipole'] = species.ase_atoms.get_dipole_moment()
+        outdict['species_dipole'] = species.ase_atoms.calc.results['dipole']
         outdict['species_dipole_mag'] = np.linalg.norm(outdict['species_dipole'])
-        outdict['species_charges'] = species.ase_atoms.get_charges()
-        outdict['energy'] = species.ase_atoms.get_total_energy()
-        outdict['forces'] = species.ase_atoms.get_forces()
+        outdict['species_charges'] = species.ase_atoms.calc.results['charges']
+        outdict['energy'] = species.ase_atoms.calc.results['energy']
+        outdict['forces'] = species.ase_atoms.calc.results['forces']
     else:
         calc = CalcExecutor(species,
                             parameters=parameters,
                             species_run=True,
                             intermediate=intermediate)
+        species = calc.mol
         outdict['energy'] = calc.energy
     if not main_molecule:
         rotations_lst = []
@@ -301,9 +304,7 @@ def add_species(init_mol,species,parameters={}):
                      'uhf':tmp_spec.uhf,
                      'xtb_uhf':tmp_spec.xtb_uhf,
                      'charge':tmp_spec.charge,
-                     'xtb_charge':tmp_spec.xtb_charge,
-                     'actinides_swapped':tmp_spec.actinides_swapped,
-                     'actinides':tmp_spec.actinides}
+                     'xtb_charge':tmp_spec.xtb_charge}
         tmp_mol.append_ligand(spec_dict, 
                               non_coordinating=True)
         tmp_mol.dist_sanity_checks()
@@ -318,8 +319,7 @@ def add_species(init_mol,species,parameters={}):
         newmol = species_generate_get_ref_params(out_rotation,
                                                  parameters=parameters,
                                                  main_molecule=True,
-                                                 intermediate='main',
-                                                 skip_act_swap=True)
+                                                 intermediate='main')
     else:
         raise ValueError('None of the Ligands passed the calculator addition.')
     return newmol
@@ -328,29 +328,36 @@ def add_non_covbound_species(mol, parameters={}):
     """add_non_covbound_species 
     Use basic docking techniques to add a given number of defined species to a central
     Molecule:
-    parameters={'species_list':['nitrate_bi']*3+['water']*6, # Pass a list of species.
-            'species_smiles':'O',
-            'n_species':6,
-            
-            'n_species_rotations':20, # Rotations in 3D of ligands to try
-            'n_species_conformers':1, # Number of conformers to try - right now only 1 will be tested.
-            
-            'species_grid_pad':5, # How much to pad around the molecule species are being added to (in Angstroms)
-            'species_gridspec':
-            0.3, # How large of steps in R3 the grid surrounding a molecule should be
-            # to which a species could be added. (in Angstroms)
-            'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
-            # to which the species could be added. (in Angstroms)
-            
-            'species_location_method':'default', # Default attempts a basic colomb repulsion placement.
-            # Only other option is 'random' at the moment.
-            'species_n_copies':1, # Copies of random species placement to use.
-            'species_add_copies':1, # Number of full "species_list" orientations to build (from scratch)
-            'species_method':'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
-            'species_relax':True, # Whether or not to relax the generated secondary solvation structures.
-            'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
-            'species_intermediate_relax':False, # Whether to perform the relaxation only after all secondary species are added
-             }
+    parameters = {
+        # "Secondary Solvation Shell" parameters
+        'species_list':['water']*3, # Pass a list of species (preferred)
+        "freeze_molecule_add_species":False, # Whether to free the original moleucule during all secondary
+        # shell relaxations, default False.
+        'species_smiles':'O', # Can also specify multiple copies of single species with this and next line
+        'n_species':3, # -->> this line!
+        'n_species_rotations':20, # Rotations in 3D of ligands to try
+        'n_species_conformers':1, # Number of conformers to try - right now only 1 will be tested.
+        'species_grid_pad':5, # How much to pad around the molecule species are being added to (in Angstroms)
+        'species_gridspec':0.3, # How large of steps in R3 the grid surrounding a molecule should be
+        # to which a species could be added. (in Angstroms)
+        'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
+        # to which the species could be added. (in Angstroms)
+        'species_grid_rad_scale':1, # Factor to multiply molecule+species vdw by to set molecules.
+        # e.g. Reduce to allow for closer molecule-species distances
+        'species_location_method':'default', # Default attempts a basic colomb repulsion placement.
+        # Only other option is 'random' at the moment.
+        'species_add_copies':1, # Number of species addition orientations to build 
+        'species_method':'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
+        'species_relax':True, # Whether or not to relax the generated secondary solvation structures.
+        'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
+        'species_intermediate_relax':True, # Whether to perform the relaxation only after all secondary species are added
+        "calculator":None, # ASE calculator class input for usage during construction or for optimization.
+        "calculator_kwargs":dict(), # ASE calculator kwargs.
+        "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+        "ase_opt_kwargs":dict(), # ASE optimizer kwargs.
+        'ase_opt_kwargs':{}, # ASE optimizer
+        'debug':False # Debug
+    }
     
     Parameters
     ----------
@@ -406,11 +413,9 @@ def add_non_covbound_species(mol, parameters={}):
         if params.get('species_relax',True) and (not params.get('species_intermediate_relax',False)): 
             out_mol = species_generate_get_ref_params(init_mol,
                                                 parameters=params,
-                                                main_molecule=True,
-                                                skip_act_swap=True)
+                                                main_molecule=True)
         else: # Just return final molecule.
             out_mol = init_mol
-        out_mol.swap_actinide(debug=params.get('debug',False))
         species_add_list.append(out_mol)
     outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
     return outmol,species_add_list
