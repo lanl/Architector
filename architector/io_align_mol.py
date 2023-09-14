@@ -200,9 +200,9 @@ def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     return rmsd, outr, msrcmol
 
 
-def neb_align(tarmol, srcmol, maxiter=1, tol=1e-6):
-    """neb_align 
-    Align for NEB including mirror images.
+def reorder_align(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False):
+    """reorder_align
+    Align including re-ordering.
 
     Parameters
     ----------
@@ -214,6 +214,8 @@ def neb_align(tarmol, srcmol, maxiter=1, tol=1e-6):
         how many times to try, by default 10
     tol : float, optional
         tolerance for convergence, by default 1e-2
+    return_rmsd: bool, optional
+        return the rmsd value?, by default False
 
     Returns
     -------
@@ -222,12 +224,16 @@ def neb_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     """
     normal, _, out = permute_align(tarmol, srcmol,
                                      maxiter=maxiter, tol=tol, in_place=False)
+    rmsd = normal
     mirror, _, out2 = mirror_align(tarmol, srcmol,
                                      maxiter=maxiter, tol=tol)
     if mirror < normal:
         out = out2
-    
-    return out
+        rmsd = mirror
+    if not return_rmsd:
+        return out
+    else:
+        return out,rmsd
     
 
 def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=None,
