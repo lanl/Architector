@@ -6,6 +6,8 @@ Some Documentation: https://pypi.org/project/py3Dmol/
 
 Visualization routine for handling jupyter notebook use of architector.
 
+Normal modes code adapted from: https://github.com/duerrsimon/normal-mode-jupyter
+
 Developed by Michael Taylor
 """
 import math as m
@@ -52,7 +54,7 @@ def type_convert(structures):
             
 def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick',labelsize=12,
                  labels=False, labelinds=None, vector=None, sphere_scale=0.3,stick_scale=0.25,
-                 metal_scale=0.75):
+                 metal_scale=0.75, modes=None):
     """
     py3Dmol view atoms object(s)
     xyz_names = xyz files that will be rendered in a tiled format in jupyter (list,str)
@@ -69,6 +71,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
     sphere_scale = how much to scale the spheres from the vdw radii (float) - default 0.3
     stick_scale = how much to scale the stick radii (float) - default 0.25
     metal_scael = how much to scale the metal radii (float) - default 0.75
+    modes = list of vibrational modes to add vibrational visualization to.
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -88,9 +91,21 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
             label_posits = mol.ase_atoms.positions[metal_ind].flatten()
         else:
             label_posits = mol.ase_atoms.get_center_of_mass().flatten()  # Put it at the geometric center of the molecule.
-        coords = mol.write_mol2('tmp.mol2', writestring=True)
+        if modes is not None:
+            syms = mol.ase_atoms.get_chemical_symbols()
+            atom_coords = mol.ase_atoms.get_positions()
+            xyz =f"{len(atom_coords)}\n\n"
+            mode_coords = modes[0]
+            for i,sym in enumerate(syms):
+                xyz+=f"{sym} {atom_coords[i][0]} {atom_coords[i][1]} {atom_coords[i][2]} {mode_coords[i][0]} {mode_coords[i][1]} {mode_coords[i][2]} \n"
+        else:
+            coords = mol.write_mol2('tmp.mol2', writestring=True)
         if representation == 'ball_stick':
-            view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+            if modes is not None:
+                view_ats.addModel(xyz,'xyz',{'vibrate': {'frames':10,'amplitude':1}})
+                view_ats.animate({'loop': 'backAndForth'})
+            else:
+                view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
             view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
             msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_ind]
             for ms in set(msyms):
@@ -103,13 +118,17 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                     'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
                     'fontColor':"white",'inFront':'true'})
         else:
-            view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+            if modes is not None:
+                view_ats.addModel(xyz,'xyz',{'vibrate':{'frames':10,'amplitude':1}})
+                view_ats.animate({'loop':'backAndForth'})
+            else:
+                view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
             if representation == 'stick':
                 view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}})
             elif representation == 'sphere':
-                 view_ats.setStyle({representation:{'colorscheme':'Jmol','scale':sphere_scale}})
+                view_ats.setStyle({representation:{'colorscheme':'Jmol','scale':sphere_scale}})
             else:
-                 view_ats.setStyle({representation:{'colorscheme':'Jmol'}})
+                view_ats.setStyle({representation:{'colorscheme':'Jmol'}})
             if label:
                 view_ats.addLabel("{}".format(label), {'position':{'x':'{}'.format(label_posits[0]),
                     'y':'{}'.format(label_posits[1]),'z':'{}'.format(label_posits[2])},
@@ -160,9 +179,21 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                 label_posits = mol.ase_atoms.positions[metal_inds[0]].flatten()
             else:
                 label_posits = mol.ase_atoms.get_center_of_mass().flatten()  # Put it at the geometric center of the molecule.
-            coords = mol.write_mol2('tmp.mol2', writestring=True)
+            if modes is not None:
+                atom_coords = mol.ase_atoms.get_positions()
+                syms = mol.ase_atoms.get_chemical_symbols()
+                xyz =f"{len(atom_coords)}\n\n"
+                mode_coords = modes[k]
+                for i,sym in enumerate(syms):
+                    xyz+=f"{sym} {atom_coords[i][0]} {atom_coords[i][1]} {atom_coords[i][2]} {mode_coords[i][0]} {mode_coords[i][1]} {mode_coords[i][2]} \n"
+            else:
+                coords = mol.write_mol2('tmp.mol2', writestring=True)
             if representation == 'ball_stick':
-                view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
+                if modes is not None:
+                    view_ats.addModel(xyz,'xyz',{'vibrate':{'frames':10,'amplitude':1}},viewer=(x,y))
+                    view_ats.animate({'loop':'backAndForth'},viewer=(x,y))
+                else:
+                    view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
                 view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}},viewer=(x,y)) 
                 msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
                 for ms in set(msyms):
@@ -188,7 +219,11 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
                             'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
                             'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
             else:
-                view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y))
+                if modes is not None:
+                    view_ats.addModel(xyz,'xyz',{'vibrate':{'frames':10,'amplitude':1}},viewer=(x,y))
+                    view_ats.animate({'loop':'backAndForth'},viewer=(x,y))
+                else:
+                    view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
                 if representation == 'stick':
                     view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}},viewer=(x,y))
                 elif representation == 'sphere':
