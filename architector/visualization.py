@@ -52,26 +52,64 @@ def type_convert(structures):
     return outlist
                 
             
-def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick',labelsize=12,
-                 labels=False, labelinds=None, vector=None, sphere_scale=0.3,stick_scale=0.25,
-                 metal_scale=0.75, modes=None):
-    """
-    py3Dmol view atoms object(s)
-    xyz_names = xyz files that will be rendered in a tiled format in jupyter (list,str)
-    w = width of frame (or subframes) in pixels (int)
-    h = height of frame (or subframes) in pixels (int)
-    cols = number of columns in subframe (int)
-    representation = how the molecule will be viewed 
-        - valid options include ('ball_stick' - default, 'stick', 'sphere') (str)
-    labelsize = size of the data label (in Points) (int)
-    labels = turn labels on/off (bool)
-    labelinds = whether to add the indices as text objects to the visualized molecule.
-    vector = {'start': {'x':-10.0, 'y':0.0, 'z':0.0}, 'end': {'x':-10.0, 'y':0.0, 'z':10.0},
-              'radius':2,'color':'red'}
-    sphere_scale = how much to scale the spheres from the vdw radii (float) - default 0.3
-    stick_scale = how much to scale the stick radii (float) - default 0.25
-    metal_scael = how much to scale the metal radii (float) - default 0.75
-    modes = list of vibrational modes to add vibrational visualization to.
+def view_structures(structures, w=200, h=200, columns=4, representation='ball_stick', labelsize=12,
+                 labels=False, labelinds=None, vector=None, sphere_scale=0.3, stick_scale=0.25,
+                 metal_scale=0.75, modes=None, trajectory=False, interval=200):
+    """view_structures
+    Jupyter-notebook-based visualization of molecular structures.
+
+    Structures can be anything from a file (.xyz, .mol2, .rxyz), ase Atoms, list (or array) of files, 
+    or list/array-like of structure strings, or list/array of ase Atoms.
+
+    Examples:
+    view_structures(ase.atoms.Atoms) gives a single viewer with the given structure.
+    view_structures('thing.xyz') gives a single viewer with the given structure.
+    view_structures(list_of_xyz_strings) gives a grid_view with 4 columns of all xyz strings passed.
+    view_structures(list_of_mol2strings) gives a grid_view with 4 columns of all mol2 strings. Will maintain bond orders specified.
+    view_structures(pd.Series of mol2strings, labels=pd.OtherSeries of Strings) gives a grid_view with 4 columns with labels superimposed.
+    view_structures(mol2string,labelinds=True) gives a single viewer with index of all atoms superimposed as labels.
+    view_structures(mol2string,labelinds=list_of_strings) gives a single viewer with the strings put on the atoms with matching indices.
+    view_structures(ase.atoms.Atoms,modes=[vibrational_mode_array]) gives a single viewer with vibrational mode array superimposed
+    view_structures([ase.atoms.Atoms]*n,modes=[vibrational_mode_array1,vibrational_mmode_array2....]]) 
+    gives a grid viewer with all vibrational modes visualized
+    view_structures([trajectory_of_xyzs],trajectory=True) gives a single viewer with the trajectory visualized.
+
+    There is much more functionality to play with.
+    Most of what I end up changing is w (width) and h (height) in pixels, and columns (int).
+    These specifiy the size of each viewer panel, and number of columns, respecitively. 
+    Parameters
+    ----------
+    structures : str,list,array-like
+        structures to visualize
+    w : int, optional
+        width of the frame or frames (tiled views) to visualize in pixels, by default 200
+    h : int, optional
+        height of the frame or frames (tiled views) to visualize in pixels, by default 200
+    columns : int, optional
+        number of columns to split multiple structures into, by default 4
+    representation : str, optional
+        What molecular representation ('stick','sphere'), by default 'ball_stick'
+    labelsize : int, optional
+        Fontsize for overlaid text labels, by default 12
+    labels : bool, optional
+        List or list of strings of labels to add to structures, by default False
+    labelinds : bool, list, optional
+        Whether to label the indices in each structure, if array passed will use array on matching atom indices, by default None
+    vector : dict, optional
+        Add arrow? e.g. vector = {'start': {'x':-10.0, 'y':0.0, 'z':0.0}, 'end': {'x':-10.0, 'y':0.0, 'z':10.0},
+              'radius':2,'color':'red'}, by default None
+    sphere_scale : float, optional
+        How large should the spheres be?, by default 0.3
+    stick_scale : float, optional
+        How large should the sticks be?, by default 0.25
+    metal_scale : float, optional
+        How large should the metals be?, by default 0.75
+    modes : bool/list(np.ndarray), optional
+        vibrational modes to animate on structure, by default None
+    trajectory : bool, optional
+        Whether to view as a trajectory animation (e.g. relaxation or MD), by default False
+    interval : int, optional
+        How long the trajectory animation should be (speed) incease to move slower, decrease to speed up, by default 200
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -152,7 +190,7 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
             view_ats.addArrow(vector)
         view_ats.zoomTo()
         view_ats.show()
-    elif len(mols) < 50:
+    elif (len(mols) < 50) and (not trajectory):
         rows = int(m.ceil(float(len(mols))/columns))
         w = w*columns
         h = h*rows 
@@ -257,6 +295,35 @@ def view_structures(structures,w=200,h=200,columns=4,representation='ball_stick'
             else:
                 x+=1
                 y=0
+        view_ats.show()
+    elif trajectory: # Animate a relaxation.
+        view_ats = py3Dmol.view(width=w,height=h)
+        metal_inds = [i for i,x in enumerate(mols[0].ase_atoms) if (x.symbol in io_ptable.all_metals)]
+        xyz = ""
+        for k,mol in enumerate(mols):
+            atom_coords = mol.ase_atoms.get_positions()
+            syms = mol.ase_atoms.get_chemical_symbols()
+            xyz += f"{len(atom_coords)}\n\n"
+            for i,sym in enumerate(syms):
+                xyz += f"{sym} {atom_coords[i][0]} {atom_coords[i][1]} {atom_coords[i][2]} \n"
+        view_ats.addModelsAsFrames(xyz,'xyz')
+        if representation == 'ball_stick':
+            view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
+            msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
+            for ms in set(msyms):
+                view_ats.setStyle({'elem':ms},{'sphere':{'colorscheme':'Jmol','scale':metal_scale}})
+            view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}}) 
+        else:
+            if representation == 'stick':
+                view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}})
+            elif representation == 'sphere':
+                view_ats.setStyle({representation:{'colorscheme':'Jmol','scale':sphere_scale}})
+            else:
+                view_ats.setStyle({representation:{'colorscheme':'Jmol'}})
+        if vector:
+            view_ats.addArrow(vector)
+        view_ats.zoomTo()
+        view_ats.animate({'interval':interval,'loop':'forward'}) # Infinite repetition
         view_ats.show()
     else: 
         raise ValueError('Warning. Passing this many structures WILL cause your kernel to crash.')
