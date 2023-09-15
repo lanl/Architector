@@ -200,7 +200,7 @@ def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     return rmsd, outr, msrcmol
 
 
-def reorder_align(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False):
+def reorder_align(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, center=True):
     """reorder_align
     Align including re-ordering.
 
@@ -216,12 +216,17 @@ def reorder_align(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False):
         tolerance for convergence, by default 1e-2
     return_rmsd: bool, optional
         return the rmsd value?, by default False
+    center : bool, optional
+        center the molecules to their center of masses, by defualt True
 
     Returns
     -------
     out : ase.atoms.Atoms
         mirrored rotated version of the molecule.
     """
+    if center:
+        tarmol.set_positions(tarmol.get_positions() - tarmol.get_positions().mean(axis=0)) # Center 
+        srcmol.set_positions(tarmol.get_positions() - tarmol.get_positions().mean(axis=0)) # Center 
     normal, _, out = permute_align(tarmol, srcmol,
                                      maxiter=maxiter, tol=tol, in_place=False)
     rmsd = normal
