@@ -88,7 +88,7 @@ class CalcExecutor:
                 fmax=0.1, maxsteps=1000, ff_preopt_run=False,
                 detect_spin_charge=False, fix_m_neighbors=False,
                 default_params=params, ase_opt_method=None, ase_opt_kwargs={}, species_run=False,
-                intermediate=False,skip_spin_assign=False,
+                intermediate=False, skip_spin_assign=False, save_trajectories=False,
                 calculator=None, debug=False):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
@@ -150,6 +150,7 @@ class CalcExecutor:
         self.method = method
         default_params = params.copy()
         default_params['debug'] = debug
+        default_params['save_trajectories'] = save_trajectories
         default_params.update(parameters)
         self.parameters = default_params
         self.init_sanity_check = init_sanity_check
@@ -430,7 +431,7 @@ class CalcExecutor:
         if self.replace_trics:
             self.ase_opt_kwargs['sella_internal_trics'] = True
         
-        if self.parameters['save_trajectories'] and (self.trajectory is not None):
+        if self.parameters['save_trajectories'] and (self.trajectory is not None) and (self.parameters['dump_ase_atoms']):
             self.dump_traj()
         elif self.parameters['save_trajectories']:
             pass
@@ -442,7 +443,7 @@ class CalcExecutor:
     def read_traj(self):
         pwd = os.path.abspath('.')
         traj = Trajectory(os.path.join(pwd,'temp.traj'))
-        self.trajectory = traj
+        self.trajectory = [x for x in traj] # Convert to atoms
 
     def dump_traj(self):
         for i,ats in enumerate(self.trajectory):

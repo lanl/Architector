@@ -32,7 +32,11 @@ def type_convert(structures):
     """
     outlist = []
     if isinstance(structures,str):
-        structures = [convert_io_molecule(structures)]
+        out = convert_io_molecule(structures)
+        if isinstance(out,(np.ndarray,list)): # Read in traj.
+            structures=out
+        else:
+            structures = [out]
     elif isinstance(structures,(ase.atoms.Atoms,architector.io_molecule.Molecule)):
         structures = [convert_io_molecule(structures)]
     elif isinstance(structures,dict):

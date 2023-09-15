@@ -9,7 +9,7 @@ Developed by Michael Taylor
 """
 
 import ase
-from ase.io import read
+from ase.io import (read, Trajectory)
 from ase.atoms import Atoms
 from ase.atom import Atom
 import numpy as np
@@ -18,7 +18,7 @@ import copy
 import itertools
 import architector
 from architector import io_obabel
-from architector.io_core import (Geometries,calc_all_coord_atom_angles)
+from architector.io_core import (Geometries, calc_all_coord_atom_angles)
 import architector.io_ptable as io_ptable
 from io import StringIO
 from scipy.sparse.csgraph import (csgraph_from_dense, connected_components)
@@ -62,6 +62,12 @@ def convert_io_molecule(structure,
         # mol2 filename
         elif structure[-5:] == '.mol2':
             mol.read_mol2(structure,readstring=False)
+        elif structure[-5:] == '.traj': # Read in trajectory file.
+            traj = Trajectory(structure)
+            output = []
+            for ats in traj:
+                output.append(convert_io_molecule(ats))
+            return output
         elif isinstance(structure,str) and (len(structure.split('\n')) > 3) and (structure.split('\n')[0].replace(' ','').isnumeric()) \
             and ('FORCES' in structure) and ('ENERGY' in structure): # RXYZ string.
             mol.read_rxyz(structure,readstring=True)
