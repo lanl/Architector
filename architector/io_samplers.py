@@ -80,7 +80,7 @@ def md_sampler(relaxed_mol, temp=298.15, interval=50, n=50, warm_up=1000,
         return []
 
 
-def bond_length_sampler(relaxed_mol, n=10, seed=42, max_dev=0.4, smallest_dist_cutoff=0.55,
+def bond_length_sampler(relaxed_mol, n=10, seed=42, max_dev_low=0.1, max_dev_hi=0.4, smallest_dist_cutoff=0.55,
                         min_dist_cutoff=3,
                         final_relax=False, final_relax_steps=50, debug=False,
                         return_energies=False,
@@ -96,8 +96,10 @@ def bond_length_sampler(relaxed_mol, n=10, seed=42, max_dev=0.4, smallest_dist_c
         number of conformers to generate, by default 10
     seed : int, optional
         random seed, by default 42
-    max_dev : float, optional
-        maximum deviation around bonds, by default 0.3
+    max_dev_low : float, optional
+        maximum compression of bonds, by default 0.1
+    max_dev_hi : float, optional
+        maximum stretch of bonds, by default 0.4
     smallest_dist_cutoff : float
         distance cutoff-make sure sum of cov radii larger than dist*smallest_dist_cutoff, default 0.55.
     min_dist_cutoff : int/float
@@ -126,8 +128,8 @@ def bond_length_sampler(relaxed_mol, n=10, seed=42, max_dev=0.4, smallest_dist_c
     while total_out < n:
         fail = False
         OBMol = convert_mol2_obmol(mol2)
-        distortion = np.random.uniform(low=1-max_dev,
-                                                     high=1+max_dev,
+        distortion = np.random.uniform(low=1-max_dev_low,
+                                                     high=1+max_dev_hi,
                                                      size=(bond_dists.shape[0]))
         new_bond_dists = bond_dists*distortion
         ase_dist_constrs = []
