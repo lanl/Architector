@@ -11,7 +11,7 @@ import copy
 import os
 # import architector.io_xtb_calc as io_xtb_calc
 import architector.io_obabel as io_obabel
-from architector.io_align_mol import rmsd_align
+from architector.io_align_mol import simple_rmsd
 import architector.arch_context_manage as arch_context_manage
 import architector.io_molecule as io_molecule
 from ase.io import Trajectory
@@ -89,6 +89,7 @@ class CalcExecutor:
                 detect_spin_charge=False, fix_m_neighbors=False,
                 default_params=params, ase_opt_method=None, ase_opt_kwargs={}, species_run=False,
                 intermediate=False, skip_spin_assign=False, save_trajectories=False,
+                store_results=False,
                 calculator=None, debug=False):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
@@ -139,6 +140,10 @@ class CalcExecutor:
             If this is an "intermediate" calculation or not, by default False
         skip_spin_assign : bool, optional
             Skip the re-assignment of spin to a molcule during the calculation, by default False
+        save_trajectories : bool, optional
+            Save the optimization trajectory, by default False
+        store_results : bool, optional
+            Store the "QM" results to calculator object, by default False.
         calculator : ase.calculators Calculator, optional
             Valid ase style calculator if desired, by default None
         debug : bool, optional 
@@ -168,11 +173,13 @@ class CalcExecutor:
         self.fix_m_neighbors = fix_m_neighbors
         self.maxsteps = maxsteps
         self.species_run = species_run
+        self.store_results = store_results
         self.ase_opt_kwargs = ase_opt_kwargs
         self.skip_spin_assign = skip_spin_assign
         self.force_generation = False
         self.force_oxo_relax = False
         self.replace_trics = False
+        self.results = None
         
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
@@ -338,9 +345,10 @@ class CalcExecutor:
                             if self.parameters['save_trajectories']:
                                 self.read_traj()
                             self.energy = self.mol.ase_atoms.get_total_energy()
-                            self.rmsd, _, _ = rmsd_align(self.mol.ase_atoms,
-                                                    io_molecule.convert_io_molecule(self.in_struct).ase_atoms,
-                                                    in_place=True)
+                            if (self.store_results):
+                                self.results = self.mol.ase_atoms.calc.results.copy()
+                            self.rmsd = simple_rmsd(self.mol.ase_atoms,
+                                                    io_molecule.convert_io_molecule(self.in_struct).ase_atoms)
                             self.calc_time = time.time() - self.calc_time
                             self.successful = True
                         except Exception as e:
@@ -365,6 +373,8 @@ class CalcExecutor:
                             self.energy = self.mol.ase_atoms.get_total_energy()
                             self.init_energy = copy.deepcopy(self.energy)
                             self.successful = True
+                            if (self.store_results):
+                                self.results = self.mol.ase_atoms.calc.results.copy()
                         except Exception as e:
                             self.errors.append(e)
                             if self.parameters['debug']:
@@ -386,9 +396,8 @@ class CalcExecutor:
                         self.successful = True
                         self.energy = energy
                         self.mol.ase_atoms.set_positions(out_atoms.get_positions())
-                        self.rmsd, _, _ = rmsd_align(self.mol.ase_atoms,
-                                                    io_molecule.convert_io_molecule(self.in_struct).ase_atoms,
-                                                    in_place=True)
+                        self.rmsd = simple_rmsd(self.mol.ase_atoms,
+                                                io_molecule.convert_io_molecule(self.in_struct).ase_atoms)
                     except Exception as e:
                         self.errors.append(e)
                         if self.parameters['debug']:
