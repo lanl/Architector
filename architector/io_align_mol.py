@@ -79,10 +79,22 @@ def permutation_cost_mat(pt_list1, pt_list2, label1, label2, costtype='xyz'):
                 cost_mat[i,j] = np.dot(diffvec, diffvec)
     return cost_mat
 
+def simple_rmsd(tarmol, insrcmol):
+    """simple_rmsd
 
-def rmsd_align(tarmol, insrcmol, in_place=False):
-    """rmsd_align 
-    Perform alignment between two ase Atoms assuming indices are ideally permuted
+    Parameters
+    ----------
+    tarmol : ase.atoms.Atoms
+        reference/target molecule to match the generated molecule to.
+    insrcmol : ase.atoms.Atoms
+        generated/predicted molecule to match to reference/target molecule.
+    """
+    rmsd = np.sqrt(np.sum((insrcmol.positions-tarmol.positions)**2)/len(tarmol))
+    return rmsd
+
+def align_rmsd(tarmol, insrcmol, in_place=False):
+    """align_rmsd
+    Perform alignment between two ase Atoms assuming indices match or are ideally permuted
     Return the rmsd_loss for the rotation.
 
     Parameters
@@ -110,7 +122,7 @@ def rmsd_align(tarmol, insrcmol, in_place=False):
         insrcmol.set_positions(newposits)
     else: 
         r = None
-    rmsd_loss = np.sqrt(np.sum((insrcmol.positions-tarmol.positions)**2)/len(tarmol))
+    rmsd_loss = simple_rmsd(tarmol,insrcmol)
     return rmsd_loss, r, insrcmol
 
 
@@ -118,7 +130,7 @@ def permute_align(tarmol, srcmol, maxiter=1, tol=1e-6, in_place=False):
     """permute_align 
     permute the atom order in mol to minimize the rmsd, in place
 
-    A follow up rmsd alignment will be applied to the new molecule to
+    A follow-up rmsd alignment will be applied to the new molecule to
     calculate the new rmsd
 
     Parameters
@@ -154,7 +166,7 @@ def permute_align(tarmol, srcmol, maxiter=1, tol=1e-6, in_place=False):
                                        costtype='xyz')
         permute = linear_sum_assignment(cost_mat)[1]
         srcmol_1 = srcmol_1[permute]
-        rms, r, srcmol_1 = rmsd_align(tarmol_1, srcmol_1, in_place=in_place)
+        rms, r, srcmol_1 = align_rmsd(tarmol_1, srcmol_1, in_place=in_place)
         if (count == 0) and (not in_place):
             outr = r[0] 
         elif (not in_place):
@@ -200,9 +212,9 @@ def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     return rmsd, outr, msrcmol
 
 
-def reorder_align(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, center=True):
-    """reorder_align
-    Align including re-ordering.
+def reorder_align_rmsd(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, center=True):
+    """reorder_align_rmsd
+    Align including re-ordering and mirroring, and calc RMSD
 
     Parameters
     ----------
@@ -224,13 +236,16 @@ def reorder_align(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, center
     out : ase.atoms.Atoms
         mirrored rotated version of the molecule.
     """
+    tmp1 = tarmol.copy()
+    tmp2 = srcmol.copy()
     if center:
-        tarmol.set_positions(tarmol.get_positions() - tarmol.get_positions().mean(axis=0)) # Center 
-        srcmol.set_positions(tarmol.get_positions() - tarmol.get_positions().mean(axis=0)) # Center 
-    normal, _, out = permute_align(tarmol, srcmol,
+        tmp1.set_positions(tmp1.get_positions() - tmp1.get_positions().mean(axis=0)) # Center 
+        tmp2.set_positions(tmp2.get_positions() - tmp2.get_positions().mean(axis=0)) # Center 
+
+    normal, _, out = permute_align(tmp1, tmp2,
                                      maxiter=maxiter, tol=tol, in_place=False)
     rmsd = normal
-    mirror, _, out2 = mirror_align(tarmol, srcmol,
+    mirror, _, out2 = mirror_align(tmp1, tmp2,
                                      maxiter=maxiter, tol=tol)
     if mirror < normal:
         out = out2

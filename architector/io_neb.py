@@ -5,7 +5,7 @@ Developed by Michael Taylor
 """
 
 from ase.neb import NEB
-from architector.io_align_mol import reorder_align
+from architector.io_align_mol import reorder_align_rmsd
 from architector.io_calc import CalcExecutor
 from architector.io_molecule import convert_io_molecule
 
@@ -20,7 +20,7 @@ def NEB_setup(initial,final,nimages=8,neb_method='GFN2-xTB',interpolation='idpp'
         charges[0] = initial_mol.charge
         magmoms[0] = initial_mol.uhf
     final_mol = convert_io_molecule(final)
-    final_mol_ase = reorder_align(initial_mol.ase_atoms,final_mol.ase_atoms)
+    final_mol_ase = reorder_align_rmsd(initial_mol.ase_atoms,final_mol.ase_atoms)
     final_mol.ase_atoms = final_mol_ase
     images = [initial_mol.ase_atoms]
     images += [initial_mol.ase_atoms.copy() for x in range(nimages-2)]
