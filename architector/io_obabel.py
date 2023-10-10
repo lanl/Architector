@@ -51,10 +51,13 @@ def smiles2xyz(smilesStr,addHydrogens=True):
     builder = ob.OBBuilder()
     builder.Build(mol)
 
-    # Set up force field
-    FF = ob.OBForceField.FindForceField("MMFF94")
-    FF.Setup(mol)
+    mmff94_ok = check_mmff_okay(mol)
 
+    # Set up force field
+    if mmff94_ok:
+        FF = ob.OBForceField.FindForceField("mmff94")
+    else:
+        FF = ob.OBForceField.FindForceField('UFF')
     # Optimize energy
     FF.ConjugateGradients(2000,1e-6)
     FF.GetCoordinates(mol)
