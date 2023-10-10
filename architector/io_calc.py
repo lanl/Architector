@@ -23,11 +23,10 @@ try:
 except:
     has_sella = False
 
-
 ### Add any other ASE calculator here.
 # To extend to other methods.
 from xtb.ase.calculator import XTB
-# from tblite.ase import TBLite -> No GFN-FF support yet
+from tblite.ase import TBLite #-> No GFN-FF nor solvent support yet
 
 params={
 "save_trajectories": False, # Only on XTB methods
@@ -273,10 +272,17 @@ class CalcExecutor:
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif 'gfn' in self.method.lower():
-                calc = XTB(method=self.method, solvent=self.xtb_solvent,
-                           max_iterations=self.xtb_max_iterations,
-                           electronic_temperature=self.xtb_electronic_temperature,
-                           accuracy=self.xtb_accuracy)
+                # Temporary workaround to use TBLite by default if applicable.
+                if (self.xtb_solvent == 'none') and (self.method != 'GFN-FF'):
+                    calc = TBLite(method=self.method, max_iterations=self.xtb_max_iterations,
+                                  electronic_temperature=self.xtb_electronic_temperature,
+                                  verbosity=self.parameters['debug'])
+                # Use XTB for other cases.
+                else:
+                    calc = XTB(method=self.method, solvent=self.xtb_solvent,
+                            max_iterations=self.xtb_max_iterations,
+                            electronic_temperature=self.xtb_electronic_temperature,
+                            accuracy=self.xtb_accuracy)
                         #    verbosity=0)
                 # Difference of more than 1. Still perform a ff_preoptimization if requested.
                 if (np.abs(self.mol.xtb_charge - self.mol.charge) > 1):

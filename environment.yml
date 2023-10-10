@@ -17,3 +17,4 @@ dependencies:
   - pynauty
   - tqdm
   - mendeleev
+  - tblite
