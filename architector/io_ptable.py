@@ -423,7 +423,7 @@ functional_groups_dict = {
 'amide':'C(=O)N(C)C',
 'cyanimide':'N(C)N',
 'phosphonate':'[PH+]([O-])(O)O',
-'2-hydroxypyradine':'c1nc(ccc1)O',
+'2-hydroxypyridine':'c1nc(ccc1)O',
 '2-methylbenzoic_acid':'c1cc(ccc1C(=O)O)C'
 }
 
@@ -466,11 +466,11 @@ ligands_dict = {
 'ethylene':{'smiles':'C=C','coordList':[0,1],'ligType':'edge_bi_cis'},
 'hydride':{'smiles':'[H-]','coordList':[0],'ligType':'mono'},
 'sulfide':{'smiles':'[S-2]','coordList':[0],'ligType':'mono'},
-'pyradine':{'smiles':'c1ccncc1','coordList':[3],'ligType':'mono'},
+'pyridine':{'smiles':'c1ccncc1','coordList':[3],'ligType':'mono'},
 'bipyridine':{'smiles':'n1ccccc1-c2ccccn2','coordList':[0,11],'ligType':'bi_cis'},
 'bipy':{'smiles':'n1ccccc1-c2ccccn2','coordList':[0,11],'ligType':'bi_cis'},
 'terpy':{'smiles':'c1ccnc(c1)c2cccc(n2)c3ccccn3','coordList':[3,11,17],'ligType':'tri_mer'},
-'terpyradine':{'smiles':'c1ccnc(c1)c2cccc(n2)c3ccccn3','coordList':[3,11,17],'ligType':'tri_mer'},
+'terpyridine':{'smiles':'c1ccnc(c1)c2cccc(n2)c3ccccn3','coordList':[3,11,17],'ligType':'tri_mer'},
 'fluoride':{'smiles':'[F-]','coordList':[0],'ligType':'mono'},
 'chloride':{'smiles':'[Cl-]','coordList':[0],'ligType':'mono'},
 'bromide':{'smiles':'[Br-]','coordList':[0],'ligType':'mono'},
