@@ -457,6 +457,9 @@ solvents_dict = {
 ligands_dict = {
 'water':{'smiles':'O','coordList':[0],'ligType':'mono'},
 'hydroxyl':{'smiles':'[OH-]','coordList':[0],'ligType':'mono'},
+'methanide':{'smiles':'[CH3-]','coordList':[0],'ligType':'mono'},
+'ethanide':{'smiles':'[CH2-]C','coordList':[0],'ligType':'mono'},
+'benzyl':{'smiles':'[c-]1ccccc1','coordList':[0],'ligType':'mono'},
 'oxo':{'smiles':'[O-2]','coordList':[0],'ligType':'mono'},
 'peroxo':{'smiles':'[O-][O-]','coordList':[0,1],'ligType':'edge_bi_cis'},
 'hydrogen_peroxo':{'smiles':'O[O-]','coordList':[0,1],'ligType':'edge_bi_cis'},
@@ -603,20 +606,20 @@ ligands_dict = {
 'tedga':{'smiles':'CCN(CC)C(=O)COCC(=O)N(CC)CC','coordList':[6,8,11],'ligType':'tri_mer_bent'},
 'hydroxyquinoline':{'smiles':'C1=CC2=C(C(=C(C)1)O)N=CC=C2','coordList':[7,8],'ligType':'bi_cis'}, # Functionalize 6
 'bi_benzimidazole':{'smiles':'C1=CC=C2C(=C1)NC(=N2)C3=NC4=CC=CC=C4N3','coordList':[8,10],'ligType':'bi_cis'}, # Functionalize 6,17 with esters
-'acetate_mono':{'smiles':'CC(=O)[O-]','coordlist':[3],'ligType':'mono'},
-'acetate_bi':{'smiles':'CC(=O)[O-]','coordlist':[2,3],'ligType':'bi_cis_chelating'},
-'bisdimethylphosphineoxidemethane':{'smiles':'CP(C)(=O)CP(C)(C)=O','coordlist':[3,8],'ligType':'bis_cis'},
-'bisdimethylphosphineoxideethane':{'smiles':'CP(C)(=O)CCP(C)(C)=O','coordlist':[3,9],'ligType':'bis_cis'},
-'bisdimethylphosphineoxidepropane':{'smiles':'CP(C)(=O)CCCP(C)(C)=O','coordlist':[3,10],'ligType':'bis_cis'},
-'bisdimethylphosphineoxidebutane':{'smiles':'CP(C)(=O)CCCCP(C)(C)=O','coordlist':[3,11],'ligType':'bis_cis'},
-'bisdiphenylphosphineoxidmethane':{'smiles':'O=P(CP(=O)(c1ccccc1)c2ccccc2)(c3ccccc3)c4ccccc4','coordlist':[0,4],'ligType':'bis_cis'},
+'acetate_mono':{'smiles':'CC(=O)[O-]','coordList':[3],'ligType':'mono'},
+'acetate_bi':{'smiles':'CC(=O)[O-]','coordList':[2,3],'ligType':'bi_cis_chelating'},
+'bisdimethylphosphineoxidemethane':{'smiles':'CP(C)(=O)CP(C)(C)=O','coordList':[3,8],'ligType':'bis_cis'},
+'bisdimethylphosphineoxideethane':{'smiles':'CP(C)(=O)CCP(C)(C)=O','coordList':[3,9],'ligType':'bis_cis'},
+'bisdimethylphosphineoxidepropane':{'smiles':'CP(C)(=O)CCCP(C)(C)=O','coordList':[3,10],'ligType':'bis_cis'},
+'bisdimethylphosphineoxidebutane':{'smiles':'CP(C)(=O)CCCCP(C)(C)=O','coordList':[3,11],'ligType':'bis_cis'},
+'bisdiphenylphosphineoxidmethane':{'smiles':'O=P(CP(=O)(c1ccccc1)c2ccccc2)(c3ccccc3)c4ccccc4','coordList':[0,4],'ligType':'bis_cis'},
 'bisdicyclohexylphosphinoeoxidemethane':{'smiles':'O=P(CP(=O)(C1CCCCC1)C2CCCCC2)(C3CCCCC3)C4CCCCC4','coordList':[0,4],'ligType':'bi_cis'},
 'bisterbutylphosphinoeoxidemethane':{'smiles':'CC(C)(C)P(=O)(CP(=O)(C(C)(C)C)C(C)(C)C)C(C)(C)C','coordList':[5,8],'ligType':'bi_cis'},
 'bisadamphosphinoeoxidemethane':{'smiles':'O=P(CP(=O)(C23CC1CC(CC(C1)C2)C3)C56CC4CC(CC(C4)C5)C6)(C89CC7CC(CC(C7)C8)C9)C%11%12CC%10CC(CC(C%10)C%11)C%12',
                                  'coordList':[0,4],'ligType':'bi_cis'}, #This works as isolated ligand - should be okay!
-'bisdimethylphosphinesulfidemethane':{'smiles':'CP(C)(=S)CP(C)(C)=S','coordlist':[3,8],'ligType':'bis_cis'},
-'bisdimethylphosphineselenidemethane':{'smiles':'CP(C)(=Se)CP(C)(C)=Se','coordlist':[3,8],'ligType':'bis_cis'},
-'bisdimethylphosphineteluridemethane':{'smiles':'CP(C)(=Te)CP(C)(C)=Te','coordlist':[3,8],'ligType':'bis_cis'},
+'bisdimethylphosphinesulfidemethane':{'smiles':'CP(C)(=S)CP(C)(C)=S','coordList':[3,8],'ligType':'bis_cis'},
+'bisdimethylphosphineselenidemethane':{'smiles':'CP(C)(=Se)CP(C)(C)=Se','coordList':[3,8],'ligType':'bis_cis'},
+'bisdimethylphosphineteluridemethane':{'smiles':'CP(C)(=Te)CP(C)(C)=Te','coordList':[3,8],'ligType':'bis_cis'},
 }
 
 
