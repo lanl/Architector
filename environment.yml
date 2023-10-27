@@ -18,3 +18,4 @@ dependencies:
   - tqdm
   - mendeleev
   - tblite
+  - tblite-python

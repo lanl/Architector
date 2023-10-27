@@ -4,8 +4,10 @@ from ase.thermochemistry import IdealGasThermo
 import numpy as np
 from architector import arch_context_manage
 
-
-def vibration_analysis(atoms,hess,project_out_rot_trans=False,mode_type='mass_weighted_unnormalized'):
+def vibration_analysis(atoms,
+                       hess,
+                       project_out_rot_trans=False,
+                       mode_type='mass_weighted_unnormalized'):
     """vibration analysis
     Gives modes, energies,frequencies, reduced masses, AND force constants
     from hessian for the requested atoms system
