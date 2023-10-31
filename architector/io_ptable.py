@@ -472,6 +472,7 @@ ligands_dict = {
 'pyridine':{'smiles':'c1ccncc1','coordList':[3],'ligType':'mono'},
 'bipyridine':{'smiles':'n1ccccc1-c2ccccn2','coordList':[0,11],'ligType':'bi_cis'},
 'bipy':{'smiles':'n1ccccc1-c2ccccn2','coordList':[0,11],'ligType':'bi_cis'},
+'dilm':{'smiles':'CN=CC=NC','coordList':[1,4],'ligType':'bi_cis'},
 'terpy':{'smiles':'c1ccnc(c1)c2cccc(n2)c3ccccn3','coordList':[3,11,17],'ligType':'tri_mer'},
 'terpyridine':{'smiles':'c1ccnc(c1)c2cccc(n2)c3ccccn3','coordList':[3,11,17],'ligType':'tri_mer'},
 'fluoride':{'smiles':'[F-]','coordList':[0],'ligType':'mono'},
