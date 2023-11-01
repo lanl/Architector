@@ -315,14 +315,19 @@ def add_species(init_mol,species,parameters={}):
                                 intermediate='rotation')
             if calc.energy < best_energy:
                 out_rotation = calc.mol
+    good = False
     if out_rotation is not None:
+        good = True
         newmol = species_generate_get_ref_params(out_rotation,
                                                  parameters=parameters,
                                                  main_molecule=True,
                                                  intermediate='main')
     else:
-        raise ValueError('None of the Ligands passed the calculator addition.')
-    return newmol
+        if parameters['debug']:
+            print('None of the Ligands passed the calculator addition - skipping ONE.')
+        good = False
+        newmol = tmp_mol
+    return newmol,good
 
 def add_non_covbound_species(mol, parameters={}):
     """add_non_covbound_species 
@@ -401,21 +406,31 @@ def add_non_covbound_species(mol, parameters={}):
         init_mol = species_generate_get_ref_params(mol,
                                                    parameters=params,
                                                    main_molecule=True)
+        good = True
         for i,spec in enumerate(species_list):
             if params['debug']:
                 print('Adding species {} of {}.'.format(i+1,len(species_list)))
                 print(species_dict[spec].write_mol2('cool_species',
                                                     writestring=True))
-            init_mol = add_species(init_mol,
+            init_mol,good = add_species(init_mol,
                                    species_dict[spec],
                                    parameters=params)
         # Ensure the last configuration is relaxed if requested.
-        if params.get('species_relax',True) and (not params.get('species_intermediate_relax',False)): 
+        if params.get('species_relax',True) and (not params.get('species_intermediate_relax',False)) and \
+            good: 
             out_mol = species_generate_get_ref_params(init_mol,
                                                 parameters=params,
                                                 main_molecule=True)
+            species_add_list.append(out_mol)
+        elif not good:
+            pass
         else: # Just return final molecule.
             out_mol = init_mol
-        species_add_list.append(out_mol)
-    outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
-    return outmol,species_add_list
+            species_add_list.append(out_mol)
+    if len(species_add_list) > 0:
+        outmol = species_add_list[np.argmin([x.param_dict["energy"] for x in species_add_list])]
+        return outmol,species_add_list
+    else:
+        return mol,[]
+
+    
