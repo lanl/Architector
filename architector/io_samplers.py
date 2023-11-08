@@ -1,5 +1,6 @@
 import ase
 import numpy as np
+import os.path as osp
 from architector.io_align_mol import (reorder_align_rmsd, simple_rmsd)
 from ase.vibrations import Vibrations
 from ase.constraints import FixBondLengths
@@ -47,7 +48,7 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
     skip_n = int(warm_up/interval) 
     good = True
     with tqdm(total=n+int(warm_up/interval)) as pbar:
-        with arch_context_manage.make_temp_directory() as _:
+        with arch_context_manage.make_temp_directory() as tdir:
             dyn = Langevin(relaxed_atoms, timestep * ase.units.fs, temp* ase.units.kB, friction=friction)
             def printenergy(a=relaxed_atoms):  # store a reference to atoms in the definition.
                 """Function to print the potential, kinetic and total energy."""
@@ -64,7 +65,7 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
             dyn.attach(incremental,interval=interval)
             # Now run the dynamics
             dyn.run(warm_up + n*interval)
-            traj = Trajectory('moldyn3.traj')
+            traj = Trajectory(osp.join(tdir,'moldyn3.traj'))
             trunc_traj = traj[skip_n:]
             displaced_structures = []
             energies = []
