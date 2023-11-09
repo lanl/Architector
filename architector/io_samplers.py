@@ -69,6 +69,7 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
             trunc_traj = traj[skip_n:]
             displaced_structures = []
             energies = []
+            full_results = []
             simple_rmsds = []
             aligned_rmsds = []
             for image in trunc_traj:
@@ -76,14 +77,15 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
                 s_rmsd = simple_rmsd(init_ase,image)
                 _,align_rmsd = reorder_align_rmsd(init_ase,image,return_rmsd=True)
                 energies.append(image.calc.results['energy'])
+                full_results.append(image.calc.results)
                 tmpmol.ase_atoms = image
                 displaced_structures.append(tmpmol)
                 simple_rmsds.append(s_rmsd)
                 aligned_rmsds.append(align_rmsd)
     if good and return_energies:
-        return displaced_structures, energies, simple_rmsds, aligned_rmsds
+        return displaced_structures, energies, full_results, simple_rmsds, aligned_rmsds
     elif return_energies:
-        return [], energies, simple_rmsds, aligned_rmsds
+        return [], energies, full_results, simple_rmsds, aligned_rmsds
     elif good:
         return displaced_structures, simple_rmsds, aligned_rmsds
     else:
@@ -151,6 +153,7 @@ def bond_length_sampler(relaxed_mol,
     max_attempts = n + max_attempts
     displaced_structures = []
     energies = []
+    full_results = []
     simple_rmsds = []
     aligned_rmsds = []
     total_out = 0
@@ -204,6 +207,7 @@ def bond_length_sampler(relaxed_mol,
                         aligned_rmsds.append(align_rmsd)
                         simple_rmsds.append(s_rmsd)
                         energies.append(out.energy)
+                        full_results.append(out.mol.ase_atoms.calc.results)
                         tmpmol = convert_io_molecule(mol2)
                         tmpmol.ase_atoms = out.mol.ase_atoms
                         displaced_structures.append(tmpmol)
@@ -218,9 +222,9 @@ def bond_length_sampler(relaxed_mol,
                     total_out += 1
                     pbar.update(1)
     if good and return_energies:
-        return displaced_structures,energies,simple_rmsds,aligned_rmsds
+        return displaced_structures,energies,full_results,simple_rmsds,aligned_rmsds
     elif return_energies:
-        return [],energies,simple_rmsds,aligned_rmsds
+        return [],energies,full_results,simple_rmsds,aligned_rmsds
     elif good:
         return displaced_structures,simple_rmsds,aligned_rmsds
     else:
@@ -274,6 +278,7 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
     na = len(relaxed_atoms)
     displaced_structures = []
     energies = []
+    full_results = []
     simple_rmsds = []
     aligned_rmsds = []
     total_out = 0
@@ -301,6 +306,7 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
                     simple_rmsds.append(s_rmsd)
                     aligned_rmsds.append(align_rmsd)
                     energies.append(out.energy)
+                    full_results.append(out.ase_atoms.calc.results)
                     displaced_structures.append(tmpmol)
                     total_out += 1
                     pbar.update(1)
@@ -313,9 +319,9 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
     if count == max_attempts:
         good = False
     if good and return_energies:
-        return displaced_structures,energies,simple_rmsds,aligned_rmsds
+        return displaced_structures,energies,full_results,simple_rmsds,aligned_rmsds
     elif return_energies:
-        return [],energies,simple_rmsds,aligned_rmsds
+        return [],energies,full_results,simple_rmsds,aligned_rmsds
     elif good:
         return displaced_structures,simple_rmsds,aligned_rmsds
     else:
@@ -437,6 +443,7 @@ def normal_mode_sampler(relaxed_mol,
             np.random.seed(seed)
         displaced_structures = []
         energies = []
+        full_results = []
         # estimated_energies = [] # Used for debugging sampling method.
         simple_rmsds = []
         aligned_rmsds = []
@@ -467,6 +474,7 @@ def normal_mode_sampler(relaxed_mol,
                 if return_energies: # Only perform energy evaluation if requested.
                     energy = out_atoms.get_total_energy()
                     energies.append(energy)
+                    full_results.append(out_atoms.calc.results)
                 tmpmol = convert_io_molecule(mol2)
                 s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
                 _,aligned_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
@@ -480,9 +488,9 @@ def normal_mode_sampler(relaxed_mol,
             except:
                 continue
     if good and return_energies:
-        return displaced_structures,energies, simple_rmsds, aligned_rmsds, hess
+        return displaced_structures,energies, full_results, simple_rmsds, aligned_rmsds, hess
     elif return_energies:
-        return [], energies
+        return [], energies, full_results
     elif good:
         return displaced_structures, simple_rmsds, aligned_rmsds, hess
     else:
