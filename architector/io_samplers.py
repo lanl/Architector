@@ -73,11 +73,11 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
             aligned_rmsds = []
             for image in trunc_traj:
                 tmpmol = convert_io_molecule(mol2)
-                tmpmol.ase_atoms = image
-                displaced_structures.append(tmpmol)
                 s_rmsd = simple_rmsd(init_ase,image)
                 _,align_rmsd = reorder_align_rmsd(init_ase,image,return_rmsd=True)
                 energies.append(image.calc.results['energy'])
+                tmpmol.ase_atoms = image
+                displaced_structures.append(tmpmol)
                 simple_rmsds.append(s_rmsd)
                 aligned_rmsds.append(align_rmsd)
     if good and return_energies:
@@ -198,7 +198,9 @@ def bond_length_sampler(relaxed_mol,
                                     ase_opt_kwargs=ase_opt_kwargs,debug=debug)
                     if out.successful:
                         s_rmsd = simple_rmsd(relaxed_atoms,out.mol.ase_atoms)
-                        _,align_rmsd = reorder_align_rmsd(relaxed_atoms,out.mol.ase_atoms,return_rmsd=True)
+                        _,align_rmsd = reorder_align_rmsd(relaxed_atoms,
+                                                          out.mol.ase_atoms,
+                                                          return_rmsd=True)
                         aligned_rmsds.append(align_rmsd)
                         simple_rmsds.append(s_rmsd)
                         energies.append(out.energy)
@@ -289,9 +291,9 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
             out_atoms.set_positions(newcoords)
             tmpmol = convert_io_molecule(mol2)
             tmpmol.dists_sane = True
-            tmpmol.ase_atoms = out_atoms
             s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
             _,align_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
+            tmpmol.ase_atoms = out_atoms
             tmpmol.dist_sanity_checks(min_dist_cutoff=min_dist_cutoff,smallest_dist_cutoff=smallest_dist_cutoff,debug=debug)
             if (tmpmol.dists_sane) and (s_rmsd > min_rmsd) and (s_rmsd < max_rmsd) and (return_energies):
                 out = CalcExecutor(out_atoms,method='custom',calculator=calc,relax=False,debug=debug)
@@ -466,12 +468,12 @@ def normal_mode_sampler(relaxed_mol,
                     energy = out_atoms.get_total_energy()
                     energies.append(energy)
                 tmpmol = convert_io_molecule(mol2)
+                s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
+                _,aligned_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
                 tmpmol.ase_atoms = out_atoms
                 tmpmol.dist_sanity_checks(min_dist_cutoff=min_dist_cutoff,
                                           smallest_dist_cutoff=smallest_dist_cutoff,
                                           debug=debug)
-                s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
-                _,aligned_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
                 simple_rmsds.append(s_rmsd)
                 aligned_rmsds.append(aligned_rmsd)
                 displaced_structures.append(tmpmol)
