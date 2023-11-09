@@ -42,6 +42,7 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
        give back energies and rmsds, by default False
     """
     # Friction increased to get to convergence faster.
+    calc = relaxed_mol.ase_atoms.get_calculator()
     mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
     init_ase = convert_io_molecule(mol2).ase_atoms
     relaxed_atoms = relaxed_mol.ase_atoms
@@ -74,10 +75,12 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
             aligned_rmsds = []
             for image in trunc_traj:
                 tmpmol = convert_io_molecule(mol2)
+                out = CalcExecutor(image,method='custom',calculator=calc,
+                                   relax=False,debug=debug)
                 s_rmsd = simple_rmsd(init_ase,image)
                 _,align_rmsd = reorder_align_rmsd(init_ase,image,return_rmsd=True)
-                energies.append(image.calc.results['energy'])
-                full_results.append(image.calc.results)
+                energies.append(out.energy)
+                full_results.append(out.mol.ase_atoms.calc.results)
                 tmpmol.ase_atoms = image
                 displaced_structures.append(tmpmol)
                 simple_rmsds.append(s_rmsd)
