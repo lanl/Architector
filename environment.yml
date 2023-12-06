@@ -13,9 +13,7 @@ dependencies:
   - jupyter
   - numba
   - pandas
-  - crest
   - pynauty
   - tqdm
   - mendeleev
-  - tblite
   - tblite-python

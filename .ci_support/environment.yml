@@ -15,5 +15,4 @@ dependencies:
   - pynauty
   - tqdm
   - mendeleev
-  - tblite
   - tblite-python
