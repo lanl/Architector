@@ -48,51 +48,62 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
     relaxed_atoms = relaxed_mol.ase_atoms
     skip_n = int(warm_up/interval) 
     good = True
-    with tqdm(total=n+int(warm_up/interval)) as pbar:
-        with arch_context_manage.make_temp_directory() as tdir:
-            dyn = Langevin(relaxed_atoms, timestep * ase.units.fs, temp* ase.units.kB, friction=friction)
-            def printenergy(a=relaxed_atoms):  # store a reference to atoms in the definition.
-                """Function to print the potential, kinetic and total energy."""
-                epot = a.get_potential_energy() / len(a)
-                ekin = a.get_kinetic_energy() / len(a)
-                print('Energy per atom: Epot = %.3feV  Ekin = %.3feV (T=%3.0fK)  '
-                    'Etot = %.3feV' % (epot, ekin, ekin / (1.5 * ase.units.kB), epot + ekin))
-            def incremental(a=relaxed_atoms):
-                pbar.update(1)
-            if debug:
-                dyn.attach(printenergy, interval=interval)
-            traj = Trajectory('moldyn3.traj', 'w', relaxed_atoms)
-            dyn.attach(traj.write, interval=interval)
-            dyn.attach(incremental,interval=interval)
-            # Now run the dynamics
-            dyn.run(warm_up + n*interval)
-            traj = Trajectory(osp.join(tdir,'moldyn3.traj'))
-            trunc_traj = traj[skip_n:]
-            displaced_structures = []
-            energies = []
-            full_results = []
-            simple_rmsds = []
-            aligned_rmsds = []
-            for image in trunc_traj:
-                tmpmol = convert_io_molecule(mol2)
-                out = CalcExecutor(image,method='custom',calculator=calc,
-                                   relax=False,debug=debug)
-                s_rmsd = simple_rmsd(init_ase,image)
-                _,align_rmsd = reorder_align_rmsd(init_ase,image,return_rmsd=True)
-                energies.append(out.energy)
-                full_results.append(out.mol.ase_atoms.calc.results)
-                tmpmol.ase_atoms = image
-                displaced_structures.append(tmpmol)
-                simple_rmsds.append(s_rmsd)
-                aligned_rmsds.append(align_rmsd)
-    if good and return_energies:
-        return displaced_structures, energies, full_results, simple_rmsds, aligned_rmsds
-    elif return_energies:
-        return [], energies, full_results, simple_rmsds, aligned_rmsds
-    elif good:
-        return displaced_structures, simple_rmsds, aligned_rmsds
-    else:
-        return []
+    displaced_structures = []
+    energies = []
+    full_results = []
+    simple_rmsds = []
+    aligned_rmsds = []
+    try: # Catch TB convergence failures.
+        with tqdm(total=n+int(warm_up/interval)) as pbar:
+            with arch_context_manage.make_temp_directory() as tdir:
+                dyn = Langevin(relaxed_atoms, timestep * ase.units.fs, temp* ase.units.kB, friction=friction)
+                def printenergy(a=relaxed_atoms):  # store a reference to atoms in the definition.
+                    """Function to print the potential, kinetic and total energy."""
+                    epot = a.get_potential_energy() / len(a)
+                    ekin = a.get_kinetic_energy() / len(a)
+                    print('Energy per atom: Epot = %.3feV  Ekin = %.3feV (T=%3.0fK)  '
+                        'Etot = %.3feV' % (epot, ekin, ekin / (1.5 * ase.units.kB), epot + ekin))
+                def incremental(a=relaxed_atoms):
+                    pbar.update(1)
+                if debug:
+                    dyn.attach(printenergy, interval=interval)
+                traj = Trajectory('moldyn3.traj', 'w', relaxed_atoms)
+                dyn.attach(traj.write, interval=interval)
+                dyn.attach(incremental,interval=interval)
+                # Now run the dynamics
+                dyn.run(warm_up + n*interval)
+                traj = Trajectory(osp.join(tdir,'moldyn3.traj'))
+                trunc_traj = traj[skip_n:]
+                for image in trunc_traj:
+                    tmpmol = convert_io_molecule(mol2)
+                    out = CalcExecutor(image,method='custom',calculator=calc,
+                                    relax=False,debug=debug)
+                    s_rmsd = simple_rmsd(init_ase,image)
+                    _,align_rmsd = reorder_align_rmsd(init_ase,image,return_rmsd=True)
+                    energies.append(out.energy)
+                    full_results.append(out.mol.ase_atoms.calc.results)
+                    tmpmol.ase_atoms = image
+                    displaced_structures.append(tmpmol)
+                    simple_rmsds.append(s_rmsd)
+                    aligned_rmsds.append(align_rmsd)
+        if good and return_energies:
+            return displaced_structures, energies, full_results, simple_rmsds, aligned_rmsds
+        elif return_energies:
+            return [], energies, full_results, simple_rmsds, aligned_rmsds
+        elif good:
+            return displaced_structures, simple_rmsds, aligned_rmsds
+        else:
+            return []
+    except:
+        if good and return_energies:
+            return displaced_structures, energies, full_results, simple_rmsds, aligned_rmsds
+        elif return_energies:
+            return [], energies, full_results, simple_rmsds, aligned_rmsds
+        elif good:
+            return displaced_structures, simple_rmsds, aligned_rmsds
+        else:
+            return []
+
 
 
 def bond_length_sampler(relaxed_mol,
@@ -408,93 +419,103 @@ def normal_mode_sampler(relaxed_mol,
     good = True
     mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
     relaxed_atoms = relaxed_mol.ase_atoms
-    with arch_context_manage.make_temp_directory() as _:
-        if (hess is None):
-            vib_analysis = Vibrations(relaxed_atoms)
-            vib_analysis.run()
-            data = vib_analysis.get_vibrations()
-            hess = data.get_hessian_2d()
-        vib_energies, modes, fconstants, _ , frequencies = vibration_analysis(relaxed_atoms,
-                                                                              hess,
-                                                                              mode_type=mode_type)
-    
-        # _ is rmasses matrix in case it is needed later.
-        if linear: # 3N-5
-            vib_energies = np.real(vib_energies[5:])
-            modes = modes[5:]
-            fconstants = np.real(fconstants[5:])
-            frequencies = np.real(frequencies[5:])
-        else: # 3N-6
-            vib_energies = np.real(vib_energies[6:])
-            modes = modes[6:]
-            fconstants = np.real(fconstants[6:])
-            frequencies = np.real(frequencies[6:])
-        if n_modes_to_sample is not None:
-            vib_energies = vib_energies[:n_modes_to_sample]
-            modes = modes[:n_modes_to_sample]
-            fconstants = fconstants[:n_modes_to_sample]
-            frequencies = frequencies[:n_modes_to_sample]
-        if np.any(np.imag(vib_energies) > 0.1):
-            print('Warning: There are some highly imaginary modes!')
-            good = False
-        if debug:
-            print('Vib Energies',vib_energies)
-        non_zero_inds = np.where(frequencies > freq_cutoff)[0]
-        nmodes = len(non_zero_inds)
-        kbT = ase.units.kB*temp
-        if seed:
-            np.random.seed(seed)
-        displaced_structures = []
-        energies = []
-        full_results = []
-        # estimated_energies = [] # Used for debugging sampling method.
-        simple_rmsds = []
-        aligned_rmsds = []
-        calc = relaxed_atoms.get_calculator()
-        for _ in tqdm(range(n),total=n):
-            out_atoms = relaxed_atoms.copy()
-            # Generate random cs
-            cs = np.random.random(nmodes)
-            # Generate random signs
-            signs = bernoulli.rvs(0.5,size=nmodes)
-            signs[np.where(signs == 0)] = -1
-            # Average energy contribution per-mode
-            if per_mode_temp:
-                per_mode_e = 2*kbT/nmodes
-            else:
-                per_mode_e = 2*kbT
-            Rs = signs*np.sqrt(per_mode_e/fconstants[non_zero_inds]*np.log(1/(1-cs))) 
-            # estimated_energy_vect = [1/2*f*Rs[i]**2 for i,f in enumerate(fconstants[non_zero_inds])]
-            Rs = Rs*distance_factor # Fudge factor for specific methods based on experience for GFn2-xTB - 1 works well.
-            displaced_posits = relaxed_atoms.get_positions()
-            for j,r in enumerate(Rs):
-                norm_mode = modes[non_zero_inds[j]]
-                displacement = norm_mode*r
-                displaced_posits += displacement
-            out_atoms.set_positions(displaced_posits)
-            try:
-                out_atoms.calc = calc
-                if return_energies: # Only perform energy evaluation if requested.
-                    energy = out_atoms.get_total_energy()
-                    energies.append(energy)
-                    full_results.append(out_atoms.calc.results)
-                tmpmol = convert_io_molecule(mol2)
-                s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
-                _,aligned_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
-                tmpmol.ase_atoms = out_atoms
-                tmpmol.dist_sanity_checks(min_dist_cutoff=min_dist_cutoff,
-                                          smallest_dist_cutoff=smallest_dist_cutoff,
-                                          debug=debug)
-                simple_rmsds.append(s_rmsd)
-                aligned_rmsds.append(aligned_rmsd)
-                displaced_structures.append(tmpmol)
-            except:
-                continue
-    if good and return_energies:
-        return displaced_structures,energies, full_results, simple_rmsds, aligned_rmsds, hess
-    elif return_energies:
-        return [], energies, full_results
-    elif good:
-        return displaced_structures, simple_rmsds, aligned_rmsds, hess
-    else:
-        return []
+    displaced_structures = []
+    energies = []
+    full_results = []
+    # estimated_energies = [] # Used for debugging sampling method.
+    simple_rmsds = []
+    aligned_rmsds = []
+    try: # Catch Vibrations TB convergence Errors.
+        with arch_context_manage.make_temp_directory() as _:
+            if (hess is None):
+                vib_analysis = Vibrations(relaxed_atoms)
+                vib_analysis.run()
+                data = vib_analysis.get_vibrations()
+                hess = data.get_hessian_2d()
+            vib_energies, modes, fconstants, _ , frequencies = vibration_analysis(relaxed_atoms,
+                                                                                hess,
+                                                                                mode_type=mode_type)
+        
+            # _ is rmasses matrix in case it is needed later.
+            if linear: # 3N-5
+                vib_energies = np.real(vib_energies[5:])
+                modes = modes[5:]
+                fconstants = np.real(fconstants[5:])
+                frequencies = np.real(frequencies[5:])
+            else: # 3N-6
+                vib_energies = np.real(vib_energies[6:])
+                modes = modes[6:]
+                fconstants = np.real(fconstants[6:])
+                frequencies = np.real(frequencies[6:])
+            if n_modes_to_sample is not None:
+                vib_energies = vib_energies[:n_modes_to_sample]
+                modes = modes[:n_modes_to_sample]
+                fconstants = fconstants[:n_modes_to_sample]
+                frequencies = frequencies[:n_modes_to_sample]
+            if np.any(np.imag(vib_energies) > 0.1):
+                print('Warning: There are some highly imaginary modes!')
+                good = False
+            if debug:
+                print('Vib Energies',vib_energies)
+            non_zero_inds = np.where(frequencies > freq_cutoff)[0]
+            nmodes = len(non_zero_inds)
+            kbT = ase.units.kB*temp
+            if seed:
+                np.random.seed(seed)
+            calc = relaxed_atoms.get_calculator()
+            for _ in tqdm(range(n),total=n):
+                out_atoms = relaxed_atoms.copy()
+                # Generate random cs
+                cs = np.random.random(nmodes)
+                # Generate random signs
+                signs = bernoulli.rvs(0.5,size=nmodes)
+                signs[np.where(signs == 0)] = -1
+                # Average energy contribution per-mode
+                if per_mode_temp:
+                    per_mode_e = 2*kbT/nmodes
+                else:
+                    per_mode_e = 2*kbT
+                Rs = signs*np.sqrt(per_mode_e/fconstants[non_zero_inds]*np.log(1/(1-cs))) 
+                # estimated_energy_vect = [1/2*f*Rs[i]**2 for i,f in enumerate(fconstants[non_zero_inds])]
+                Rs = Rs*distance_factor # Fudge factor for specific methods based on experience for GFn2-xTB - 1 works well.
+                displaced_posits = relaxed_atoms.get_positions()
+                for j,r in enumerate(Rs):
+                    norm_mode = modes[non_zero_inds[j]]
+                    displacement = norm_mode*r
+                    displaced_posits += displacement
+                out_atoms.set_positions(displaced_posits)
+                try:
+                    out_atoms.calc = calc
+                    if return_energies: # Only perform energy evaluation if requested.
+                        energy = out_atoms.get_total_energy()
+                        energies.append(energy)
+                        full_results.append(out_atoms.calc.results)
+                    tmpmol = convert_io_molecule(mol2)
+                    s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
+                    _,aligned_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
+                    tmpmol.ase_atoms = out_atoms
+                    tmpmol.dist_sanity_checks(min_dist_cutoff=min_dist_cutoff,
+                                            smallest_dist_cutoff=smallest_dist_cutoff,
+                                            debug=debug)
+                    simple_rmsds.append(s_rmsd)
+                    aligned_rmsds.append(aligned_rmsd)
+                    displaced_structures.append(tmpmol)
+                except:
+                    continue
+        if good and return_energies:
+            return displaced_structures,energies, full_results, simple_rmsds, aligned_rmsds, hess
+        elif return_energies:
+            return [], energies, full_results
+        elif good:
+            return displaced_structures, simple_rmsds, aligned_rmsds, hess
+        else:
+            return []
+    except:
+        if good and return_energies:
+            return displaced_structures,energies, full_results, simple_rmsds, aligned_rmsds, hess
+        elif return_energies:
+            return [], energies, full_results
+        elif good:
+            return displaced_structures, simple_rmsds, aligned_rmsds, hess
+        else:
+            return []
