@@ -156,7 +156,6 @@ def bond_length_sampler(relaxed_mol,
     """
     good = True
     mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
-    tmpmol = convert_io_molecule(mol2)
     relaxed_atoms = relaxed_mol.ase_atoms
     calc = relaxed_atoms.get_calculator()
     if seed:
@@ -200,6 +199,7 @@ def bond_length_sampler(relaxed_mol,
                 fail = True
             ff.GetCoordinates(OBMol)
             if not fail:
+                tmpmol = convert_io_molecule(mol2)
                 tmp_atoms = convert_obmol_ase(OBMol)
                 out_atoms = relaxed_atoms.copy()
                 out_atoms.set_positions(tmp_atoms.positions)
@@ -228,8 +228,8 @@ def bond_length_sampler(relaxed_mol,
                         total_out += 1
                         pbar.update(1)
                 elif tmpmol.dists_sane:
-                    s_rmsd = simple_rmsd(relaxed_atoms,tmpmol.ase_atoms)
-                    _,align_rmsd = reorder_align_rmsd(relaxed_atoms,tmpmol.ase_atoms,return_rmsd=True)
+                    s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
+                    _,align_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
                     simple_rmsds.append(s_rmsd)
                     aligned_rmsds.append(align_rmsd)
                     displaced_structures.append(tmpmol)
