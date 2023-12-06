@@ -20,7 +20,7 @@ from ase.db import connect
 
 def isnotebook():
     """isnotebook
-    hacky function to determine if exection is inside a jupyer notebook or ipython shell
+    hacky function to determine if exection is inside a juptyer notebook or ipython shell
 
     from: https://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook
 
@@ -701,11 +701,16 @@ def inparse(inputDict):
             "return_only_1":False, # Only return single relaxed conformer (do not test multiple conformations)
             "n_symmetries":10, # Total metal-center symmetrys to build, NSymmetries should be >= n_conformers
             # 'n_lig_combos':1, # Number of randomized ligand conformations to run/return for each conformer -> possibly add back
-            "crest_sampling":False, # Perform CREST sampling on lowest-energy conformer(s)?
+            "crest_sampling":False, # Perform CREST conformational sampling on lowest-energy conformer(s)?
             "crest_sampling_n_conformers":1, # Number of lowest-energy Architector conformers on which to perform crest sampling.
             "crest_options":"--gfn2//gfnff --noreftopo --nocross --quick", # Crest Additional commandline options 
             # Charge/Spin/Solvent should not be added to crest_options 
             # they will be used from the generated complexes and xtb_solvent flags below.
+            "obmol_sampling":False, # Perform Openbabel Diverse ConfGen (conformational samping) on structures after generating?
+            "obmol_total_confs":3000, # Number of conformers to generate and test with openbabel
+            "obmol_rmsd_cutoff":0.4, # RMSD cutoff for classifying "new" conformers
+            "obmol_energy_cutoff":50.0, # Energy cutoff for classifying "new" conformers
+            "obmol_sampling_n_conformers":1, # Number of lowest-energy Architector conformers on which to perform openbabel sampling.
             "relax": True, # Perform xTB geomtetry relaxation of assembled complexes
             "debug": False, # Print out additional info for debugging purposes.
             "save_init_geos": False, # Save initial geometries before relaxations with xTB.
