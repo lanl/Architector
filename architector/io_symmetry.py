@@ -255,11 +255,11 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
     tmp_cn = core_geo_class.geo_cn_dict[coreType]
     geometry = core_geo_class.geometry_dict[coreType]
     geometry = np.array(geometry)
-    ligLists = []
     selected_con_lists = []
     lig_charges = []
     lig_num_atoms = []
     out_liglists = []
+    total_unique_symmetries = 0
     newLigInputDicts = ligInputDicts.copy()
 
     nsand = np.sum([1 for x in ligInputDicts if ((x['ligType'] == 'sandwich') or (x['ligType'] == 'haptic'))])
@@ -443,6 +443,7 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
 
                 if (out_energy not in out_energies): # (out_energy < (min_score)+1e10) and
                     good = True
+                    total_unique_symmetries += 1
                     out_combos.append(combo)
                     out_energies.append(out_energy)
                     # min_score = min(out_energies)
@@ -472,4 +473,4 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
             print('Not all individual ligands can map to this {} - Not generating!'.format(coreType))
     if params['debug']:
         print('Total valid symmetries for core {}: '.format(coreType),len(out_liglists))
-    return newLigInputDicts, out_liglists, good
+    return newLigInputDicts, out_liglists, total_unique_symmetries, good
