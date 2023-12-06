@@ -136,17 +136,10 @@ inputDict = {
     "vdwrad_metal": vdwrad_metal,
     "covrad_metal": covrad_metal,
 
-    ####### Conformer parameters and information stored ########
-    "n_conformers": 1, # Number of metal-core symmetries at each core to save / relax
+    ####### Information stored parameters ########
     "return_only_1": False, # Only return single relaxed conformer (do not test multiple conformations)
-    "n_symmetries": 10, # Total metal-center symmetrys to build, NSymmetries should be >= n_conformers
     "relax": True, # Perform final geomtetry relaxation of assembled complexes
     "save_init_geos": False, # Save initial geometries before relaxations.
-    "crest_sampling": False, # Perform CREST sampling on lowest-energy conformer(s)?
-    "crest_sampling_n_conformers": 1, # Number of lowest-energy Architector conformers on which to perform crest sampling.
-    "crest_options": "--gfn2//gfnff --noreftopo --nocross --quick", # Crest Additional commandline options 
-    # Note that Charge/Spin/Solvent should NOT be added to crest_options 
-    # they will be used from the generated complexes and xtb_solvent flags above.
     "return_timings": True, # Return all intermediate and final timings.
     "skip_duplicate_tests": False, # Skip the duplicate tests (return all generated/relaxed configurations)
     "return_full_complex_class": False, # Return the complex class containing all ligand geometry and core information.
@@ -155,12 +148,29 @@ inputDict = {
     # If you want to replicate whole workflows - set np.random.seed() at the beginning of your workflow.
     # Right not openbabel will still introduce randomness into generations - so it is often valuable
     # To run multiple searches if something is failing.
-
     # Dump all possible intermediate xtb calculations to separate ASE database
     "dump_ase_atoms": False, # or True
     "ase_atoms_db_name": 'architector_ase_db_{uid}.json', # Possible to name the databse filename
     # Will default to a "uid" included name.
     "temp_prefix":"/tmp/", # Default here - for MPI running on HPC suggested /scratch/$USER/
+
+    ####### Conformer parameters ########
+    "n_conformers": 1, # Number of metal-core symmetries at each core to save / relax
+    "n_symmetries": 10, # Total metal-center symmetrys to build, NSymmetries should be >= n_conformers
+    # Brief explanation: 
+    # n_symmetries: will specify how many metal-center symmetries for architector to generate
+    # INITIAL (un-relaxed) (UFF/MMFF level structures) to generate for each core geometry (e.g. give me 10 different octahedral metal-ligand structures)
+    # n_conformers: will specify how many of the generated n_symmetries to relax with tight binding and return to the user. Architector will decide which ones to try by relative energy of the INITIAL (un-relaxed) structures.
+    "crest_sampling": False, # Perform CREST sampling on lowest-energy conformer(s)?
+    "crest_sampling_n_conformers": 1, # Number of lowest-energy Architector conformers on which to perform crest sampling.
+    "crest_options": "--gfn2//gfnff --noreftopo --nocross --quick", # Crest Additional commandline options 
+    # Note that Charge/Spin/Solvent should NOT be added to crest_options 
+    # they will be used from the generated complexes and xtb_solvent flags above.
+    "obmol_sampling":False, # Perform Openbabel Diverse ConfGen (conformational samping) sampling on lowest-energy conformer(s)?
+    "obmol_total_confs":3000, # Number of conformers to generate and potentially test with openbabel
+    "obmol_rmsd_cutoff":0.4, # RMSD cutoff for classifying "new" conformers
+    "obmol_energy_cutoff":50.0, # Energy cutoff for classifying "new" conformers
+    "obmol_sampling_n_conformers":1, # Number of lowest-energy Architector conformers on which to perform openbabel sampling.
 
     ####### Ligand parameters #########
     # Ligand to finish filling out coordination environment if underspecified.
@@ -238,6 +248,7 @@ out = {
     'mol2string': str, # Final relaxed structure in TRIPOS mol2 format.
     'init_mol2string': str, # Initial unrelaxed structure in TRIPOS mol2 format.
     'energy_sorted_index': int, # Index of the complex from pseudo-energy ranking,
+    'total_possible_n_symmetries': int, # Total calculated unique n_symmetries for the complex.
     'inputDict': dict, # Full input dictionary copy (including assigned parameters) for replication!
     ..... Timing information ....},
     ** More structures **

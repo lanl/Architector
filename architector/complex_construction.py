@@ -17,7 +17,7 @@ import architector.io_lig as io_lig
 import architector.io_ptable as io_ptable
 import architector.io_molecule as io_molecule
 import architector.io_align_mol as io_align_mol
-import architector.io_crest as io_crest
+import architector.io_conformers as io_conformers
 import architector.io_symmetry as io_symmetry
 import architector.io_arch_dock as io_arch_dock
 from architector.io_calc import CalcExecutor
@@ -450,13 +450,14 @@ def complex_driver(inputDict1):
             coreCoordList = core_geo_class.geometry_dict[coreType]
 
             # Assign con atoms based on all ligands
-            newLigInputDicts, all_liglists, good = io_symmetry.select_cons(inputDict["ligands"],
+            newLigInputDicts, all_liglists, total_unique_symmetries, good = io_symmetry.select_cons(inputDict["ligands"],
                                                             coreType, core_geo_class, inputDict['parameters']
                                                             )
             if inputDict['parameters']['debug']:
                 print('Assigned LigCons ->')
                 print('LigLists:', all_liglists) 
                 print('coreCoordList:', coreCoordList)
+                print('Unique Symmetries:',total_unique_symmetries)
 
             fin_time1 = time.time()
             symmetry_preprocess_time = fin_time1 - int_time1
@@ -501,6 +502,7 @@ def complex_driver(inputDict1):
                     order = np.argsort(out_energies)
                     for ind,j in enumerate(order[0:inputDict['parameters']['n_conformers']]):
                         tmp_conformer = out_complexlist[j]
+                        setattr(tmp_conformer,'total_possible_n_symmetries',total_unique_symmetries)
                         if any([(not x.relax) for x in tmp_conformer.ligandList]):
                             if inputDict['parameters']['debug']:
                                 print('Warning This complex is likely strange because of failures of MMFF94 or distance geometry!')
@@ -609,6 +611,7 @@ def build_complex_driver(inputDict1):
                             'energy':xtb_energies[i],
                             'mol2string':mol2strings[i], 'init_mol2string':init_mol2strings[i],
                             'energy_sorted_index': energy_sorted_inds[i],
+                            'total_possible_n_symmetries':structs[i].total_possible_n_symmetries,
                             'inputDict':inputDict
                             }
             else:
@@ -622,6 +625,7 @@ def build_complex_driver(inputDict1):
                         'energy':xtb_energies[i],
                         'mol2string':mol2strings[i], 'init_mol2string':init_mol2strings[i],
                         'energy_sorted_index': energy_sorted_inds[i],
+                        'total_possible_n_symmetries':structs[i].total_possible_n_symmetries,
                         'inputDict':inputDict
                         }
             if (not iscopy) and inputDict['parameters']['return_timings']:
@@ -719,7 +723,7 @@ def build_complex(inputDict):
                 calculator = CalcExecutor(mol_plus_species,
                             parameters=tmp_inputDict['parameters'],
                             final_sanity_check=tmp_inputDict['parameters']['full_sanity_checks'],
-                            relax=True,
+                            relax=tmp_inputDict['parameters']['relax'],
                             assembly=False,
                             skip_spin_assign=True) # Skip spin-reassignment after generation.
                 if calculator.successful:
@@ -739,17 +743,36 @@ def build_complex(inputDict):
             # Run crest sampling on lowest N-energy isomer(s) - default is just 1!
             if tmp_inputDict['parameters']['crest_sampling'] and (j < tmp_inputDict['parameters']['crest_sampling_n_conformers']): 
                 if tmp_inputDict['parameters']['debug']:
-                    print('Starting crest sampling on {} of {}!'.format(j+1,len(order)))
-                samples,energies = io_crest.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['xtb_solvent'],
+                    print('Starting CREST sampling on {} of {}!'.format(j+1,len(order)))
+                samples,energies = io_conformers.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['xtb_solvent'],
                                                              crest_options=tmp_inputDict['parameters']['crest_options'])
                 if tmp_inputDict['parameters']['debug']:
-                     print('Finished crest sampling on {} of {}!'.format(j+1,len(order)))
-                vals[i].update({'crest_conformers':samples,'crest_energies':energies})
+                     print('Finished CREST sampling on {} of {}!'.format(j+1,len(order)))
+                vals[i].update({'conformers':samples,'energies':energies})
                 vals[i].update({'energy':min(energies)})
                 tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
                 posits = io_molecule.convert_io_molecule(samples[0]).ase_atoms.get_positions()
                 tmpmol.ase_atoms.set_positions(posits)
-                vals[i].update({'mol2string':tmpmol.write_mol2('Crest_Min_Energy', writestring=True)})
+                vals[i].update({'mol2string':tmpmol.write_mol2('CREST_Min_Energy', writestring=True)})
+            if tmp_inputDict['parameters']['obmol_sampling'] and (j < tmp_inputDict['parameters']['obmol_sampling_n_conformers']): 
+                if tmp_inputDict['parameters']['debug']:
+                    print('Starting OBMol sampling on {} of {}!'.format(j+1,len(order)))
+                samples,energies = io_conformers.obmol_conformers(vals[i]['mol2string'],
+                                                                  obmol_total_confs=tmp_inputDict['parameters']['obmol_total_confs'],
+                                                                  obmol_rmsd_cutoff=tmp_inputDict['parameters']['obmol_rmsd_cutoff'],
+                                                                  obmol_energy_cutoff=tmp_inputDict['parameters']['obmol_energy_cutoff'],
+                                                                  parameters=tmp_inputDict['parameters'],
+                                                                  relax=tmp_inputDict['parameters']['relax'],
+                                                                  assembly=False,
+                                                                  skip_spin_assign=True)
+                if tmp_inputDict['parameters']['debug']:
+                     print('Finished OBMol sampling on {} of {}!'.format(j+1,len(order)))
+                vals[i].update({'conformers':samples,'energies':energies})
+                vals[i].update({'energy':min(energies)})
+                tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
+                posits = io_molecule.convert_io_molecule(samples[0]).ase_atoms.get_positions()
+                tmpmol.ase_atoms.set_positions(posits)
+                vals[i].update({'mol2string':tmpmol.write_mol2('OBMol_Min_Energy', writestring=True)})
             out_ordered_conf_dict[keys[i]] = vals[i]
     else:
         out_ordered_conf_dict = dict()

@@ -613,8 +613,13 @@ class Molecule:
             charge += np.sum(infodict['lig_charges'])
             met_syms = np.array(self.ase_atoms.get_chemical_symbols())[metals]
             uhf = np.sum([io_ptable.metal_spin_dict[x] for x in met_syms])
-        else:
-            raise ValueError('Detect_charge_spin not implemented for non-metal containing systems.')
+        else: # Assume low-spin and that charge was already assinged at some step.
+            if self.charge is not None:
+                charge = self.charge
+            else:
+                charge = np.sum(self.ase_atoms.get_initial_charges())
+            uhf = 0
+            met_syms = []
         even_odd_electrons = (np.sum([atom.number for atom in self.ase_atoms])-charge) % 2
         if (uhf is not None):
             uhf = uhf

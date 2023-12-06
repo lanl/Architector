@@ -271,6 +271,13 @@ def get_obmol_smiles(smilesStr,
         Built openbabel molecule
     """
     # Set up conversion
+    if ')' in smilesStr: # Needed to clear cache for some reason.
+        # Deeply embedded in Openbabel Build class.
+        obConversion = ob.OBConversion()
+        obConversion.SetInAndOutFormats("smi", "xyz")
+        OBmol = ob.OBMol()
+        obConversion.ReadString(OBmol, '[F-]')
+        _ = build_3D(OBmol)
     obConversion = ob.OBConversion()
     obConversion.SetInAndOutFormats("smi", "xyz")
     OBmol = ob.OBMol()
@@ -381,8 +388,9 @@ def build_3D(OBmol,addHydrogens=True):
     return OBmol
 
 
-def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_cutoff=50.0, 
+def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000, energy_cutoff=50.0, 
         confab_verbose = False, output_format='mol2', neutralize=False, functionalizations=None,
+        fix_m_neighbors=True,
         return_energies = False):
     """generate_obmol_conformers 
     generate conformers with openbabel for given smiles
@@ -393,8 +401,8 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
 
     Parameters
     ----------
-    smiles : str
-        smiles to generate conformers 
+    structure : str/obmol/architector molecule
+        structure to generate conformers
     rmsd_cutoff : float, optional
         cutoff for how similar conformers, by default 0.4
     conf_cutoff : int, optional
@@ -409,6 +417,8 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
         neutralize smiles?, by default False
     functionalizations : dict, optional
         add functionalizations?, by default None
+    fix_m_neighbors : bool, optional
+        Fix the metal and it's neighbors for conformer generation?, by default True
     return_energies : bool, optional
         return the FF energies in addition to the conformers generated
 
@@ -419,9 +429,39 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
     output_energies : list (float)
         forcefield energies
     """
-    obmol = get_obmol_smiles(smiles,
-                             neutralize=neutralize,
-                             functionalizations=functionalizations)
+    if isinstance(structure, str):
+        if 'TRIPOS' in structure:
+            obmol = convert_mol2_obmol(structure,readstring=True)
+        elif structure[-5:] == '.mol2':
+            obmol = convert_mol2_obmol(structure,readstring=False)
+        elif ('.xyz' in structure):
+            obmol = convert_xyz_obmol(structure,readstring=False)
+        elif isinstance(structure,str) and (len(structure.split('\n')) > 3) and (structure.split('\n')[0].replace(' ','').isnumeric()):
+            obmol = convert_xyz_obmol(structure,readstring=True)
+        else: # Smiles
+            obmol = get_obmol_smiles(structure,
+                                    neutralize=neutralize,
+                                    functionalizations=functionalizations)
+    elif isinstance(structure, ob.OBMol):
+        obmol = structure
+    elif isinstance(structure, architector.io_molecule.Molecule):
+        obmol = convert_mol2_obmol(structure.write_mol2('example',writestring=True))
+    else:
+        raise ValueError('Unrecognized type for structure,',type(structure))
+    ### Swap actinides for lanthanides
+    _,anums,graph = get_OBMol_coords_anums_graph(obmol, return_coords=False, get_types=False)
+    syms = [io_ptable.elements[x] for x in anums]
+    act_inds = [i for i,x in enumerate(syms) if x in io_ptable.actinides]
+    swapped=False
+    if len(act_inds) > 0:
+        an_symbols = [syms[x] for x in act_inds]
+        ln_symbols = [io_ptable.lanthanides[io_ptable.actinides.index(x)] for x in an_symbols]
+        j = 0
+        for i, atom in enumerate(ob.OBMolAtomIter(obmol)):
+            if i in act_inds:
+                atom.SetAtomicNum(io_ptable.elements.index(ln_symbols[j]))
+                j+=1
+        swapped=True
     mmff94_ok = check_mmff_okay(obmol)
     if mmff94_ok:
         FF = ob.OBForceField.FindForceField("MMFF94")
@@ -429,6 +469,20 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
     else:
         FF = ob.OBForceField.FindForceField("UFF")
         FF.Setup(obmol) # Make sure setup works OK
+    if fix_m_neighbors:
+        mets = [i for i,x in enumerate(syms) if x in io_ptable.all_metals]
+        if len(mets) == 1: # Freeze metal and neighbor positions - relax ligands
+            frozen_atoms = [mets[0]+1] + (np.nonzero(np.ravel(graph[mets[0]]))[0] + 1).tolist()
+            constr = ob.OBFFConstraints()
+            for j in frozen_atoms:
+                constr.AddAtomConstraint(int(j))
+        elif len(mets) > 1:
+            constr = ob.OBFFConstraints()
+            print('Warning : Multiple Metals present for FF optimization.')
+        elif len(mets) == 0:
+            constr = ob.OBFFConstraints()
+            # print('No Metals present for FF optimization.')
+        FF.Setup(obmol,constr)
     # Run Diverse conformer generation
     FF.DiverseConfGen(rmsd_cutoff, conf_cutoff, energy_cutoff, confab_verbose)
     FF.GetConformers(obmol)
@@ -452,6 +506,12 @@ def generate_obmol_conformers(smiles, rmsd_cutoff=0.4, conf_cutoff=3000, energy_
             else:
                 energy = energy * units.kJ / units.mol
             output_energies.append(energy)
+        if swapped: # Swap Back
+            j = 0
+            for i, atom in enumerate(ob.OBMolAtomIter(obmol)):
+                if i in act_inds:
+                    atom.SetAtomicNum(io_ptable.elements.index(an_symbols[j]))
+                    j+=1
         output_strings.append(obconversion.WriteString(obmol))
     if return_energies:
         return output_strings,output_energies
