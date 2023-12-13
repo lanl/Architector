@@ -170,11 +170,11 @@ def species_generate_get_ref_params(species_id,parameters={},
                             species_run=True,
                             intermediate=intermediate)
         species = calc.mol
-        outdict['species_dipole'] = species.ase_atoms.calc.results['dipole']
-        outdict['species_dipole_mag'] = np.linalg.norm(outdict['species_dipole'])
-        outdict['species_charges'] = species.ase_atoms.calc.results['charges']
-        outdict['energy'] = species.ase_atoms.calc.results['energy']
-        outdict['forces'] = species.ase_atoms.calc.results['forces']
+        outdict['species_dipole'] = species.ase_atoms.calc.results.get('dipole',np.zeros(3))
+        outdict['species_dipole_mag'] = np.linalg.norm(outdict.get('species_dipole',None))
+        outdict['species_charges'] = species.ase_atoms.calc.results.get('charges',np.zeros(len(calc.mol.ase_atoms)))
+        outdict['energy'] = species.ase_atoms.calc.results.get('energy',100000)
+        outdict['forces'] = species.ase_atoms.calc.results.get('forces',np.zeros((len(calc.mol.ase_atoms),3)))
     else:
         calc = CalcExecutor(species,
                             parameters=parameters,
