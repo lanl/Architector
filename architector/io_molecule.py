@@ -21,6 +21,7 @@ from architector import io_obabel
 from architector.io_core import (Geometries, calc_all_coord_atom_angles)
 import architector.io_ptable as io_ptable
 from io import StringIO
+import pandas as pd
 from scipy.sparse.csgraph import (csgraph_from_dense, connected_components)
 
 def convert_io_molecule(structure,
@@ -1186,7 +1187,7 @@ class Molecule:
         Returns
         -------
         userlig_dict : dict
-            User lignad dictionary of angles
+            User ligand dictionary of angles
         denticity : int
             User ligand denticity
         """
@@ -1290,3 +1291,96 @@ class Molecule:
         self.metal_center_geos = metal_center_geos
         if return_result:
             return metal_center_geos
+
+    def get_lig_dists(self,
+                     calc_nonbonded_dists=True,
+                     skin=0.3,
+                     ref_ind='metals'):
+        """Calculate metal-ligand distances and tabulate for a given structure.
+
+        Parameters
+        ----------
+        calc_nonbonded_dists : bool, optional
+            Calulate nonbonded distances?, by default True
+        skin : int, optional
+            Cutoff for nonbonded distances in Angstroms (distance considered "close" by within this many angstroms
+            of another coordinating atom to the metal), by default 0.3
+        ref_ind : int, optional
+            Index of the atom to reference to, None will reference to all metals.
+            If integer passed, the distances will be calculated from this index
+            If list or array of integers passed, the distances will be calculated to all indices.
+            Default 'metals'.
+
+        Returns
+        -------
+        ml_dist_dict : dict
+            Dictionary of the metal-ligand distances including indices (0-indexed)
+        """
+        if not len(self.graph):
+            self.create_mol_graph()
+        if isinstance(ref_ind,str):
+            if ref_ind == 'metals':
+                atoms = np.array(self.find_metals())
+            else: 
+                raise NotImplementedError('Not yet implemented for other keywords - only "metals".')
+        elif isinstance(ref_ind,bool):
+            atoms = np.array(self.find_metals())
+        elif isinstance(ref_ind,(int,float)):
+            atoms = np.array([int(ref_ind)])
+        elif isinstance(ref_ind,list):
+            atoms = np.array(ref_ind)
+        elif isinstance(ref_ind,np.ndarray):
+            atoms = ref_ind
+        elif ref_ind is None:
+            atoms = []
+        symbols = self.ase_atoms.get_chemical_symbols()
+        ml_dist_dicts = []
+        index = 0
+        # Metal charges
+        if len(atoms) > 0:
+            distmat = self.ase_atoms.get_all_distances()
+            ligsmiles , _ , info_dict, = io_obabel.obmol_lig_split(
+                self.write_mol2('temp.mol2',writestring=True),
+                return_info=True,
+                calc_all=True
+                )
+            for met in atoms:
+                con_atoms = np.nonzero(self.graph[met])[0]
+                con_atom_dists = distmat[met][con_atoms]
+                for j,c in enumerate(con_atoms):
+                    for i,ind_set in enumerate(info_dict['original_lig_inds']):
+                        if c in ind_set: # Find ligand this atom belongs to.
+                            ind_in_ligand = np.where(ind_set == c)[0][0]
+                            ml_dist_dicts.append({
+                                'atom_pair':(met,c),
+                                'bond_type':'explicit_bond',
+                                'smiles':ligsmiles[i],
+                                'smiles_index':info_dict['mapped_smiles_inds'][i][ind_in_ligand],
+                                'distance':con_atom_dists[j],
+                                'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                })
+                            index += 1
+                if calc_nonbonded_dists:
+                    other_close_atoms = np.where(distmat[met] < (np.max(con_atom_dists)+skin))[0]
+                    other_close_atoms = np.array([x for x in other_close_atoms if x not in (con_atoms.tolist() + \
+                                                   [int(met)])])
+                    if len(other_close_atoms) > 0:
+                        other_close_atom_dists = distmat[met][other_close_atoms]
+                        for j,c in enumerate(other_close_atoms):
+                            for i,ind_set in enumerate(info_dict['original_lig_inds']):
+                                if c in ind_set: # Find ligand this atom belongs to.
+                                    ind_in_ligand = np.where(ind_set == c)[0][0]
+                                    ml_dist_dicts.append({
+                                        'atom_pair':(met,c),
+                                        'bond_type':'implicit_bond',
+                                        'smiles':ligsmiles[i],
+                                        'smiles_index':info_dict['mapped_smiles_inds'][i][ind_in_ligand],
+                                        'distance':other_close_atom_dists[j],
+                                        'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                        io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                        'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                        })
+                                    index += 1
+        return pd.DataFrame(ml_dist_dicts)

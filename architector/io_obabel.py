@@ -878,7 +878,10 @@ def remove_obmol_metals(Conf3D):
     return Conf3D
 
 
-def obmol_lig_split(mol2string,return_info=False,calc_coord_atoms=True):
+def obmol_lig_split(mol2string,
+                    return_info=False,
+                    calc_coord_atoms=True,
+                    calc_all=False):
     """obmol_lig_split 
     Take in a mol2string and use openbabel to split into ligands, convert to smiles, 
     and calculate metal-ligand coordinating atoms implicit in the mol2string.
@@ -891,6 +894,8 @@ def obmol_lig_split(mol2string,return_info=False,calc_coord_atoms=True):
         return information dictionary as well with metal,ligand_charges,coordAt symbols, default False
     calc_coord_atoms : bool, optional
         return the coordination atoms for smiles, default True
+    calc_all : bool, optional
+        return all information in dictionary, default False
 
     Returns
     -------
@@ -925,6 +930,7 @@ def obmol_lig_split(mol2string,return_info=False,calc_coord_atoms=True):
             ligs_inds.append(sg)
     ligand_smiles = []
     coord_atom_lists = []
+    mapped_smiles_inds = []
     for lig in ligs_inds:
         lig = lig.tolist()
         ligobmol = ob.OBMol()
@@ -953,7 +959,11 @@ def obmol_lig_split(mol2string,return_info=False,calc_coord_atoms=True):
             atom.SetFormalCharge(int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val)))
         new_smiles = get_smiles_obmol(ligobmol,canonicalize=True)
         ligand_smiles.append(new_smiles)
-        if calc_coord_atoms:
+        if calc_all:
+            new_coord_atom_list,all_smi_inds_list = map_coord_ats_smiles(new_smiles, ligobmol, coord_atom_list, return_all=True)
+            mapped_smiles_inds.append(all_smi_inds_list)
+            coord_atom_lists.append(sorted(new_coord_atom_list))
+        elif calc_coord_atoms:
             new_coord_atom_list = map_coord_ats_smiles(new_smiles, ligobmol, coord_atom_list)
             coord_atom_lists.append(sorted(new_coord_atom_list))
         else:
@@ -973,7 +983,14 @@ def obmol_lig_split(mol2string,return_info=False,calc_coord_atoms=True):
                     build=False) for smi in ligand_smiles]
         info_dict['lig_charges'] = [x.GetTotalCharge() for x in lig_obmols]
         lig_coord_ats = []
-        if calc_coord_atoms:
+        if calc_all:
+            for i,lig_obmol in enumerate(lig_obmols):
+                _,anums,_ = get_OBMol_coords_anums_graph(lig_obmol,get_types=False)
+                lig_coord_ats.append(','.join([io_ptable.elements[x] for x in np.array(anums)[np.array(coord_atom_lists[i])]]))
+            info_dict['lig_coord_ats'] = lig_coord_ats
+            info_dict['original_lig_inds'] = ligs_inds
+            info_dict['mapped_smiles_inds'] = mapped_smiles_inds
+        elif calc_coord_atoms:
             for i,lig_obmol in enumerate(lig_obmols):
                 _,anums,_ = get_OBMol_coords_anums_graph(lig_obmol,get_types=False)
                 lig_coord_ats.append(','.join([io_ptable.elements[x] for x in np.array(anums)[np.array(coord_atom_lists[i])]]))
@@ -1011,7 +1028,7 @@ def get_vertex_coloring(anums):
     return out_sets
 
 
-def map_coord_ats_smiles(lig_smiles, lig_obmol, coord_atoms):
+def map_coord_ats_smiles(lig_smiles, lig_obmol, coord_atoms, return_all=False):
     """map_coord_ats_smiles 
     Map the 3d structure of a ligand with encoded coordinating atom information
     to the smiles string of the ligand to get the correct smicat atoms
@@ -1027,7 +1044,14 @@ def map_coord_ats_smiles(lig_smiles, lig_obmol, coord_atoms):
     for atom in coord_atoms: # Match canonicalized graph indices
         a_ind = can2.index(atom)
         smicat.append(can1[a_ind])
-    return smicat
+    if return_all:
+        all_inds = []
+        for ind in range(len(can2)):
+            a_ind = can2.index(ind)
+            all_inds.append(can1[a_ind])
+        return smicat, all_inds
+    else:
+        return smicat
 
 def get_fingerprint(obmol,fp='FP2'):
     """get_fingerprint 

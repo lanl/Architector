@@ -54,11 +54,79 @@ def type_convert(structures):
             except:
                 raise ValueError('Not Recognized Structure Type for index: ' +str(i))
     return outlist
-                
+
+def add_bonds(view_ats, 
+              mol, 
+              labelsize=12,
+              distradius=0.3, 
+              distcolor='black',
+              distskin=0.3,
+              distopacity=0.85,
+              vis_distances=None, 
+              viewer=None):
+    """Add bonds to visualization displayer?
+
+    Parameters
+    ----------
+    view_ats : py3dmol viewer
+        py3dmol viewer
+    mol : architector.io_molecule.Molecule
+        molecule
+    labelsize, int
+        Size of labels (default 12)
+    vis_distances : int/bool/list(int)/str/None,
+        Add visualization of distances? Calculate from given indices or from metal.
+        e.g. vis_distances=True will add arrows and labels from the metal centers to nearby atoms.
+        vis_distances='metals' will do the same
+        vis_distances=0 will add arrows and distance labels from the atom 0 to nearby atoms.
+        vis_distances=[0,1] will add arrows and distances labesl from both atoms 0 and 1 to nearby atoms.
+    distradius : float,
+        radius of drawn distance vectors, by default 0.3
+    distcolor : str,
+        color of drawn distance vectors, by default 'black'
+    distopacity: float,
+        opacity (from 0(transparent) to 1(no transparent) for drawn distance vectors, by default 0.85
+    distskin : float,
+        skin around given atom to flag "nearby" neighbors, by default 0.3
+    viewer : None,
+        which viewer to add the arrows to, by default None
+    """
+    if vis_distances is not None:
+        bondsdf = mol.get_lig_dists(calc_nonbonded_dists=True,
+                                    skin=distskin,
+                                    ref_ind=vis_distances)
+        for i,row in bondsdf.iterrows():
+            starting = mol.ase_atoms.get_positions()[row['atom_pair'][0]] # Should be metal.
+            ending = mol.ase_atoms.get_positions()[row['atom_pair'][1]]
+            sx= starting[0]
+            sy= starting[1]
+            sz= starting[2]
+            ex= ending[0]
+            ey= ending[1]
+            ez= ending[2]
+            vector = {'start': {'x':sx, 'y':sy, 'z':sz}, 'end': {'x':ex, 'y':ey, 'z':ez},
+                'radius':distradius,'color':distcolor,'opacity':distopacity}
+            if viewer is None:
+                view_ats.addArrow(vector)
+                view_ats.addLabel("{0:.2f}".format(row['distance']), {'position':{'x':'{}'.format(ex),
+                        'y':'{}'.format(ey),'z':'{}'.format(ez)},
+                        'backgroundColor':"'black'",'backgroundOpacity':'0.3',
+                        'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                        'fontColor':"white",'inFront':'true'})
+            else:
+                view_ats.addArrow(vector,viewer=viewer)
+                view_ats.addLabel("{0:.2f}".format(row['distance']), {'position':{'x':'{}'.format(ex),
+                        'y':'{}'.format(ey),'z':'{}'.format(ez)},
+                        'backgroundColor':"'black'",'backgroundOpacity':'0.3',
+                        'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                        'fontColor':"white",'inFront':'true'},viewer=viewer)
+
+
             
 def view_structures(structures, w=200, h=200, columns=4, representation='ball_stick', labelsize=12,
                  labels=False, labelinds=None, vector=None, sphere_scale=0.3, stick_scale=0.25,
-                 metal_scale=0.75, modes=None, trajectory=False, interval=200):
+                 metal_scale=0.75, modes=None, trajectory=False, interval=200, vis_distances=None,
+                 distradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3):
     """view_structures
     Jupyter-notebook-based visualization of molecular structures.
 
@@ -73,6 +141,8 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
     view_structures(pd.Series of mol2strings, labels=pd.OtherSeries of Strings) gives a grid_view with 4 columns with labels superimposed.
     view_structures(mol2string,labelinds=True) gives a single viewer with index of all atoms superimposed as labels.
     view_structures(mol2string,labelinds=list_of_strings) gives a single viewer with the strings put on the atoms with matching indices.
+    view_structures(metal_complex_mol2string,
+                    vis_distances=True) Will visualize metal-ligand bond distances on the inset images
     view_structures(ase.atoms.Atoms,modes=[vibrational_mode_array]) gives a single viewer with vibrational mode array superimposed
     view_structures([ase.atoms.Atoms]*n,modes=[vibrational_mode_array1,vibrational_mmode_array2....]]) 
     gives a grid viewer with all vibrational modes visualized
@@ -114,6 +184,20 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
         Whether to view as a trajectory animation (e.g. relaxation or MD), by default False
     interval : int, optional
         How long the trajectory animation should be (speed) incease to move slower, decrease to speed up, by default 200
+    vis_distances : int/bool/list(int)/str/None,
+        Add visualization of distances? Calculate from given indices or from metal.
+        e.g. vis_distances=True will add arrows and labels from the metal centers to nearby atoms.
+        vis_distances='metals' will do the same
+        vis_distances=0 will add arrows and distance labels from the atom 0 to nearby atoms.
+        vis_distances=[0,1] will add arrows and distances labesl from both atoms 0 and 1 to nearby atoms.
+    distradius : float,
+        radius of drawn distance vectors, by default 0.3
+    distcolor : str,
+        color of drawn distance vectors, by default 'black'
+    distopacity: float,
+        opacity (from 0(transparent) to 1(no transparent) for drawn distance vectors, by default 0.85
+    distskin : float,
+        skin around given atom to flag "nearby" neighbors, by default 0.3
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -192,6 +276,13 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                     'fontColor':"white",'inFront':'true'})
         if vector:
             view_ats.addArrow(vector)
+        add_bonds(view_ats, mol, 
+                  labelsize=labelsize,
+                  distradius=distradius,
+                  distcolor=distcolor,
+                  distskin=distskin,
+                  distopacity=distopacity,
+                  vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.show()
     elif (len(mols) < 50) and (not trajectory):
@@ -292,7 +383,13 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                             'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
                             'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
             if vector:
-                view_ats.addArrow(vector)
+                view_ats.addArrow(vector, viewer=(x,y))
+            add_bonds(view_ats, mol, 
+                      distradius=distradius,
+                      distcolor=distcolor,
+                      distskin=distskin,
+                      distopacity=distopacity,
+                      labelsize=labelsize, vis_distances=vis_distances, viewer=(x,y))
             view_ats.zoomTo(viewer=(x,y))
             if y+1 < columns: # Fill in columns
                 y+=1
@@ -326,6 +423,12 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                 view_ats.setStyle({representation:{'colorscheme':'Jmol'}})
         if vector:
             view_ats.addArrow(vector)
+        add_bonds(view_ats, mol, 
+                  distradius=distradius,
+                  distcolor=distcolor,
+                  distskin=distskin,
+                  distopacity=distopacity,
+                  labelsize=labelsize, vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.animate({'interval':interval,'loop':'forward'}) # Infinite repetition
         view_ats.show()
