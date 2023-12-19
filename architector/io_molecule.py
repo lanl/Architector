@@ -815,12 +815,7 @@ class Molecule:
             newligbodict.update({newkey:val})
         if lig_constraints is not None:
             for ind,dist in lig_constraints.items():
-                if non_coordinating:
-                    newind = natoms + ind
-                elif ind > 1:
-                    newind = natoms + ind - 1
-                else:
-                    newind = 1
+                newind = natoms + ind
                 self.ase_constraints.update({(0,newind):dist})
         self.BO_dict.update(newligbodict)
         self.ase_atoms += lig_ase_atoms
@@ -1295,6 +1290,7 @@ class Molecule:
     def get_lig_dists(self,
                      calc_nonbonded_dists=True,
                      skin=0.3,
+                     radius=None,
                      ref_ind='metals'):
         """Calculate metal-ligand distances and tabulate for a given structure.
 
@@ -1305,6 +1301,8 @@ class Molecule:
         skin : int, optional
             Cutoff for nonbonded distances in Angstroms (distance considered "close" by within this many angstroms
             of another coordinating atom to the metal), by default 0.3
+        radius : float, optional
+            Cutoff for radius of interaction to visualize around the molecule, by default None.
         ref_ind : int, optional
             Index of the atom to reference to, None will reference to all metals.
             If integer passed, the distances will be calculated from this index
@@ -1321,18 +1319,24 @@ class Molecule:
         if isinstance(ref_ind,str):
             if ref_ind == 'metals':
                 atoms = np.array(self.find_metals())
+                metals = atoms
             else: 
                 raise NotImplementedError('Not yet implemented for other keywords - only "metals".')
         elif isinstance(ref_ind,bool):
             atoms = np.array(self.find_metals())
+            metals = atoms
         elif isinstance(ref_ind,(int,float)):
             atoms = np.array([int(ref_ind)])
+            metals = np.array(self.find_metals())
         elif isinstance(ref_ind,list):
             atoms = np.array(ref_ind)
+            metals = np.array(self.find_metals())
         elif isinstance(ref_ind,np.ndarray):
             atoms = ref_ind
+            metals = np.array(self.find_metals())
         elif ref_ind is None:
             atoms = []
+            metals = np.array(self.find_metals())
         symbols = self.ase_atoms.get_chemical_symbols()
         ml_dist_dicts = []
         index = 0
@@ -1347,6 +1351,7 @@ class Molecule:
             for met in atoms:
                 con_atoms = np.nonzero(self.graph[met])[0]
                 con_atom_dists = distmat[met][con_atoms]
+                m_visited = False
                 for j,c in enumerate(con_atoms):
                     for i,ind_set in enumerate(info_dict['original_lig_inds']):
                         if c in ind_set: # Find ligand this atom belongs to.
@@ -1362,13 +1367,30 @@ class Molecule:
                                 'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
                                 })
                             index += 1
+                        elif (c in metals) and (c != met) and (not m_visited):
+                            m_visited=True
+                            ml_dist_dicts.append({
+                                'atom_pair':(met,c),
+                                'bond_type':'explicit_bond',
+                                'smiles':None,
+                                'smiles_index':None,
+                                'distance':con_atom_dists[j],
+                                'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                })
+                            index += 1
                 if calc_nonbonded_dists:
-                    other_close_atoms = np.where(distmat[met] < (np.max(con_atom_dists)+skin))[0]
+                    if radius is None:
+                        other_close_atoms = np.where(distmat[met] < (np.max(con_atom_dists)+skin))[0]
+                    else:
+                        other_close_atoms = np.where(distmat[met] < (radius))[0]
                     other_close_atoms = np.array([x for x in other_close_atoms if x not in (con_atoms.tolist() + \
                                                    [int(met)])])
                     if len(other_close_atoms) > 0:
                         other_close_atom_dists = distmat[met][other_close_atoms]
                         for j,c in enumerate(other_close_atoms):
+                            m_visited = False
                             for i,ind_set in enumerate(info_dict['original_lig_inds']):
                                 if c in ind_set: # Find ligand this atom belongs to.
                                     ind_in_ligand = np.where(ind_set == c)[0][0]
@@ -1377,6 +1399,19 @@ class Molecule:
                                         'bond_type':'implicit_bond',
                                         'smiles':ligsmiles[i],
                                         'smiles_index':info_dict['mapped_smiles_inds'][i][ind_in_ligand],
+                                        'distance':other_close_atom_dists[j],
+                                        'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                        io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                        'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                        })
+                                    index += 1
+                                elif (c in metals) and (c != met) and (not m_visited):
+                                    m_visited=True
+                                    ml_dist_dicts.append({
+                                        'atom_pair':(met,c),
+                                        'bond_type':'implicit_bond',
+                                        'smiles':None,
+                                        'smiles_index':None,
                                         'distance':other_close_atom_dists[j],
                                         'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
                                                         io_ptable.rcov1[io_ptable.elements.index(symbols[c])],

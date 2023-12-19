@@ -58,11 +58,13 @@ def type_convert(structures):
 def add_bonds(view_ats, 
               mol, 
               labelsize=12,
-              distradius=0.3, 
+              distvisradius=0.3, 
               distcolor='black',
               distskin=0.3,
               distopacity=0.85,
-              vis_distances=None, 
+              vis_distances=None,
+              distradius=None,
+              distlabelposit=1.0,
               viewer=None):
     """Add bonds to visualization displayer?
 
@@ -80,7 +82,7 @@ def add_bonds(view_ats,
         vis_distances='metals' will do the same
         vis_distances=0 will add arrows and distance labels from the atom 0 to nearby atoms.
         vis_distances=[0,1] will add arrows and distances labesl from both atoms 0 and 1 to nearby atoms.
-    distradius : float,
+    distvisradius : float,
         radius of drawn distance vectors, by default 0.3
     distcolor : str,
         color of drawn distance vectors, by default 'black'
@@ -88,14 +90,30 @@ def add_bonds(view_ats,
         opacity (from 0(transparent) to 1(no transparent) for drawn distance vectors, by default 0.85
     distskin : float,
         skin around given atom to flag "nearby" neighbors, by default 0.3
+    distradius : float,
+        Radius around a given atom to flag "nearby" neighbors, by default None.
+    distlabelposit : float,
+        Fraction of the distance (towards the ending atom) that the distance label should be placed, by default 1.0 
     viewer : None,
         which viewer to add the arrows to, by default None
     """
     if vis_distances is not None:
         bondsdf = mol.get_lig_dists(calc_nonbonded_dists=True,
                                     skin=distskin,
-                                    ref_ind=vis_distances)
+                                    ref_ind=vis_distances,
+                                    radius=distradius)
+        visited = list()
+        count = 0
         for i,row in bondsdf.iterrows():
+            # Allow for multiple different colors of interatomic distances.
+            if (row['atom_pair'][0] in visited) and (isinstance(distcolor,(list,np.ndarray))):
+                tcolor = distcolor[visited.index(row['atom_pair'][0])]
+            elif (isinstance(distcolor,(list,np.ndarray))):
+                tcolor = distcolor[count]
+                visited.append(row['atom_pair'][0])
+                count += 1
+            else:
+                tcolor = distcolor
             starting = mol.ase_atoms.get_positions()[row['atom_pair'][0]] # Should be metal.
             ending = mol.ase_atoms.get_positions()[row['atom_pair'][1]]
             sx= starting[0]
@@ -104,19 +122,21 @@ def add_bonds(view_ats,
             ex= ending[0]
             ey= ending[1]
             ez= ending[2]
+            dxyz = np.array([ex-sx,ey-sy,ez-sz])
             vector = {'start': {'x':sx, 'y':sy, 'z':sz}, 'end': {'x':ex, 'y':ey, 'z':ez},
-                'radius':distradius,'color':distcolor,'opacity':distopacity}
+                'radius':distvisradius,'color':tcolor,'opacity':distopacity}
+            lposit = starting + distlabelposit * dxyz
             if viewer is None:
                 view_ats.addArrow(vector)
-                view_ats.addLabel("{0:.2f}".format(row['distance']), {'position':{'x':'{}'.format(ex),
-                        'y':'{}'.format(ey),'z':'{}'.format(ez)},
+                view_ats.addLabel("{0:.2f}".format(row['distance']), {'position':{'x':'{}'.format(lposit[0]),
+                        'y':'{}'.format(lposit[1]),'z':'{}'.format(lposit[2])},
                         'backgroundColor':"'black'",'backgroundOpacity':'0.3',
                         'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true'})
             else:
                 view_ats.addArrow(vector,viewer=viewer)
-                view_ats.addLabel("{0:.2f}".format(row['distance']), {'position':{'x':'{}'.format(ex),
-                        'y':'{}'.format(ey),'z':'{}'.format(ez)},
+                view_ats.addLabel("{0:.2f}".format(row['distance']), {'position':{'x':'{}'.format(lposit[0]),
+                        'y':'{}'.format(lposit[1]),'z':'{}'.format(lposit[2])},
                         'backgroundColor':"'black'",'backgroundOpacity':'0.3',
                         'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true'},viewer=viewer)
@@ -126,7 +146,8 @@ def add_bonds(view_ats,
 def view_structures(structures, w=200, h=200, columns=4, representation='ball_stick', labelsize=12,
                  labels=False, labelinds=None, vector=None, sphere_scale=0.3, stick_scale=0.25,
                  metal_scale=0.75, modes=None, trajectory=False, interval=200, vis_distances=None,
-                 distradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3):
+                 distvisradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3, distradius=None,
+                 distlabelposit=1.0):
     """view_structures
     Jupyter-notebook-based visualization of molecular structures.
 
@@ -190,14 +211,18 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
         vis_distances='metals' will do the same
         vis_distances=0 will add arrows and distance labels from the atom 0 to nearby atoms.
         vis_distances=[0,1] will add arrows and distances labesl from both atoms 0 and 1 to nearby atoms.
-    distradius : float,
+    distvisradius : float,
         radius of drawn distance vectors, by default 0.3
     distcolor : str,
         color of drawn distance vectors, by default 'black'
     distopacity: float,
         opacity (from 0(transparent) to 1(no transparent) for drawn distance vectors, by default 0.85
     distskin : float,
-        skin around given atom to flag "nearby" neighbors, by default 0.3
+        "Skin" on top of sum of cov radii around given atom to flag "nearby" neighbors, by default 0.3
+    distradius : float,
+        Radius around a given atom to flag "nearby" neighbors, by default None.
+    distlabelposit : float,
+        Fraction of the distance (towards the ending atom) that the distance label should be placed, by default 1.0 
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -278,10 +303,12 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
             view_ats.addArrow(vector)
         add_bonds(view_ats, mol, 
                   labelsize=labelsize,
-                  distradius=distradius,
+                  distvisradius=distvisradius,
                   distcolor=distcolor,
                   distskin=distskin,
                   distopacity=distopacity,
+                  distradius=distradius,
+                  distlabelposit=distlabelposit,
                   vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.show()
@@ -385,10 +412,12 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
             if vector:
                 view_ats.addArrow(vector, viewer=(x,y))
             add_bonds(view_ats, mol, 
-                      distradius=distradius,
+                      distvisradius=distvisradius,
                       distcolor=distcolor,
                       distskin=distskin,
                       distopacity=distopacity,
+                      distradius=distradius,
+                      distlabelposit=distlabelposit,
                       labelsize=labelsize, vis_distances=vis_distances, viewer=(x,y))
             view_ats.zoomTo(viewer=(x,y))
             if y+1 < columns: # Fill in columns
@@ -424,10 +453,12 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
         if vector:
             view_ats.addArrow(vector)
         add_bonds(view_ats, mol, 
-                  distradius=distradius,
+                  distvisradius=distvisradius,
                   distcolor=distcolor,
                   distskin=distskin,
                   distopacity=distopacity,
+                  distradius=distradius,
+                  distlabelposit=distlabelposit,
                   labelsize=labelsize, vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.animate({'interval':interval,'loop':'forward'}) # Infinite repetition

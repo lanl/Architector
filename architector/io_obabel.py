@@ -986,7 +986,8 @@ def obmol_lig_split(mol2string,
         if calc_all:
             for i,lig_obmol in enumerate(lig_obmols):
                 _,anums,_ = get_OBMol_coords_anums_graph(lig_obmol,get_types=False)
-                lig_coord_ats.append(','.join([io_ptable.elements[x] for x in np.array(anums)[np.array(coord_atom_lists[i])]]))
+                if len(coord_atom_lists[i]) > 0:
+                    lig_coord_ats.append(','.join([io_ptable.elements[x] for x in np.array(anums)[np.array(coord_atom_lists[i])]]))
             info_dict['lig_coord_ats'] = lig_coord_ats
             info_dict['original_lig_inds'] = ligs_inds
             info_dict['mapped_smiles_inds'] = mapped_smiles_inds

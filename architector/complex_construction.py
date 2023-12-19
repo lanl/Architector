@@ -280,9 +280,10 @@ class Complex:
                                          fix_m_neighbors=True,
                                          ff_preopt_run=True
                                          )
-                self.calculator = CalcExecutor(tmp_relax.mol, parameters=self.parameters,
-                                                final_sanity_check=self.parameters['full_sanity_checks'],
-                                                relax=(not single_point)
+                self.calculator = CalcExecutor(tmp_relax.mol, 
+                                               parameters=self.parameters,
+                                               final_sanity_check=self.parameters['full_sanity_checks'],
+                                               relax=(not single_point)
                                                 )
         else: # Ensure calculation object at least exists
             self.calculator = CalcExecutor(self.complexMol,method='UFF',fix_m_neighbors=False,relax=False)
