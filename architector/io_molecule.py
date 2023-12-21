@@ -1287,13 +1287,14 @@ class Molecule:
         if return_result:
             return metal_center_geos
 
-    def get_lig_dists(self,
+    def get_dists(self,
                      calc_nonbonded_dists=True,
                      skin=0.3,
                      radius=None,
                      ref_ind='metals',
                      atom_pairs=None):
-        """Calculate metal-ligand distances and tabulate for a given structure.
+        """Calculate interatomic distances and tabulate for a given structure,
+        with indices.
 
         Parameters
         ----------

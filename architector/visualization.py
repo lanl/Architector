@@ -102,11 +102,11 @@ def add_bonds(view_ats,
         which viewer to add the arrows to, by default None
     """
     if vis_distances is not None:
-        bondsdf = mol.get_lig_dists(calc_nonbonded_dists=True,
-                                    skin=distskin,
-                                    ref_ind=vis_distances,
-                                    radius=distradius,
-                                    atom_pairs=distatompairs)
+        bondsdf = mol.get_dists(calc_nonbonded_dists=True,
+                                skin=distskin,
+                                ref_ind=vis_distances,
+                                radius=distradius,
+                                atom_pairs=distatompairs)
         visited = list()
         count = 0
         for i,row in bondsdf.iterrows():
