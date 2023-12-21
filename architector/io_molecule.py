@@ -1291,7 +1291,8 @@ class Molecule:
                      calc_nonbonded_dists=True,
                      skin=0.3,
                      radius=None,
-                     ref_ind='metals'):
+                     ref_ind='metals',
+                     atom_pairs=None):
         """Calculate metal-ligand distances and tabulate for a given structure.
 
         Parameters
@@ -1308,6 +1309,8 @@ class Molecule:
             If integer passed, the distances will be calculated from this index
             If list or array of integers passed, the distances will be calculated to all indices.
             Default 'metals'.
+        atom_pairs : list(list(int)), optional
+            Specific atom pairs to track, e.g. [[0,1],[1,2]] would track atoms 0-1 and 1-2 distances.
 
         Returns
         -------
@@ -1324,6 +1327,8 @@ class Molecule:
                 raise NotImplementedError('Not yet implemented for other keywords - only "metals".')
         elif isinstance(ref_ind,bool):
             atoms = np.array(self.find_metals())
+            if len(atoms) == 0: # Organic-only
+                atoms = [0] # Add single atom as index.
             metals = atoms
         elif isinstance(ref_ind,(int,float)):
             atoms = np.array([int(ref_ind)])
@@ -1348,74 +1353,97 @@ class Molecule:
                 return_info=True,
                 calc_all=True
                 )
-            for met in atoms:
-                con_atoms = np.nonzero(self.graph[met])[0]
-                con_atom_dists = distmat[met][con_atoms]
-                m_visited = False
-                for j,c in enumerate(con_atoms):
-                    for i,ind_set in enumerate(info_dict['original_lig_inds']):
-                        if c in ind_set: # Find ligand this atom belongs to.
-                            ind_in_ligand = np.where(ind_set == c)[0][0]
-                            ml_dist_dicts.append({
-                                'atom_pair':(met,c),
-                                'bond_type':'explicit_bond',
-                                'smiles':ligsmiles[i],
-                                'smiles_index':info_dict['mapped_smiles_inds'][i][ind_in_ligand],
-                                'distance':con_atom_dists[j],
-                                'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
-                                                io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
-                                'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
-                                })
-                            index += 1
-                        elif (c in metals) and (c != met) and (not m_visited):
-                            m_visited=True
-                            ml_dist_dicts.append({
-                                'atom_pair':(met,c),
-                                'bond_type':'explicit_bond',
+            if atom_pairs is None:
+                for met in atoms:
+                    con_atoms = np.nonzero(self.graph[met])[0]
+                    con_atom_dists = distmat[met][con_atoms]
+                    m_visited = False
+                    for j,c in enumerate(con_atoms):
+                        for i,ind_set in enumerate(info_dict['original_lig_inds']):
+                            if c in ind_set: # Find ligand this atom belongs to.
+                                ind_in_ligand = np.where(ind_set == c)[0][0]
+                                ml_dist_dicts.append({
+                                    'atom_pair':(met,c),
+                                    'bond_type':'explicit_bond',
+                                    'smiles':ligsmiles[i],
+                                    'smiles_index':info_dict['mapped_smiles_inds'][i][ind_in_ligand],
+                                    'distance':con_atom_dists[j],
+                                    'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                    io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                    'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                    })
+                                index += 1
+                            elif (c in metals) and (c != met) and (not m_visited):
+                                m_visited=True
+                                ml_dist_dicts.append({
+                                    'atom_pair':(met,c),
+                                    'bond_type':'explicit_bond',
+                                    'smiles':None,
+                                    'smiles_index':None,
+                                    'distance':con_atom_dists[j],
+                                    'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                    io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                    'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                    })
+                                index += 1
+                    if calc_nonbonded_dists:
+                        if radius is None:
+                            other_close_atoms = np.where(distmat[met] < (np.max(con_atom_dists)+skin))[0]
+                        else:
+                            other_close_atoms = np.where(distmat[met] < (radius))[0]
+                        other_close_atoms = np.array([x for x in other_close_atoms if x not in (con_atoms.tolist() + \
+                                                    [int(met)])])
+                        if len(other_close_atoms) > 0:
+                            other_close_atom_dists = distmat[met][other_close_atoms]
+                            for j,c in enumerate(other_close_atoms):
+                                m_visited = False
+                                for i,ind_set in enumerate(info_dict['original_lig_inds']):
+                                    if c in ind_set: # Find ligand this atom belongs to.
+                                        ind_in_ligand = np.where(ind_set == c)[0][0]
+                                        ml_dist_dicts.append({
+                                            'atom_pair':(met,c),
+                                            'bond_type':'implicit_bond',
+                                            'smiles':ligsmiles[i],
+                                            'smiles_index':info_dict['mapped_smiles_inds'][i][ind_in_ligand],
+                                            'distance':other_close_atom_dists[j],
+                                            'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                            io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                            'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                            })
+                                        index += 1
+                                    elif (c in metals) and (c != met) and (not m_visited):
+                                        m_visited=True
+                                        ml_dist_dicts.append({
+                                            'atom_pair':(met,c),
+                                            'bond_type':'implicit_bond',
+                                            'smiles':None,
+                                            'smiles_index':None,
+                                            'distance':other_close_atom_dists[j],
+                                            'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
+                                                            io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                            'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                            })
+                                        index += 1
+            else:
+                for inds in atom_pairs:
+                    i0,i1 = int(inds[0]),int(inds[1])
+                    ml_dist_dicts.append({
+                                'atom_pair':(i0,i1),
+                                'bond_type':'explicit_ask',
                                 'smiles':None,
                                 'smiles_index':None,
-                                'distance':con_atom_dists[j],
-                                'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
-                                                io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
-                                'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
+                                'distance':distmat[i0][i1],
+                                'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[i0])] + \
+                                                io_ptable.rcov1[io_ptable.elements.index(symbols[i1])],
+                                'atom_symbols':'{}-{}'.format(symbols[i0],symbols[i1])
                                 })
-                            index += 1
-                if calc_nonbonded_dists:
-                    if radius is None:
-                        other_close_atoms = np.where(distmat[met] < (np.max(con_atom_dists)+skin))[0]
-                    else:
-                        other_close_atoms = np.where(distmat[met] < (radius))[0]
-                    other_close_atoms = np.array([x for x in other_close_atoms if x not in (con_atoms.tolist() + \
-                                                   [int(met)])])
-                    if len(other_close_atoms) > 0:
-                        other_close_atom_dists = distmat[met][other_close_atoms]
-                        for j,c in enumerate(other_close_atoms):
-                            m_visited = False
-                            for i,ind_set in enumerate(info_dict['original_lig_inds']):
-                                if c in ind_set: # Find ligand this atom belongs to.
-                                    ind_in_ligand = np.where(ind_set == c)[0][0]
-                                    ml_dist_dicts.append({
-                                        'atom_pair':(met,c),
-                                        'bond_type':'implicit_bond',
-                                        'smiles':ligsmiles[i],
-                                        'smiles_index':info_dict['mapped_smiles_inds'][i][ind_in_ligand],
-                                        'distance':other_close_atom_dists[j],
-                                        'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
-                                                        io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
-                                        'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
-                                        })
-                                    index += 1
-                                elif (c in metals) and (c != met) and (not m_visited):
-                                    m_visited=True
-                                    ml_dist_dicts.append({
-                                        'atom_pair':(met,c),
-                                        'bond_type':'implicit_bond',
-                                        'smiles':None,
-                                        'smiles_index':None,
-                                        'distance':other_close_atom_dists[j],
-                                        'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[met])] + \
-                                                        io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
-                                        'atom_symbols':'{}-{}'.format(symbols[met],symbols[c])
-                                        })
-                                    index += 1
-        return pd.DataFrame(ml_dist_dicts)
+        df = pd.DataFrame(ml_dist_dicts)
+        visited_keys = set()
+        duplicates = []
+        for i,row in df.iterrows():
+            if tuple(sorted(row['atom_pair'])) in visited_keys:
+                duplicates.append(row['atom_pair'])
+            else:
+                visited_keys.add(tuple(sorted(row['atom_pair'])))
+        filterdf = df[~df.atom_pair.isin(duplicates)]
+        return filterdf

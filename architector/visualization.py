@@ -59,6 +59,7 @@ def add_bonds(view_ats,
               mol, 
               labelsize=12,
               distvisradius=0.3, 
+              distatompairs=None,
               distcolor='black',
               distskin=0.3,
               distopacity=0.85,
@@ -84,6 +85,9 @@ def add_bonds(view_ats,
         vis_distances=[0,1] will add arrows and distances labesl from both atoms 0 and 1 to nearby atoms.
     distvisradius : float,
         radius of drawn distance vectors, by default 0.3
+    distatompairs : list, 
+        Atom pairs to view distances. 
+        e.g. [[0,1],[1,2]] will show only distances between a0 and a1, and a1 and a2, by default None
     distcolor : str,
         color of drawn distance vectors, by default 'black'
     distopacity: float,
@@ -101,7 +105,8 @@ def add_bonds(view_ats,
         bondsdf = mol.get_lig_dists(calc_nonbonded_dists=True,
                                     skin=distskin,
                                     ref_ind=vis_distances,
-                                    radius=distradius)
+                                    radius=distradius,
+                                    atom_pairs=distatompairs)
         visited = list()
         count = 0
         for i,row in bondsdf.iterrows():
@@ -147,7 +152,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                  labels=False, labelinds=None, vector=None, sphere_scale=0.3, stick_scale=0.25,
                  metal_scale=0.75, modes=None, trajectory=False, interval=200, vis_distances=None,
                  distvisradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3, distradius=None,
-                 distlabelposit=1.0):
+                 distlabelposit=1.0, distatompairs=None):
     """view_structures
     Jupyter-notebook-based visualization of molecular structures.
 
@@ -223,6 +228,9 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
         Radius around a given atom to flag "nearby" neighbors, by default None.
     distlabelposit : float,
         Fraction of the distance (towards the ending atom) that the distance label should be placed, by default 1.0 
+    distatompairs : list, 
+        Atom pairs to view distances. 
+        e.g. [[0,1],[1,2]] will show only distances between a0 and a1, and a1 and a2, by default None
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -309,6 +317,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                   distopacity=distopacity,
                   distradius=distradius,
                   distlabelposit=distlabelposit,
+                  distatompairs=distatompairs,
                   vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.show()
@@ -418,6 +427,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                       distopacity=distopacity,
                       distradius=distradius,
                       distlabelposit=distlabelposit,
+                      distatompairs=distatompairs,
                       labelsize=labelsize, vis_distances=vis_distances, viewer=(x,y))
             view_ats.zoomTo(viewer=(x,y))
             if y+1 < columns: # Fill in columns
@@ -459,6 +469,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                   distopacity=distopacity,
                   distradius=distradius,
                   distlabelposit=distlabelposit,
+                  distatompairs=distatompairs,
                   labelsize=labelsize, vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.animate({'interval':interval,'loop':'forward'}) # Infinite repetition
