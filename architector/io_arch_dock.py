@@ -2,27 +2,6 @@
 Basic Docking routine for solvent molecules around a central metal.
 
 Developed by Michael Taylor
-
-parameters={'species_list':['nitrate_bi']*3+['water']*6, # Pass a list of species.
-            'species_smiles':'O',
-            'n_species':6,
-            
-            'n_species_rotations':20, # Rotations in 3D of ligands to try
-            'n_species_conformers':1, # Number of conformers to try - right now only 1 will be tested.
-            
-            'species_grid_pad':5, # How much to pad around the molecule species are being added to (in Angstroms)
-            'species_gridspec':0.3, # How large of steps in R3 the grid surrounding a molecule should be
-            # to which a species could be added. (in Angstroms)
-            'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
-            # to which the species could be added. (in Angstroms)
-            
-            'species_add_method':'default', # Default attempts a basic colomb repulsion placement.
-            # Only other option is 'random' at the moment.
-            'species_xtb_method':'GFN2-xTB', # Right now only GFN2-xTB really works
-            
-            'species_relax':True, # Whether or not to relax the generated "solvated" structures.
-            'debug':True,
-             }
 """
 import copy
 import numpy as np
@@ -49,7 +28,7 @@ defaults = {
             # to which the species could be added. (in Angstroms)
             'species_grid_rad_scale':1, # Factor to multiply molecule+species vdw by to set molecules.
     # e.g. Reduce to allow for closer molecule-species distances
-            'species_location_method':'default', # Default attempts a basic colomb repulsion placement.
+            'species_location_method':'default', # Default attempts a basic colomb repulsion placement, targeted
             # Only other option is 'random' at the moment.
             'species_add_copies':1, # Number of species addition orientations to build 
             'species_method':'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
@@ -61,8 +40,44 @@ defaults = {
             "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
             "ase_opt_kwargs":dict(), # ASE optimizer kwargs.
             'ase_opt_kwargs':{}, # ASE optimizer
+            'targeted_indices_close':None, # Indices of both base molecule and added molecule to add close to one another.
+            # e.g. [1,0]
             'debug':False # Debug
 }
+
+targeted_defaults = {
+            # "Secondary Solvation Shell" parameters
+            'species_list':['water']*3, # Pass a list of species (preferred)
+            "freeze_molecule_add_species":False, # Whether to free the original moleucule during all secondary
+            # shell relaxations, default False.
+            'species_smiles':'O', # Can also specify multiple copies of single species with this and next line
+            'n_species':3, # -->> this line!
+            'n_species_rotations':200, # Rotations in 3D of ligands to try
+            'n_species_conformers':1, # Number of conformers to try - right now only 1 will be tested.
+            'species_grid_pad':5, # How much to pad around the molecule species are being added to (in Angstroms)
+            'species_gridspec':0.1, # How large of steps in R3 the grid surrounding a molecule should be
+            # to which a species could be added. (in Angstroms)
+            'species_skin':0.6, # How much buffer or "skin" should be added to around a molecule 
+            # to which the species could be added. (in Angstroms)
+            'species_grid_rad_scale':1.2, # Factor to multiply molecule+species vdw by to set molecules.
+    # e.g. Reduce to allow for closer molecule-species distances
+            'species_location_method':'targeted', # Default attempts a basic colomb repulsion placement, targeted
+            # Only other option is 'random' at the moment.
+            'species_add_copies':5, # Number of species orientations to build 
+            'species_method':'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
+            'species_relax':False, # Whether or not to relax the generated secondary solvation structures.
+            'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
+            'species_intermediate_relax':False, # Whether to perform the relaxation only after all secondary species are added
+            "calculator":None, # ASE calculator class input for usage during construction or for optimization.
+            "calculator_kwargs":dict(), # ASE calculator kwargs.
+            "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+            "ase_opt_kwargs":dict(), # ASE optimizer kwargs.
+            'ase_opt_kwargs':{}, # ASE optimizer
+            'targeted_indices_close':None, # Indices of both base molecule and added molecule to add close to one another.
+            # e.g. [1,0]
+            'debug':False # Debug
+}
+
 
 def center_molecule_gen_grid(mol, parameters={}):
     """center_molecule_gen_grid
@@ -263,6 +278,19 @@ def decide_new_species_location(mol, species, parameters={}):
             out_location = possible_grid_locs[np.argmax(np.abs(eq))]
         else:
             out_location = possible_grid_locs[np.argmin(eq)]
+    elif (parameters['species_location_method'] == 'targeted') and \
+          (isinstance(parameters['targeted_indices_close'],(list,tuple,np.ndarray))):
+        target_inds = parameters['targeted_indices_close']
+        upper_inds_target = np.where(np.less_equal(dist_grid_molecule[target_inds[0]], 
+                                                   upper_radvect[target_inds[0]]))[0] # Get grid points close to only this atom
+        lower_inds_target = np.where(np.less_equal(dist_grid_molecule[target_inds[0]], 
+                                                   lower_radvect[target_inds[0]]))[0] # Get grid points close to only this atom
+        shared_inds_target = np.setdiff1d(upper_inds_target,lower_inds_target)
+        shared_inds_sel = np.intersect1d(shared_inds_target,shared_inds)
+        if parameters['debug']:
+            print('Total possible locations',len(shared_inds_sel),len(shared_inds_target))
+        sel_ind = np.random.choice(shared_inds_sel,size=1)
+        out_location = grid[sel_ind]
     return out_location
 
 def add_species(init_mol,species,parameters={}):
@@ -291,7 +319,7 @@ def add_species(init_mol,species,parameters={}):
     tmp_spec = copy.deepcopy(species)
     init_mol.ase_atoms.calc = None
     rotations = tmp_spec.param_dict['rotations_list']
-    best_energy = np.inf
+    best_obj = np.inf
     out_rotation = None
     for i,r in enumerate(rotations): # Test all rotations using 'GFN-FF'
         if parameters['debug']:
@@ -313,8 +341,16 @@ def add_species(init_mol,species,parameters={}):
                                 parameters=parameters,
                                 species_run=True,
                                 intermediate='rotation')
-            if calc.energy < best_energy:
+            if parameters['species_location_method'] in ['default','random']:
+                obj = calc.energy
+            elif parameters['species_location_method'] in ['targeted']:
+                target_inds = parameters['targeted_indices_close']
+                targeted_dist = calc.mol.ase_atoms.get_distance(target_inds[0],
+                                                                len(init_mol.ase_atoms)+target_inds[1])
+                obj = calc.energy / targeted_dist # Both lower energy (-VE), lower distance (+VE)
+            if obj < best_obj:
                 out_rotation = calc.mol
+                best_obj = obj
     good = False
     if out_rotation is not None:
         good = True
@@ -335,33 +371,37 @@ def add_non_covbound_species(mol, parameters={}):
     Molecule:
     parameters = {
         # "Secondary Solvation Shell" parameters
-        'species_list':['water']*3, # Pass a list of species (preferred)
-        "freeze_molecule_add_species":False, # Whether to free the original moleucule during all secondary
+        "species_list": ['water']*3, # Pass a list of species (preferred)
+        "freeze_molecule_add_species": False, # Whether to free the original moleucule during all secondary
         # shell relaxations, default False.
-        'species_smiles':'O', # Can also specify multiple copies of single species with this and next line
-        'n_species':3, # -->> this line!
-        'n_species_rotations':20, # Rotations in 3D of ligands to try
-        'n_species_conformers':1, # Number of conformers to try - right now only 1 will be tested.
-        'species_grid_pad':5, # How much to pad around the molecule species are being added to (in Angstroms)
-        'species_gridspec':0.3, # How large of steps in R3 the grid surrounding a molecule should be
+        "species_smiles": "O", # Can also specify multiple copies of single species with this and next line
+        "n_species": 3, # -->> this line!
+        "n_species_rotations": 20, # Rotations in 3D of ligands to try
+        "n_species_conformers": 1, # Number of conformers to try - right now only 1 will be tested.
+        "species_grid_pad": 5, # How much to pad around the molecule species are being added to (in Angstroms)
+        "species_gridspec": 0.3, # How large of steps in R3 the grid surrounding a molecule should be
         # to which a species could be added. (in Angstroms)
-        'species_skin':0.2, # How much buffer or "skin" should be added to around a molecule 
+        "species_skin": 0.2, # How much buffer or "skin" should be added to around a molecule 
         # to which the species could be added. (in Angstroms)
-        'species_grid_rad_scale':1, # Factor to multiply molecule+species vdw by to set molecules.
+        "species_grid_rad_scale": 1, # Factor to multiply molecule+species vdw by to set molecules.
         # e.g. Reduce to allow for closer molecule-species distances
-        'species_location_method':'default', # Default attempts a basic colomb repulsion placement.
-        # Only other option is 'random' at the moment.
-        'species_add_copies':1, # Number of species addition orientations to build 
-        'species_method':'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
-        'species_relax':True, # Whether or not to relax the generated secondary solvation structures.
-        'species_intermediate_method':'GFN-FF', # Method to use for intermediate species screening - Suggested GFN-FF
-        'species_intermediate_relax':True, # Whether to perform the relaxation only after all secondary species are added
-        "calculator":None, # ASE calculator class input for usage during construction or for optimization.
-        "calculator_kwargs":dict(), # ASE calculator kwargs.
-        "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
-        "ase_opt_kwargs":dict(), # ASE optimizer kwargs.
-        'ase_opt_kwargs':{}, # ASE optimizer
-        'debug':False # Debug
+        "species_location_method": "default", # 'default' attempts a basic colomb repulsion placement.
+        # Another option is 'random' at the moment. Finally 'targeted' attempts to pick locations and rotations
+        # Optimizing for two indices (one from mol and 1 from the species added) to be close. 
+        # See "targeted_indices_close".
+        "species_add_copies": 1, # Number of species addition orientations to build 
+        "species_method": "GFN2-xTB", # Method to use on full species - right now only GFN2-xTB really works
+        "species_relax": True, # Whether or not to relax the generated secondary solvation structures.
+        "species_intermediate_method": "GFN-FF", # Method to use for intermediate species screening - Suggested GFN-FF
+        "species_intermediate_relax": True, # Whether to perform the relaxation only after all secondary species are added
+        "calculator": None, # ASE calculator class input for usage during construction or for optimization.
+        "calculator_kwargs": dict(), # ASE calculator kwargs.
+        "ase_opt_method": None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+        "ase_opt_kwargs": dict(), # ASE optimizer kwargs.
+        "ase_opt_kwargs": {}, # ASE optimizer
+        "targeted_indices_close": None, # Indices of both base molecule and added species to add close to one another.
+        # e.g. [1,0]
+        "debug": False # Debug
     }
     
     Parameters
@@ -381,7 +421,10 @@ def add_non_covbound_species(mol, parameters={}):
     ValueError
         Needs either "species_list" or "n_species"/"species_smiles" specified.
     """
-    params = copy.deepcopy(defaults)
+    if parameters.get('species_location_method','default') in ['default','random']:
+        params = copy.deepcopy(defaults)
+    elif parameters.get('species_location_method','default') in ['targeted']:
+        params = copy.deepcopy(targeted_defaults)
     params.update(parameters)
     species_list = params.get('species_list',None)
     n_species = params.get('n_species',None)
