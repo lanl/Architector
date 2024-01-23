@@ -341,7 +341,10 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
             raise ValueError('{} not in known ligTypes'.format(ligInput['ligType']))
         ligobmol = io_obabel.get_obmol_smiles(ligInput['smiles']) # Get obmol for each lig 
         lig_charges.append(ligobmol.GetTotalCharge()) # Calculate total charge.
-        lig_num_atoms.append(ligobmol.NumAtoms()) # Get number of atoms (estimate steric contribution)
+        lig_zs=[]
+        for atom in io_obabel.ob.OBMolAtomIter(ligobmol):
+            lig_zs.append(atom.GetAtomicNum())
+        lig_num_atoms.append(np.sum(lig_zs)) # Get sum of z of atoms (estimate steric contribution)
         selected_con_lists.append(possible_core_cons)
     
     # Re-order so highest denticity ligand is always placed first.
