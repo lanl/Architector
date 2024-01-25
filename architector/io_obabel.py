@@ -37,35 +37,13 @@ def smiles2xyz(smilesStr,addHydrogens=True):
         whether to add hydrogens or not?!?, default True
     '''
 
-    # Set up conversion
     obConversion = ob.OBConversion()
-    obConversion.SetInAndOutFormats("smi", "xyz")
-    mol = ob.OBMol()
-    obConversion.ReadString(mol, smilesStr)
+    obConversion.SetOutFormat("xyz")
 
-    # Add hydrogens
-    if (addHydrogens == True):
-        mol.AddHydrogens()
+    obmol = get_obmol_smiles(smilesStr=smilesStr,
+                             addHydrogens=addHydrogens)
 
-    # Generate 3d structure
-    builder = ob.OBBuilder()
-    builder.Build(mol)
-
-    mmff94_ok = check_mmff_okay(mol)
-
-    # Set up force field
-    if mmff94_ok:
-        FF = ob.OBForceField.FindForceField("mmff94")
-    else:
-        FF = ob.OBForceField.FindForceField('UFF')
-    # Optimize energy
-    FF.ConjugateGradients(2000,1e-6)
-    FF.GetCoordinates(mol)
-
-    # Perform conversion
-    obConversion.Convert()
-
-    return obConversion.WriteString(mol).strip()
+    return obConversion.WriteString(obmol).strip()
 
 def smiles2Atoms(smilesStr,addHydrogens=True):
     """smiles2Atoms
