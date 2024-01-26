@@ -592,12 +592,14 @@ def build_complex_driver(inputDict1):
                     #     continue
                     # else:
                     _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
-                                                             coresize=10, override=True)
+                                                             coresize=10, override=True,
+                                                             debug=inputDict['parameters']['debug'])
                     if (rmsd_full < 0.5):
                         iscopy = True
                         break
                     rmsd_core, _, _ = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
-                                                             override=True)
+                                                             override=True,
+                                                             debug=inputDict['parameters']['debug'])
                     if (rmsd_core < 0.7) and np.isclose(val['energy'],xtb_energies[i],atol=0.1):
                         iscopy = True
                         break

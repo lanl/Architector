@@ -644,7 +644,7 @@ class Molecule:
         self.xtb_uhf = int(xtb_uhf)
         self.xtb_charge = int(charge)
 
-    def find_metal(self):
+    def find_metal(self,debug=False):
         """find_metal 
         pull out the metal index in a complex
 
@@ -658,10 +658,12 @@ class Molecule:
         if len(metalinds) == 1:
             metalind = metalinds[0]
         elif len(metalinds) > 1:
-            print('Assigning first metal as metalind.')
+            if debug:
+                print('Assigning first metal as metalind.')
             metalind = metalinds[0]
         else:
-            print('No metals in this molecule.')
+            if debug:
+                print('No metals in this molecule.')
             metalind = None
         return metalind
 

@@ -257,7 +257,7 @@ def reorder_align_rmsd(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, c
     
 
 def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=None,
-              return_structures=False, rmsd_type='simple',override=False): 
+              return_structures=False, rmsd_type='simple',override=False, debug=False): 
     """calc_rmsd 
     Calculate the rmsd by different methods for this molecule compared to another.
 
@@ -281,6 +281,8 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         whether or not to return the rotated versions of the core and full structures, by defualt False
     override : bool, optional
         if no metals are present, use index 0 for comparison, default False
+    debug : bool, optional
+        Print debug statements
 
     Returns
     -------
@@ -298,10 +300,10 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         print('Warning - comparison not possible between molecules of different sizes/stoichiometries.')
         flag_struct = True
         # Set ordering to be identical based on canonical labels.
-        genMol_metalind = genMol.find_metal()
+        genMol_metalind = genMol.find_metal(debug=debug)
         genMol_graph_depths = get_graph_depths(genMol.graph)
 
-        compareMol_metalind = compareMol.find_metal()
+        compareMol_metalind = compareMol.find_metal(debug=debug)
         compareMol_graph_depths = get_graph_depths(compareMol.graph)
 
         if ((genMol_metalind is None) or (compareMol_metalind is None)) and override:
@@ -320,10 +322,10 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         coreinds = None
     else:
         # Set ordering to be identical based on canonical labels.
-        genMol_metalind = genMol.find_metal()
+        genMol_metalind = genMol.find_metal(debug=debug)
         genMol_graph_depths = get_graph_depths(genMol.graph)
 
-        compareMol_metalind = compareMol.find_metal()
+        compareMol_metalind = compareMol.find_metal(debug=debug)
         compareMol_graph_depths = get_graph_depths(compareMol.graph)
 
         if ((genMol_metalind is None) or (compareMol_metalind is None)) and override:
