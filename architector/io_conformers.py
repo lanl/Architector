@@ -9,6 +9,7 @@ import ase.io as ase_io
 import shutil
 import subprocess as sub
 import numpy as np
+import copy
 
 import architector.io_obabel as io_obabel 
 import architector.io_molecule as io_molecule
@@ -104,6 +105,10 @@ def crest_conformers(structure, charge=None, uhf=None,
         mol.detect_charge_spin()
     mol_charge = mol.xtb_charge
 
+    mol.swap_actinide()
+    actinides = copy.deepcopy(mol.actinides)
+    actinides_swapped = copy.deepcopy(mol.actinides_swapped)
+
     even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms])-mol_charge) % 2
     if (uhf is not None):
         if (even_odd_electrons == 1) and (uhf == 0):
@@ -161,8 +166,11 @@ def crest_conformers(structure, charge=None, uhf=None,
         conformerList_temp, xtb_energies = read_conformers("crest_conformers.xyz")
         conformerList = []
         for i,conf in enumerate(conformerList_temp):
+            mol.actinides = actinides
+            mol.actinides_swapped = actinides_swapped
             tmol = io_molecule.convert_io_molecule(conf)
             mol.ase_atoms = tmol.ase_atoms
+            mol.swap_actinide()
             conformerList.append(mol.write_mol2('Crest Conformer {}'.format(i),writestring=True))
 
     return conformerList, xtb_energies 
