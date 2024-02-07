@@ -149,7 +149,7 @@ def add_bonds(view_ats,
 
             
 def view_structures(structures, w=200, h=200, columns=4, representation='ball_stick', labelsize=12,
-                 labels=False, labelinds=None, vector=None, sphere_scale=0.3, stick_scale=0.25,
+                 labels=False, labelinds=None, labelatoms=False, vector=None, sphere_scale=0.3, stick_scale=0.25,
                  metal_scale=0.75, modes=None, trajectory=False, interval=200, vis_distances=None,
                  distvisradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3, distradius=None,
                  distlabelposit=1.0, distatompairs=None):
@@ -195,6 +195,8 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
         List or list of strings of labels to add to structures, by default False
     labelinds : bool, list, optional
         Whether to label the indices in each structure, if array passed will use array on matching atom indices, by default None
+    labelatoms : bool, optional
+        Whether to label the atoms by atom-type, by default False. Will supercede labelinds if True.
     vector : dict, optional
         Add arrow? e.g. vector = {'start': {'x':-10.0, 'y':0.0, 'z':0.0}, 'end': {'x':-10.0, 'y':0.0, 'z':10.0},
               'radius':2,'color':'red'}, by default None
@@ -246,12 +248,12 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
             else:
                 label = False
         metal_ind = [i for i,x in enumerate(mol.ase_atoms) if (x.symbol in io_ptable.all_metals)]
+        syms = mol.ase_atoms.get_chemical_symbols()
         if len(metal_ind) > 0 : # Take advantage of empty list
             label_posits = mol.ase_atoms.positions[metal_ind].flatten()
         else:
             label_posits = mol.ase_atoms.get_center_of_mass().flatten()  # Put it at the geometric center of the molecule.
         if modes is not None:
-            syms = mol.ase_atoms.get_chemical_symbols()
             atom_coords = mol.ase_atoms.get_positions()
             xyz =f"{len(atom_coords)}\n\n"
             mode_coords = modes[0]
@@ -294,15 +296,25 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                     'backgroundColor':"'black'",'backgroundOpacity':'0.3',
                     'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
                     'fontColor':"white",'inFront':'true'})
-        if labelinds is not None:
+        if (labelinds is not None) and (not labelatoms):
             if isinstance(labelinds,list):
                 inds = labelinds
             else:
                 inds = [x for x in range(len(mol.ase_atoms))]
             for p,i in enumerate(inds):
                 atom_posit = mol.ase_atoms.positions[p]
-                if i is not None:
+                if (i is not None):
                     view_ats.addLabel("{}".format(i), {'position':{'x':'{}'.format(atom_posit[0]),
+                    'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                    'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                    'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                    'fontColor':"white",'inFront':'true'})
+        elif labelatoms:
+            inds = [x for x in range(len(mol.ase_atoms))]
+            for p,i in enumerate(inds):
+                atom_posit = mol.ase_atoms.positions[p]
+                if (i is not None):
+                    view_ats.addLabel("{}".format(syms[i]), {'position':{'x':'{}'.format(atom_posit[0]),
                     'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
                     'backgroundColor':"'black'",'backgroundOpacity':'0.4',
                     'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
@@ -343,6 +355,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
             raise ValueError('What sort of labels are wanting? Not recognized.')
         x,y = 0,0 # Subframe position
         for k,mol in enumerate(mols):
+            syms = mol.ase_atoms.get_chemical_symbols()
             metal_inds = [i for i,x in enumerate(mol.ase_atoms) if (x.symbol in io_ptable.all_metals)]
             if len(metal_inds) > 0 : # Take advantage of empty list
                 label_posits = mol.ase_atoms.positions[metal_inds[0]].flatten()
@@ -350,7 +363,6 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                 label_posits = mol.ase_atoms.get_center_of_mass().flatten()  # Put it at the geometric center of the molecule.
             if modes is not None:
                 atom_coords = mol.ase_atoms.get_positions()
-                syms = mol.ase_atoms.get_chemical_symbols()
                 xyz =f"{len(atom_coords)}\n\n"
                 mode_coords = modes[k]
                 for i,sym in enumerate(syms):
@@ -374,7 +386,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                         'backgroundColor':"'black'",'backgroundOpacity':'0.5',
                         'fontOpacity':'1','fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true',}, viewer=(x,y))
-                if labelinds is not None:
+                if (labelinds is not None) and (not labelatoms):
                     if isinstance(labelinds,list):
                         inds = labelinds[k]
                     else:
@@ -387,6 +399,16 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                             'backgroundColor':"'black'",'backgroundOpacity':'0.4',
                             'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
                             'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
+                elif labelatoms:
+                    inds = [x for x in range(len(mol.ase_atoms))]
+                    for p,i in enumerate(inds):
+                        atom_posit = mol.ase_atoms.positions[p]
+                        if (i is not None):
+                            view_ats.addLabel("{}".format(syms[i]), {'position':{'x':'{}'.format(atom_posit[0]),
+                            'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                            'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                            'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                            'fontColor':"white",'inFront':'true'}, viewer=(x,y))
             else:
                 if modes is not None:
                     view_ats.addModel(xyz,'xyz',{'vibrate':{'frames':10,'amplitude':1}},viewer=(x,y))
@@ -405,7 +427,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                         'backgroundColor':"'black'",'backgroundOpacity':'0.5',
                         'fontOpacity':'1','fontSize':'{}'.format(labelsize),
                         'fontColor':"white",'inFront':'true',}, viewer=(x,y))
-                if labelinds is not None:
+                if (labelinds is not None) and (not labelatoms):
                     if isinstance(labelinds,list):
                         inds = labelinds[k]
                     else:
@@ -418,6 +440,16 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                             'backgroundColor':"'black'",'backgroundOpacity':'0.4',
                             'fontOpacity':'1', 'fontSize':'{}'.format(int(labelsize)),
                             'fontColor':"white", 'inFront':'true'}, viewer=(x,y))
+                elif labelatoms:
+                    inds = [x for x in range(len(mol.ase_atoms))]
+                    for p,i in enumerate(inds):
+                        atom_posit = mol.ase_atoms.positions[p]
+                        if (i is not None):
+                            view_ats.addLabel("{}".format(syms[i]), {'position':{'x':'{}'.format(atom_posit[0]),
+                            'y':'{}'.format(atom_posit[1]),'z':'{}'.format(atom_posit[2])},
+                            'backgroundColor':"'black'",'backgroundOpacity':'0.4',
+                            'fontOpacity':'1', 'fontSize':'{}'.format(labelsize),
+                            'fontColor':"white",'inFront':'true'})
             if vector:
                 view_ats.addArrow(vector, viewer=(x,y))
             add_bonds(view_ats, mol, 
