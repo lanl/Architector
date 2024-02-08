@@ -249,13 +249,14 @@ def get_obmol_smiles(smilesStr,
         Built openbabel molecule
     """
     # Set up conversion
-    if ')' in smilesStr: # Needed to clear cache for some reason.
-        # Deeply embedded in Openbabel Build class.
-        obConversion = ob.OBConversion()
-        obConversion.SetInAndOutFormats("smi", "xyz")
-        OBmol = ob.OBMol()
-        obConversion.ReadString(OBmol, '[F-]')
-        _ = build_3D(OBmol)
+    # Needed to clear cache for some reason.
+    # Deeply embedded in Openbabel Build class.
+    obConversion = ob.OBConversion()
+    obConversion.SetInAndOutFormats("smi", "xyz")
+    OBmol = ob.OBMol()
+    obConversion.ReadString(OBmol, '[F-]')
+    _ = build_3D(OBmol)
+    # END Pre-build to clear cache
     obConversion = ob.OBConversion()
     obConversion.SetInAndOutFormats("smi", "xyz")
     OBmol = ob.OBMol()
