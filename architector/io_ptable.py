@@ -619,8 +619,8 @@ ligands_dict = {
 'bisadamphosphinoeoxidemethane':{'smiles':'O=P(CP(=O)(C23CC1CC(CC(C1)C2)C3)C56CC4CC(CC(C4)C5)C6)(C89CC7CC(CC(C7)C8)C9)C%11%12CC%10CC(CC(C%10)C%11)C%12',
                                  'coordList':[0,4],'ligType':'bi_cis'}, #This works as isolated ligand - should be okay!
 'bisdimethylphosphinesulfidemethane':{'smiles':'CP(C)(=S)CP(C)(C)=S','coordList':[3,8],'ligType':'bi_cis'},
-'bisdimethylphosphineselenidemethane':{'smiles':'CP(C)(=Se)CP(C)(C)=Se','coordList':[3,8],'ligType':'bi_cis'},
-'bisdimethylphosphineteluridemethane':{'smiles':'CP(C)(=Te)CP(C)(C)=Te','coordList':[3,8],'ligType':'bi_cis'},
+'bisdimethylphosphineselenidemethane':{'smiles':'CP(C)(=[Se])CP(C)(C)=[Se]','coordList':[3,8],'ligType':'bi_cis'},
+'bisdimethylphosphineteluridemethane':{'smiles':'CP(C)(=[Te])CP(C)(C)=[Te]','coordList':[3,8],'ligType':'bi_cis'},
 }
 
 
