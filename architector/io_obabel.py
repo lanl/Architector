@@ -21,8 +21,8 @@ import numpy as np
 from pynauty import Graph as pnGraph
 from pynauty import canon_label
 
-ob_log_handler = ob.OBMessageHandler()
-ob_log_handler.SetOutputLevel(0) # Set warnings to only critical.
+# ob.obErrorLog.SetOutputLevel(0) # Set warnings to only critical.
+ob.obErrorLog.StopLogging() # Turn off ALL openbabel logging.
 
 warnings.filterwarnings('ignore') # Supress warnings.
 
@@ -783,6 +783,32 @@ def convert_mol2_obmol(mol2,readstring=True):
         conv.ReadString(obmol,mol2)
     else:
         conv.ReadFile(obmol,mol2)
+    return obmol
+
+
+def convert_cif_obmol(cif,readstring=True):
+    """convert_mol2_obmol
+    mol2 to OBMol
+
+    Parameters
+    ----------
+    mol2 : str
+        either filename or mol2 string
+    readstring : bool, optional
+        read from string or from file, by default True
+
+    Returns
+    -------
+    obmol : ob.OBMol
+        openbabel of the mol2 file
+    """
+    conv = ob.OBConversion()
+    obmol = ob.OBMol()
+    conv.SetInFormat('cif')
+    if readstring:
+        conv.ReadString(obmol,cif)
+    else:
+        conv.ReadFile(obmol,cif)
     return obmol
 
 

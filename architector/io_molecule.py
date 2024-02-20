@@ -63,6 +63,10 @@ def convert_io_molecule(structure,
         # mol2 filename
         elif structure[-5:] == '.mol2':
             mol.read_mol2(structure,readstring=False)
+        elif structure[-4:] == '.cif':
+            obmol = io_obabel.convert_cif_obmol(structure,readstring=False)
+            mol2 = io_obabel.convert_obmol_mol2(obmol)
+            mol.read_mol2(mol2,readstring=True)
         elif structure[-5:] == '.traj': # Read in trajectory file.
             traj = Trajectory(structure)
             output = []
