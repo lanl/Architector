@@ -245,6 +245,8 @@ out = {
     'metal_ox': int, # Metal oxidation state assigned to the complex
     'init_energy': float, # Initial (unrelaxed) xTB energy (eV)
     'energy': float, # Relaxed xTB energy (eV)
+    'metal_center_symmetry': str, # What the measured metal-center symmetry is, useful if it changed during optimization
+    'metal_center_confidence': float, # Confidence in metal-center symmetry assignment (0-1). Higher = more confident.
     'mol2string': str, # Final relaxed structure in TRIPOS mol2 format.
     'init_mol2string': str, # Initial unrelaxed structure in TRIPOS mol2 format.
     'energy_sorted_index': int, # Index of the complex from pseudo-energy ranking,

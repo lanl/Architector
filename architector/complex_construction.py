@@ -604,6 +604,7 @@ def build_complex_driver(inputDict1):
                         iscopy = True
                         break
                 if (not iscopy):
+                    structs[i].complexMol.classify_metal_geo_type()
                     ordered_conf_dict[keys[i]] = {'ase_atoms':structs[i].complexMol.ase_atoms,
                             'total_charge':int(structs[i].complexMol.charge),
                             'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
@@ -612,12 +613,15 @@ def build_complex_driver(inputDict1):
                             'metal_ox':inputDict['parameters']['metal_ox'],
                             'init_energy':structs[i].calculator.init_energy,
                             'energy':xtb_energies[i],
+                            'metal_center_symmetry':structs[i].complexMol.metal_center_geos[0]['metal_geo_type'],
+                            'metal_center_confidence':structs[i].complexMol.metal_center_geos[0]['confidence'],
                             'mol2string':mol2strings[i], 'init_mol2string':init_mol2strings[i],
                             'energy_sorted_index': energy_sorted_inds[i],
                             'total_possible_n_symmetries':structs[i].total_possible_n_symmetries,
                             'inputDict':inputDict
                             }
             else:
+                structs[i].complexMol.classify_metal_geo_type()
                 ordered_conf_dict[keys[i]] = {'ase_atoms':structs[i].complexMol.ase_atoms, 
                         'total_charge':int(structs[i].complexMol.charge),
                         'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
@@ -626,6 +630,8 @@ def build_complex_driver(inputDict1):
                         'metal_ox':inputDict['parameters']['metal_ox'],
                         'init_energy':structs[i].calculator.init_energy,
                         'energy':xtb_energies[i],
+                        'metal_center_symmetry':structs[i].complexMol.metal_center_geos[0]['metal_geo_type'],
+                        'metal_center_confidence':structs[i].complexMol.metal_center_geos[0]['confidence'],
                         'mol2string':mol2strings[i], 'init_mol2string':init_mol2strings[i],
                         'energy_sorted_index': energy_sorted_inds[i],
                         'total_possible_n_symmetries':structs[i].total_possible_n_symmetries,
@@ -735,11 +741,14 @@ def build_complex(inputDict):
                     if tmp_inputDict['parameters']['debug']:
                         print('Warning: Final calc after adding secondary solvation failed. Returning solvated species anyways!!!!')
                 # Add "docked" molecule to output.
+                mol_plus_species.classify_metal_geo_type()
                 vals[i].update({'mol2string':mol_plus_species.write_mol2('Mol_Plus_Species_Example_Energy', writestring=True),
                                 'energy':calculator.energy,
                                 'sampled_solvation_shells':species_list,
                                 'ase_atoms':mol_plus_species.ase_atoms,
                                 'total_charge':int(mol_plus_species.charge),
+                                'metal_center_symmetry':mol_plus_species.metal_center_geos[0]['metal_geo_type'],
+                                'metal_center_confidence':mol_plus_species.metal_center_geos[0]['confidence'],
                                 'xtb_n_unpaired_electrons': mol_plus_species.xtb_uhf,
                                 'calc_n_unpaired_electrons': mol_plus_species.uhf,
                                 'xtb_total_charge':int(mol_plus_species.xtb_charge)})
@@ -756,7 +765,11 @@ def build_complex(inputDict):
                 tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
                 posits = io_molecule.convert_io_molecule(samples[0]).ase_atoms.get_positions()
                 tmpmol.ase_atoms.set_positions(posits)
-                vals[i].update({'mol2string':tmpmol.write_mol2('CREST_Min_Energy', writestring=True)})
+                tmpmol.classify_metal_geo_type()
+                vals[i].update({'mol2string':tmpmol.write_mol2('CREST_Min_Energy', writestring=True),
+                                'metal_center_symmetry':tmpmol.metal_center_geos[0]['metal_geo_type'],
+                                'metal_center_confidence':tmpmol.metal_center_geos[0]['confidence'],
+                                })
             if tmp_inputDict['parameters']['obmol_sampling'] and (j < tmp_inputDict['parameters']['obmol_sampling_n_conformers']): 
                 if tmp_inputDict['parameters']['debug']:
                     print('Starting OBMol sampling on {} of {}!'.format(j+1,len(order)))
@@ -775,7 +788,11 @@ def build_complex(inputDict):
                 tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
                 posits = io_molecule.convert_io_molecule(samples[0]).ase_atoms.get_positions()
                 tmpmol.ase_atoms.set_positions(posits)
-                vals[i].update({'mol2string':tmpmol.write_mol2('OBMol_Min_Energy', writestring=True)})
+                tmpmol.classify_metal_geo_type()
+                vals[i].update({'mol2string':tmpmol.write_mol2('OBMol_Min_Energy', writestring=True),
+                                'metal_center_symmetry':tmpmol.metal_center_geos[0]['metal_geo_type'],
+                                'metal_center_confidence':tmpmol.metal_center_geos[0]['confidence'],
+                                })
             out_ordered_conf_dict[keys[i]] = vals[i]
     else:
         out_ordered_conf_dict = dict()
