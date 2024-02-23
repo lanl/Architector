@@ -1528,3 +1528,30 @@ class Molecule:
                 visited_keys.add(tuple(sorted(row['atom_pair'])))
         filterdf = df[~df.atom_pair.isin(duplicates)]
         return filterdf
+
+    def get_disjoint_molecules(self):
+        """split this molecule into non-bonded sub-molecules.
+        """
+        if len(self.graph) < 1:
+            self.create_mol_graph()
+        csg = csgraph_from_dense(self.graph)
+        disjoint_components = connected_components(csg)
+        atom_groups = disjoint_components[1]
+        unique_group_names = np.unique(atom_groups)
+        mols = []
+        for i in unique_group_names:
+            newmol = Molecule()
+            subinds = np.where(atom_groups == i)[0]
+            subinds_bodict = subinds + 1
+            ase_ats = self.ase_atoms[subinds]
+            newbodict=dict()
+            for inds,bo in self.BO_dict.items():
+                ind0,ind1 = inds[0],inds[1]
+                if (ind0 in subinds_bodict) and (ind1 in subinds_bodict):
+                    nind0 = len(np.where(subinds_bodict < ind0)[0]) + 1
+                    nind1 = len(np.where(subinds_bodict < ind1)[0]) + 1
+                    newbodict[(nind0,nind1)] = bo
+            natom_types = np.array(self.atom_types)[subinds].tolist()
+            newmol.load_ase(ase_ats,BO_dict=newbodict,atom_types=natom_types)
+            mols.append(newmol)
+        return mols
