@@ -886,6 +886,7 @@ def remove_obmol_metals(Conf3D):
 def obmol_lig_split(mol2string,
                     return_info=False,
                     calc_coord_atoms=True,
+                    allow_radicals=False,
                     calc_all=False):
     """obmol_lig_split 
     Take in a mol2string and use openbabel to split into ligands, convert to smiles, 
@@ -909,7 +910,12 @@ def obmol_lig_split(mol2string,
     coord_atom_lists : list(list)
         list of coordinating atom indices for the smiles str
     """
-    obmol = convert_mol2_obmol(mol2string)
+    if 'un' in mol2string:
+        mol2string = mol2string.replace('un','0')
+        obmol = convert_mol2_obmol(mol2string)
+        obmol.ConvertZeroBonds()
+    else:
+        obmol = convert_mol2_obmol(mol2string)
     _,anums,graph = get_OBMol_coords_anums_graph(obmol)
     bo_dict, _ = get_OBMol_bo_dict_atom_types(obmol,metal_passed=False)
     met_inds = [i for i,x in enumerate(anums) if (io_ptable.elements[x] in io_ptable.all_metals)]
@@ -959,9 +965,56 @@ def obmol_lig_split(mol2string,
         # Key block for catching where coordinating atoms were deprotonated
         ### WORKING -> Does not work great for nitrogen compounds.
         for l, atom in enumerate(ob.OBMolAtomIter(ligobmol)):
-            total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
-            close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
-            atom.SetFormalCharge(int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val)))
+            if l in coord_atom_list:
+                total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
+                close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
+                if atom.GetFormalCharge() > 0: # Coordinating atoms rarely +ve
+                    atom.SetFormalCharge(0)
+                else:
+                    newcharge = int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val))
+                    if (newcharge != int(atom.GetFormalCharge())) and (newcharge > 0):
+                        atom.SetFormalCharge(0)
+                    elif (newcharge == -1):
+                        atom.SetFormalCharge(newcharge)
+                    elif (newcharge != int(atom.GetFormalCharge())):
+                        if np.abs(total_val - 6) < 3: # Most likely octet-breaker or strange coordination
+                            newcharge = int(atom.GetFormalCharge()-(6-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        elif np.abs(total_val - 10) < 3: # octet breaker near 10 # R3P=0
+                            newcharge = int(atom.GetFormalCharge()-(10-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        elif np.abs(total_val - 12) < 3: # octet breaker near 12
+                            newcharge = int(atom.GetFormalCharge()-(12-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        elif np.abs(total_val - 14) < 3: # octet breaker near 14
+                            newcharge = int(atom.GetFormalCharge()-(14-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        elif np.abs(total_val - 16) < 3: # octet breaker near 16
+                            newcharge = int(atom.GetFormalCharge()-(16-total_val))
+                            atom.SetFormalCharge(newcharge)
+        if (not allow_radicals) and (ligobmol.GetTotalSpinMultiplicity() > 1):
+            for l, atom in enumerate(ob.OBMolAtomIter(ligobmol)):
+                if l not in coord_atom_list:
+                    total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
+                    close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
+                    newcharge = int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val))
+                    if newcharge < 3: # Others most likely octet-breakers
+                        atom.SetFormalCharge(newcharge)
+                    elif np.abs(total_val - 6) < 3: # octet-breaker near 6 B
+                        newcharge = int(atom.GetFormalCharge()-(6-total_val))
+                        atom.SetFormalCharge(newcharge)
+                    elif np.abs(total_val - 10) < 3: # octet breaker near 10 # R3P=0
+                        newcharge = int(atom.GetFormalCharge()-(10-total_val))
+                        atom.SetFormalCharge(newcharge)
+                    elif np.abs(total_val - 12) < 3: # octet breaker near 12
+                        newcharge = int(atom.GetFormalCharge()-(12-total_val))
+                        atom.SetFormalCharge(newcharge)
+                    elif np.abs(total_val - 14) < 3: # octet breaker near 14
+                        newcharge = int(atom.GetFormalCharge()-(14-total_val))
+                        atom.SetFormalCharge(newcharge)
+                    elif np.abs(total_val - 16) < 3: # octet breaker near 16
+                        newcharge = int(atom.GetFormalCharge()-(16-total_val))
+                        atom.SetFormalCharge(newcharge)
         new_smiles = get_smiles_obmol(ligobmol,canonicalize=True)
         ligand_smiles.append(new_smiles)
         if calc_all:
