@@ -97,7 +97,7 @@ inputDict = {
 # Here, metal oxdiation state and spin state, methods for evaluating complexes during construction, #
 # And many other options are defined, but are often handled automatically by Architector in the background #
 
-"parameters" = {
+"parameters": {
     ######## Electronic parameters #########
     "metal_ox": None, # Oxidation State
     "metal_spin": None, # Spin State
