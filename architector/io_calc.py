@@ -157,6 +157,9 @@ class CalcExecutor:
         default_params['save_trajectories'] = save_trajectories
         default_params.update(parameters)
         self.parameters = default_params
+        if len(self.parameters) > 0:
+            for key,val in self.parameters.items():
+                setattr(self,key,val)
         self.init_sanity_check = init_sanity_check
         self.final_sanity_check = final_sanity_check
         self.calculator = calculator
@@ -184,7 +187,6 @@ class CalcExecutor:
         if len(parameters) > 0:
             for key,val in parameters.items():
                 setattr(self,key,val)
-
         if assembly:
             self.init_sanity_check = True
             self.relax = False
