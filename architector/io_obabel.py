@@ -974,22 +974,34 @@ def obmol_lig_split(mol2string,
                     newcharge = int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val))
                     if (newcharge != int(atom.GetFormalCharge())) and (newcharge > 0):
                         atom.SetFormalCharge(0)
-                    elif (newcharge == -1):
+                    elif (newcharge < 0) and (atom.GetAtomicNum() not in [4,5,13]):
                         atom.SetFormalCharge(newcharge)
-                    elif (newcharge != int(atom.GetFormalCharge())):
-                        if np.abs(total_val - 6) < 3: # Most likely octet-breaker or strange coordination
+                    elif atom.GetAtomicNum() in [5,13]: # B/Al coordinating atoms can have valence = 6
+                        if np.abs(total_val - 6) < 2: # Most likely octet-breaker or strange coordination
                             newcharge = int(atom.GetFormalCharge()-(6-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 10) < 3: # octet breaker near 10 # R3P=0
+                        else:
+                            atom.SetFormalCharge(newcharge)
+                    elif atom.GetAtomicNum() == 4: # Be coordinating atoms can have valence = 4
+                        if np.abs(total_val - 4) < 2:
+                            newcharge = int(atom.GetFormalCharge()-(4-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        else:
+                            atom.SetFormalCharge(newcharge)
+                    elif (newcharge != int(atom.GetFormalCharge())):
+                        if np.abs(total_val - 6) < 2: # Most likely octet-breaker or strange coordination
+                            newcharge = int(atom.GetFormalCharge()-(6-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        elif np.abs(total_val - 10) < 2: # octet breaker near 10 # R3P=0
                             newcharge = int(atom.GetFormalCharge()-(10-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 12) < 3: # octet breaker near 12
+                        elif np.abs(total_val - 12) < 2: # octet breaker near 12
                             newcharge = int(atom.GetFormalCharge()-(12-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 14) < 3: # octet breaker near 14
+                        elif np.abs(total_val - 14) < 2: # octet breaker near 14
                             newcharge = int(atom.GetFormalCharge()-(14-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 16) < 3: # octet breaker near 16
+                        elif np.abs(total_val - 16) < 2: # octet breaker near 16
                             newcharge = int(atom.GetFormalCharge()-(16-total_val))
                             atom.SetFormalCharge(newcharge)
         if (not allow_radicals) and (ligobmol.GetTotalSpinMultiplicity() > 1):
@@ -998,21 +1010,33 @@ def obmol_lig_split(mol2string,
                     total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
                     close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
                     newcharge = int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val))
-                    if newcharge < 3: # Others most likely octet-breakers
+                    if (newcharge < 2) and (atom.GetAtomicNum() not in [4,5,13]): # Others most likely octet-breakers
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 6) < 3: # octet-breaker near 6 B
+                    elif atom.GetAtomicNum() in [5,13]: # B/Al can have valence = 6
+                        if np.abs(total_val - 6) < 2: # Most likely octet-breaker or strange coordination
+                            newcharge = int(atom.GetFormalCharge()-(6-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        else:
+                            atom.SetFormalCharge(newcharge)
+                    elif atom.GetAtomicNum() == 4: # Be atoms can have valence = 4
+                        if np.abs(total_val - 4) < 2:
+                            newcharge = int(atom.GetFormalCharge()-(4-total_val))
+                            atom.SetFormalCharge(newcharge)
+                        else:
+                            atom.SetFormalCharge(newcharge)
+                    elif np.abs(total_val - 6) < 2: # octet-breaker near 6 B
                         newcharge = int(atom.GetFormalCharge()-(6-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 10) < 3: # octet breaker near 10 # R3P=0
+                    elif np.abs(total_val - 10) < 2: # octet breaker near 10 # R3P=0
                         newcharge = int(atom.GetFormalCharge()-(10-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 12) < 3: # octet breaker near 12
+                    elif np.abs(total_val - 12) < 2: # octet breaker near 12
                         newcharge = int(atom.GetFormalCharge()-(12-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 14) < 3: # octet breaker near 14
+                    elif np.abs(total_val - 14) < 2: # octet breaker near 14
                         newcharge = int(atom.GetFormalCharge()-(14-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 16) < 3: # octet breaker near 16
+                    elif np.abs(total_val - 16) < 2: # octet breaker near 16
                         newcharge = int(atom.GetFormalCharge()-(16-total_val))
                         atom.SetFormalCharge(newcharge)
         new_smiles = get_smiles_obmol(ligobmol,canonicalize=True)
