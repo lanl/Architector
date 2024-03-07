@@ -297,7 +297,8 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
 
     # Check that these are stoichiometrically identical molecules.
     if np.any(sorted(genMol.ase_atoms.get_atomic_numbers()) != sorted(compareMol.ase_atoms.get_atomic_numbers())):
-        print('Warning - comparison not possible between molecules of different sizes/stoichiometries.')
+        if debug:
+            print('Warning - comparison not possible between molecules of different sizes/stoichiometries.')
         flag_struct = True
         # Set ordering to be identical based on canonical labels.
         genMol_metalind = genMol.find_metal(debug=debug)
@@ -343,10 +344,11 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         flag_struct = False
 
         if np.any(sorted(tmp_self_comp.get_atomic_numbers()) != sorted(tmp_ref_comp.get_atomic_numbers())):
-            print('Warning cores not matched at graph depth!')
-            print('Can re-attempt. Not doing that now.')
-            print(tmp_self_comp.get_chemical_formula())
-            print(tmp_ref_comp.get_chemical_formula())
+            if debug:
+                print('Warning cores not matched at graph depth!')
+                print('Can re-attempt. Not doing that now.')
+                print(tmp_self_comp.get_chemical_formula())
+                print(tmp_ref_comp.get_chemical_formula())
             outcore = tmp_self_comp
             rmsd_loss_core = 1000
             rmsd_loss_full = 1000
