@@ -225,7 +225,7 @@ inputDict = {
     "species_relax":True, # Whether or not to relax the generated secondary solvation structures.
     "species_intermediate_method":'GFN-FF', # Method to use for intermediate species orientation screening - Suggested GFN-FF
     "species_intermediate_relax":True, # Whether to perform the relaxation only after all secondary species are added
-    "freeze_molecule_add_species":False, # Whether to free the original moleucule during all secondary
+    "freeze_molecule_add_species":False, # Whether to freeze the original moleucule during all secondary
     # shell relaxations, default False.
     } 
 }
