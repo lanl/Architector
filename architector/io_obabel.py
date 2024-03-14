@@ -17,6 +17,7 @@ from openbabel import openbabel as ob
 from openbabel import pybel
 from io import StringIO
 from scipy.sparse import csgraph
+from scipy.spatial.transform import Rotation as Rot
 import numpy as np
 from pynauty import Graph as pnGraph
 from pynauty import canon_label
@@ -253,33 +254,33 @@ def get_obmol_smiles(smilesStr,
     # Deeply embedded in Openbabel Build class.
     obConversion = ob.OBConversion()
     obConversion.SetInAndOutFormats("smi", "xyz")
-    OBmol = ob.OBMol()
-    obConversion.ReadString(OBmol, '[F-]')
-    _ = build_3D(OBmol)
+    tOBmol = ob.OBMol()
+    obConversion.ReadString(tOBmol, '[F-]')
+    _ = build_3D(tOBmol)
     # END Pre-build to clear cache
     obConversion = ob.OBConversion()
     obConversion.SetInAndOutFormats("smi", "xyz")
-    OBmol = ob.OBMol()
-    obConversion.ReadString(OBmol, smilesStr)
+    tOBmol = ob.OBMol()
+    obConversion.ReadString(tOBmol, smilesStr)
 
     if (functionalizations is not None):
         for fg in functionalizations:
-            OBmol = functionalize(OBmol, 
+            tOBmol = functionalize(tOBmol, 
                                   functional_group=fg['functional_group'],
                                   smiles_inds=fg['smiles_inds'])
 
     if neutralize:
-        _ = Neutralize(OBmol)
+        _ = Neutralize(tOBmol)
 
     # Add hydrogens
     if (addHydrogens == True):
-        OBmol.AddHydrogens()
+        tOBmol.AddHydrogens()
 
     if build:
-        OBmol = build_3D(OBmol,addHydrogens=addHydrogens)
-        return OBmol
+        tOBmol = build_3D(tOBmol,addHydrogens=addHydrogens)
+        return tOBmol
     else:
-        return OBmol
+        return tOBmol
 
 
 def get_smiles_obmol(OBmol,canonicalize=False):
@@ -535,6 +536,154 @@ def functionalize(OBmol,functional_group='C',smiles_inds=[0]):
                 atom.SetImplicitHCount(atom.GetImplicitHCount()-1)
 
     return OBmol
+
+
+def functionalize_3D(OBmol,functional_groups=['C'],funct_inds=[0],bond_orders=[1]):
+    """functionalize_3D functionalization routine for existing molecules
+
+    Parameters
+    ----------
+    OBmol : ob.OBMol
+        Un"built" 3D ligand
+    functional_groups : list[str], optional
+        smiles string or name of functional_group, by default 'C'
+    funct_inds : list, optional
+        indices where the functional_group should be added, by default [0]
+    bond_orders : list, optional
+        bond orders of the functional group added to the initial molecule, by default [1]
+
+    Returns
+    -------
+    out_mol2 : str
+        functionalized mol2 string of the group.
+    """
+    new_functional_groups = []
+    for fg in functional_groups:
+        if fg in io_ptable.functional_groups_dict:
+            tfg = io_ptable.functional_groups_dict[fg]
+            new_functional_groups.append(tfg)
+        else:
+            new_functional_groups.append(fg)
+
+    init_n_atoms = OBmol.NumAtoms()
+    removed_indices = []
+
+    for i,idx in enumerate(funct_inds):
+
+        functional_group = new_functional_groups[i]
+
+        removed_indices = np.array(removed_indices)
+        idx = idx - len(np.where(removed_indices < idx)[0])
+        removed_indices = removed_indices.tolist()
+
+        second_mol = get_obmol_smiles(functional_group,build=True,neutralize=False,addHydrogens=True)
+
+        mol_coords,mol_anums,mol_graph = get_OBMol_coords_anums_graph(OBMol=OBmol)
+
+        funct_coords,funct_anums,funct_graph = get_OBMol_coords_anums_graph(OBMol=second_mol)
+
+        funct_coords = funct_coords - funct_coords[0] # Assumes function group insertion at index 0.
+        mol_coords = mol_coords - mol_coords[idx]
+
+        # rotate molecule to -z
+        r = Rot.align_vectors(np.array([[0.,0.,-1.]]*len(mol_coords)), mol_coords)#.reshape(1,-1))
+        mol_coords = r[0].apply(mol_coords)
+
+        for j,atom in enumerate(ob.OBMolAtomIter(OBmol)):
+            atom.SetVector(mol_coords[j][0],mol_coords[j][1],mol_coords[j][2])
+
+        # rotate functional group to +z 
+        r = Rot.align_vectors(np.array([[0.,0.,1.]]*len(funct_coords)), funct_coords)#.reshape(1,-1))
+        funct_coords = r[0].apply(funct_coords) + np.array((0.,0.,2.)) # Move to 2
+
+        fg_hydrogens_inds = np.intersect1d(np.nonzero(funct_graph[0])[0],
+                                      np.where(np.array(funct_anums) == 1)[0])
+        
+        mol_hydrogens_inds = np.intersect1d(np.nonzero(mol_graph[idx])[0],
+                                      np.where(np.array(mol_anums) == 1)[0])
+        
+        if (len(mol_hydrogens_inds) < bond_orders[i]):
+            raise ValueError('Molecule atom {} bound by fewer hydrogen atoms than needed!'.format(idx))
+        elif (len(fg_hydrogens_inds) < bond_orders[i]):
+            raise ValueError('Functional group atom 0 bound by fewer hydrogen atoms than needed!')
+        
+        # Distance from FG for molecule
+        mol_hydrogen_dists = np.linalg.norm(mol_coords[mol_hydrogens_inds] - np.array((0.,0.,2.)),
+                                            axis=1)
+        # Distance from molecule for FG
+        fg_hydrogen_dists = np.linalg.norm(funct_coords[fg_hydrogens_inds],
+                                            axis=1)
+        mol_delete_inds = mol_hydrogens_inds[mol_hydrogen_dists.argsort()[:bond_orders[i]]]
+        mol_delete_inds = [int(x) for x in mol_delete_inds]
+        
+        removed_indices += mol_delete_inds
+        fg_delete_inds = fg_hydrogens_inds[fg_hydrogen_dists.argsort()[:bond_orders[i]]]
+        fg_delete_inds = [int(x) for x in fg_delete_inds]
+
+        for j,atom in enumerate(ob.OBMolAtomIter(second_mol)):
+            atom.SetVector(funct_coords[j][0],
+                            funct_coords[j][1],
+                            funct_coords[j][2])
+        for j,atom in enumerate(ob.OBMolAtomIter(second_mol)):
+            if j in fg_delete_inds:
+                second_mol.DeleteAtom(atom)
+
+        start_index = OBmol.NumAtoms()
+        for j,atom in enumerate(ob.OBMolAtomIter(second_mol)):
+            OBmol.AddAtom(atom)
+            
+        for obbond in ob.OBMolBondIter(second_mol):
+            OBmol.AddBond(obbond.GetBeginAtomIdx()+start_index,obbond.GetEndAtomIdx()+start_index,obbond.GetBondOrder())
+            
+        OBmol.AddBond(start_index+1,idx+1,bond_orders[i])
+
+        for j,atom in enumerate(ob.OBMolAtomIter(OBmol)):
+            if j in mol_delete_inds:
+                OBmol.DeleteAtom(atom)
+
+    frozen_inds = [x for x in range(init_n_atoms-len(removed_indices))]
+    mol2 = convert_obmol_mol2(OBmol)
+    newobmol = convert_mol2_obmol(mol2)
+    ### Swap actinides for lanthanides
+    _,anums,_ = get_OBMol_coords_anums_graph(newobmol, return_coords=False, get_types=False)
+    syms = [io_ptable.elements[x] for x in anums]
+    act_inds = [i for i,x in enumerate(syms) if x in io_ptable.actinides]
+    swapped=False
+    if len(act_inds) > 0:
+        an_symbols = [syms[x] for x in act_inds]
+        ln_symbols = [io_ptable.lanthanides[io_ptable.actinides.index(x)] for x in an_symbols]
+        j = 0
+        for i, atom in enumerate(ob.OBMolAtomIter(newobmol)):
+            if i in act_inds:
+                atom.SetAtomicNum(io_ptable.elements.index(ln_symbols[j]))
+                j+=1
+        swapped=True
+
+    mmff94_ok = check_mmff_okay(newobmol)
+
+    # Set up force field
+    if mmff94_ok:
+        FF = ob.OBForceField.FindForceField("mmff94")
+    else:
+        FF = ob.OBForceField.FindForceField('UFF')
+    
+    constr = ob.OBFFConstraints()
+    for j in frozen_inds:
+        constr.AddAtomConstraint(int(j)+1)
+    FF.Setup(newobmol,constr)
+    # Optimize energy
+    FF.ConjugateGradients(2000,1e-6)
+    FF.GetCoordinates(newobmol)
+    if swapped: # Swap Back
+        j = 0
+        for i, atom in enumerate(ob.OBMolAtomIter(newobmol)):
+            if i in act_inds:
+                atom.SetAtomicNum(io_ptable.elements.index(an_symbols[j]))
+                j+=1
+
+    out_mol2 = convert_obmol_mol2(newobmol)
+    return out_mol2
+
 
 def convert_obmol_ase(OBMol,posits=None,set_zero=False,add_hydrogens=False):
     """convert_obmol_ase 
