@@ -85,7 +85,7 @@ class CalcExecutor:
                 method='GFN2-xTB', xtb_solvent='none', xtb_accuracy=1.0,
                 xtb_electronic_temperature=300, xtb_max_iterations=250,
                 fmax=0.1, maxsteps=1000, ff_preopt_run=False,
-                detect_spin_charge=False, fix_m_neighbors=False,
+                detect_spin_charge=False, fix_m_neighbors=False, fix_indices=None,
                 default_params=params, ase_opt_method=None, ase_opt_kwargs={}, species_run=False,
                 intermediate=False, skip_spin_assign=False, save_trajectories=False,
                 store_results=False,
@@ -129,6 +129,8 @@ class CalcExecutor:
             Detect the charge and spin with openbabel routines?, by default False
         fix_m_neighbors : bool, optional
             Set the metal neighbors as fixed, by default False
+        fix_indices : list, optional
+            indices to fix (0-index), by default None
         default_params :dict, optional
             default parameters to evaluate to, by default params
         ase_opt_method : ase.optimize Optimizer, optional
@@ -176,6 +178,7 @@ class CalcExecutor:
         self.maxsteps = maxsteps
         self.species_run = species_run
         self.store_results = store_results
+        self.fix_indices = fix_indices
         self.ase_opt_kwargs = ase_opt_kwargs
         self.skip_spin_assign = skip_spin_assign
         self.force_generation = False
@@ -313,6 +316,9 @@ class CalcExecutor:
                         fix_inds = self.mol.find_component_indices(component=0)
                         c = FixAtoms(indices=fix_inds.tolist())
                         self.mol.ase_atoms.set_constraint(c)
+                    elif isinstance(self.fix_indices,list):
+                        c = FixAtoms(indices=self.fix_indices)
+                        self.mol.ase_atoms.set_constraint(c)
                     if len(self.mol.ase_constraints) > 0:
                         fix_list = [[x[0],x[1]] for x in self.mol.ase_constraints]
                         c = FixBondLengths(fix_list)
@@ -398,7 +404,7 @@ class CalcExecutor:
                     try:
                         self.init_energy = io_obabel.obmol_energy(self.mol)
                         out_atoms, energy = io_obabel.obmol_opt(self.mol, center_metal=True, 
-                                fix_m_neighbors=self.fix_m_neighbors, # Note - fixing metal neighbors in UFF
+                                fix_m_neighbors=self.fix_m_neighbors,fix_indices=self.fix_indices, # Note - fixing metal neighbors in UFF
                                     # Done to maintain metal center symmetry
                                     return_energy=True)
                         self.successful = True
