@@ -1559,9 +1559,9 @@ class Molecule:
     
 
     def functionalize_3D(self,
-                         functional_groups=['C'],
-                         funct_inds=[0],
-                         bond_orders=[1],
+                         functional_groups=['carboxyllic_acid'],
+                         funct_inds=[1],
+                         bond_orders=[],
                          uff_opt=True,
                          xtb_opt=False,
                          core_frozen=True):
@@ -1611,12 +1611,18 @@ class Molecule:
         from architector.io_calc import CalcExecutor
 
         new_functional_groups = []
-        for fg in functional_groups:
+        for i,fg in enumerate(functional_groups):
             if fg in io_ptable.functional_groups_dict:
                 tfg = io_ptable.functional_groups_dict[fg]
                 new_functional_groups.append(tfg)
+                if len(bond_orders) < i+1:
+                    bond_orders.append(1)
+                else:
+                    bond_orders[i] = 1
             else:
                 new_functional_groups.append(fg)
+                if len(bond_orders) < i+1:
+                    bond_orders.append(1)
 
         init_n_atoms = len(self.ase_atoms)
         removed_indices = []
