@@ -17,7 +17,6 @@ from openbabel import openbabel as ob
 from openbabel import pybel
 from io import StringIO
 from scipy.sparse import csgraph
-from scipy.spatial.transform import Rotation as Rot
 import numpy as np
 from pynauty import Graph as pnGraph
 from pynauty import canon_label
