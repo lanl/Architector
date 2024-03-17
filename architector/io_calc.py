@@ -281,6 +281,7 @@ class CalcExecutor:
                 if (self.xtb_solvent == 'none') and (self.method != 'GFN-FF'):
                     calc = TBLite(method=self.method, max_iterations=self.xtb_max_iterations,
                                   electronic_temperature=self.xtb_electronic_temperature,
+                                #   spin_polarization=1.0, # Have spin polarization on if desired.
                                   verbosity=self.parameters['debug'])
                 # Use XTB for other cases.
                 else:

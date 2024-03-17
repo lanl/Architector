@@ -717,6 +717,26 @@ class Molecule:
         metals = self.find_metals()
         for i in sorted(metals)[::-1]:
             self.remove_atom(i)
+
+    def remove_atoms(self,inds):
+        """Delete the indices passed from the molecule.
+
+        Parameters
+        ----------
+        inds : list/np.ndarray(int)
+            Delete these indices from the molecule.
+        """
+        if isinstance(inds,(list,np.ndarray)):
+            delete_inds = sorted(inds)[::-1] # Do these in reverse order.
+            for ind in delete_inds:
+                try:
+                    self.remove_atom(int(ind))
+                except:
+                    print('Warning - type unknown for index {}. Need an integer got {}! This atom was not removed.'.format(
+                        ind,type(ind)))
+        else:
+            print('Warning - either unknown list/array of indices to delete passed {}. No atoms were removed.'.format(
+                inds))
                 
     def create_mol_graph(self, cutoffs=True, skin=0.2, allow_mm_bonds=False):
         """create_mol_graph 
@@ -1702,6 +1722,12 @@ class Molecule:
 
             self.ase_atoms += funct_mol.ase_atoms
             self.atom_types += funct_mol.atom_types
+            if funct_mol.charge is not None:
+                self.charge += funct_mol.charge # Add charge for charged functional groups.
+                if isinstance(self.xtb_charge,int):
+                    self.xtb_charge += funct_mol.charge
+                else:
+                    self.xtb_charge = funct_mol.charge
             self.BO_dict.update(newligbodict)
             self.create_graph_from_bo_dict()
 
@@ -1718,3 +1744,21 @@ class Molecule:
                                      method='GFN2-xTB',
                                      fix_indices=freeze_indices)
             self.ase_atoms.set_positions(obmol_opt.mol.ase_atoms.get_positions())
+
+
+    def split_ligs(self):
+        """Split the molecule into ligands with labelled information.
+
+        Returns
+        -------
+        info_dict : dict
+            Dictionary with all ligand information.
+        """
+        ligsmiles , catoms , info_dict, = io_obabel.obmol_lig_split(
+            self.write_mol2('temp.mol2',writestring=True),
+            return_info=True,
+            calc_all=True
+            )
+        info_dict['lig_smiles'] = ligsmiles
+        info_dict['lig_metal_coordatoms'] = catoms
+        return info_dict
