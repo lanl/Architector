@@ -606,7 +606,7 @@ ligands_dict = {
 'valinate_bi_o':{'smiles':'CC(C)C(C(=O)[O-])N','coordList':[5,7],'ligType':'bi_cis_chelating'},
 'oxime':{'smiles':'c1(O)c(C(C)(C)C)cc(C(C)(C)C)cc1(C(=NO))','coordList':[1,16],'ligType':'bi_cis'},
 'pyridine_ester':{'smiles':'COC(=O)C1=CC(=CN=C1)C(=O)OC','coordList':[8],'ligType':'mono'},
-'tedga':{'smiles':'CCN(CC)C(=O)COCC(=O)N(CC)CC','coordList':[6,8,11],'ligType':'tri_mer_bent'},
+'tedga':{'smiles':'CCN(CC)C(=O)COCC(=O)N(CC)CC','coordList':[6,8,11],'ligType':'tri_mer'},
 'hydroxyquinoline':{'smiles':'C1=CC2=C(C(=C(C)1)O)N=CC=C2','coordList':[7,8],'ligType':'bi_cis'}, # Functionalize 6
 'bi_benzimidazole':{'smiles':'C1=CC=C2C(=C1)NC(=N2)C3=NC4=CC=CC=C4N3','coordList':[8,10],'ligType':'bi_cis'}, # Functionalize 6,17 with esters
 'acetate_mono':{'smiles':'CC(=O)[O-]','coordList':[3],'ligType':'mono'},
