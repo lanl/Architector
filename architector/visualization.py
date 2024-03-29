@@ -19,6 +19,7 @@ import py3Dmol
 import architector
 from architector.io_molecule import convert_io_molecule
 import architector.io_ptable as io_ptable
+from architector.io_align_mol import reorder_align_rmsd
 
 def type_convert(structures):
     """Handle multiple types of structures passed. List of xyz, mol2 files,
@@ -152,11 +153,11 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                  labels=False, labelinds=None, labelatoms=False, vector=None, sphere_scale=0.3, stick_scale=0.25,
                  metal_scale=0.75, modes=None, trajectory=False, interval=200, vis_distances=None,
                  distvisradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3, distradius=None,
-                 distlabelposit=1.0, distatompairs=None):
+                 distlabelposit=1.0, distatompairs=None, stack=False, stack_align=True):
     """view_structures
     Jupyter-notebook-based visualization of molecular structures.
 
-    Structures can be anything from a file (.xyz, .mol2, .rxyz), ase Atoms, list (or array) of files, 
+    Structures can be anything from a file (.xyz, .mol2, .rxyz), ase Atoms, list (or array) of files,
     or list/array-like of structure strings, or list/array of ase Atoms.
 
     Examples:
@@ -170,13 +171,13 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
     view_structures(metal_complex_mol2string,
                     vis_distances=True) Will visualize metal-ligand bond distances on the inset images
     view_structures(ase.atoms.Atoms,modes=[vibrational_mode_array]) gives a single viewer with vibrational mode array superimposed
-    view_structures([ase.atoms.Atoms]*n,modes=[vibrational_mode_array1,vibrational_mmode_array2....]]) 
+    view_structures([ase.atoms.Atoms]*n,modes=[vibrational_mode_array1,vibrational_mmode_array2....]])
     gives a grid viewer with all vibrational modes visualized
     view_structures([trajectory_of_xyzs],trajectory=True) gives a single viewer with the trajectory visualized.
 
     There is much more functionality to play with.
     Most of what I end up changing is w (width) and h (height) in pixels, and columns (int).
-    These specifiy the size of each viewer panel, and number of columns, respecitively. 
+    These specifiy the size of each viewer panel, and number of columns, respectively.
     Parameters
     ----------
     structures : str,list,array-like
@@ -233,6 +234,10 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
     distatompairs : list, 
         Atom pairs to view distances. 
         e.g. [[0,1],[1,2]] will show only distances between a0 and a1, and a1 and a2, by default None
+    stack : bool,
+        Stack all the images in a single viewer, default False.
+    stack_align : bool,
+        Align all the molecules by rmsd for stacking, default True.
     """
     mols = type_convert(structures)
     if len(mols) == 1:
@@ -333,7 +338,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                   vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.show()
-    elif (len(mols) < 50) and (not trajectory):
+    elif (len(mols) < 50) and (not trajectory) and (not stack):
         rows = int(m.ceil(float(len(mols))/columns))
         w = w*columns
         h = h*rows 
@@ -505,6 +510,47 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                   labelsize=labelsize, vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.animate({'interval':interval,'loop':'forward'}) # Infinite repetition
+        view_ats.show()
+    elif stack:
+        view_ats = py3Dmol.view(width=w,height=h)
+        metal_inds = [i for i,x in enumerate(mols[0].ase_atoms) if (x.symbol in io_ptable.all_metals)]
+        xyz = ""
+        mol0 = mols[0]
+        for k,mol in enumerate(mols):
+            if stack_align:
+                aligned = reorder_align_rmsd(mol0.ase_atoms,
+                                             mol.ase_atoms)
+                newmol = convert_io_molecule(aligned)
+                newmol.create_mol_graph()
+                mol = newmol
+            coords = mol.write_mol2('thing',writestring=True)
+            coords = coords.replace('un','1')
+            view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+        if representation == 'ball_stick':
+            view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
+            msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
+            for ms in set(msyms):
+                view_ats.setStyle({'elem':ms},{'sphere':{'colorscheme':'Jmol','scale':metal_scale}})
+            view_ats.addStyle({'stick':{'colorscheme':'Jmol','radius':stick_scale}}) 
+        else:
+            if representation == 'stick':
+                view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}})
+            elif representation == 'sphere':
+                view_ats.setStyle({representation:{'colorscheme':'Jmol','scale':sphere_scale}})
+            else:
+                view_ats.setStyle({representation:{'colorscheme':'Jmol'}})
+        if vector:
+            view_ats.addArrow(vector)
+        add_bonds(view_ats, mol, 
+                  distvisradius=distvisradius,
+                  distcolor=distcolor,
+                  distskin=distskin,
+                  distopacity=distopacity,
+                  distradius=distradius,
+                  distlabelposit=distlabelposit,
+                  distatompairs=distatompairs,
+                  labelsize=labelsize, vis_distances=vis_distances)
+        view_ats.zoomTo()
         view_ats.show()
     else: 
         raise ValueError('Warning. Passing this many structures WILL cause your kernel to crash.')

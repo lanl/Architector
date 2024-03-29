@@ -122,12 +122,12 @@ def align_rmsd(tarmol, insrcmol, in_place=False):
         insrcmol.set_positions(newposits)
     else: 
         r = None
-    rmsd_loss = simple_rmsd(tarmol,insrcmol)
+    rmsd_loss = simple_rmsd(tarmol, insrcmol)
     return rmsd_loss, r, insrcmol
 
 
 def permute_align(tarmol, srcmol, maxiter=1, tol=1e-6, in_place=False):
-    """permute_align 
+    """permute_align
     permute the atom order in mol to minimize the rmsd, in place
 
     A follow-up rmsd alignment will be applied to the new molecule to
@@ -161,16 +161,19 @@ def permute_align(tarmol, srcmol, maxiter=1, tol=1e-6, in_place=False):
     outr = None
     count = 0
     for _ in range(maxiter):
-        cost_mat = permutation_cost_mat(tarmol_1.positions, srcmol_1.positions, 
-                                        tarmol_1.get_atomic_numbers(), srcmol_1.get_atomic_numbers(),
-                                       costtype='xyz')
+        cost_mat = permutation_cost_mat(tarmol_1.positions, srcmol_1.positions,
+                                        tarmol_1.get_atomic_numbers(), 
+                                        srcmol_1.get_atomic_numbers(),
+                                        costtype='xyz')
         permute = linear_sum_assignment(cost_mat)[1]
         srcmol_1 = srcmol_1[permute]
-        rms, r, srcmol_1 = align_rmsd(tarmol_1, srcmol_1, in_place=in_place)
+        rms, r, srcmol_1 = align_rmsd(tarmol_1,
+                                      srcmol_1,
+                                      in_place=in_place)
         if (count == 0) and (not in_place):
             outr = r[0] 
         elif (not in_place):
-            outr = outr * r[0] # Composite rotation.
+            outr = outr * r[0]  # Composite rotation.
         else:
             outr = r
         if abs(rms-last_rms) < tol:
@@ -206,13 +209,17 @@ def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     """
     srcmol_tmp = srcmol.copy()
     newposits = srcmol_tmp.positions
-    newposits[:,0] = -newposits[:,0]
+    newposits[:, 0] = -newposits[:, 0]
     srcmol_tmp.set_positions(newposits)
-    rmsd, outr, msrcmol = permute_align(tarmol,srcmol_tmp,maxiter=maxiter,tol=tol)
+    rmsd, outr, msrcmol = permute_align(tarmol,
+                                        srcmol_tmp,
+                                        maxiter=maxiter,
+                                        tol=tol)
     return rmsd, outr, msrcmol
 
 
-def reorder_align_rmsd(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, center=True):
+def reorder_align_rmsd(tarmol, srcmol, sample=300,
+                       maxiter=1, tol=1e-6, return_rmsd=False, center=True):
     """reorder_align_rmsd
     Align including re-ordering and mirroring, and calc RMSD
 
@@ -222,6 +229,8 @@ def reorder_align_rmsd(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, c
         target molecule
     srcmol : ase.atoms.Atoms
         source molecule
+    sample : int
+        how many random samples to try, by default 300
     maxiter : int, optional
         how many times to try, by default 10
     tol : float, optional
@@ -238,23 +247,32 @@ def reorder_align_rmsd(tarmol, srcmol, maxiter=1, tol=1e-6, return_rmsd=False, c
     """
     tmp1 = tarmol.copy()
     tmp2 = srcmol.copy()
+    min_rmsd = np.inf
+    final_out = None
+
     if center:
         tmp1.set_positions(tmp1.get_positions() - tmp1.get_positions().mean(axis=0)) # Center 
         tmp2.set_positions(tmp2.get_positions() - tmp2.get_positions().mean(axis=0)) # Center 
 
-    normal, _, out = permute_align(tmp1, tmp2,
-                                     maxiter=maxiter, tol=tol, in_place=False)
-    rmsd = normal
-    mirror, _, out2 = mirror_align(tmp1, tmp2,
-                                     maxiter=maxiter, tol=tol)
-    if mirror < normal:
-        out = out2
-        rmsd = mirror
+    for _ in range(sample):
+        r = Rot.random()
+        tmp2.set_positions(r.apply(tmp2.get_positions()))
+        normal, _, out = permute_align(tmp1, tmp2, maxiter=maxiter,
+                                       tol=tol, in_place=False)
+        rmsd = normal
+        mirror, _, out2 = mirror_align(tmp1, tmp2, maxiter=maxiter,
+                                       tol=tol)
+        if mirror < normal:
+            out = out2
+            rmsd = mirror
+        if rmsd < min_rmsd:
+            min_rmsd = rmsd
+            final_out = out
     if not return_rmsd:
-        return out
+        return final_out
     else:
-        return out,rmsd
-    
+        return final_out, min_rmsd
+
 
 def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=None,
               return_structures=False, rmsd_type='simple',override=False, debug=False): 
