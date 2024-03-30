@@ -1753,7 +1753,7 @@ class Molecule:
 
                 removed_indices = np.array(removed_indices)
                 for j,x in enumerate(idx):
-                    idx[j] = x - len(np.where(removed_indices < x)[0])
+                    idx[j] = x - len(np.where(removed_indices <= x)[0])
 
                 funct_mol = convert_io_molecule(functional_group)
 
@@ -1800,9 +1800,19 @@ class Molecule:
                     fg_hydrogen_dists = np.linalg.norm(funct_coords[fg_hydrogens_inds],
                                                         axis=1)
                     
-                    mol_delete_inds += mol_hydrogens_inds[mol_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
+                    mol_del_inds = mol_hydrogens_inds[mol_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
 
-                    fg_delete_inds += fg_hydrogens_inds[fg_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
+                    if len([x for x in mol_del_inds if x in mol_delete_inds]) > 0: # Repeated deleted hydrogen
+                        mol_del_inds = [x for x in mol_hydrogens_inds if x not in mol_delete_inds][:bond_orders[i][j]]
+                    
+                    mol_delete_inds += mol_del_inds
+
+                    fg_del_inds = fg_hydrogens_inds[fg_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
+
+                    if len([x for x in fg_del_inds if x in fg_delete_inds]) > 0: # Repeated deleted hydrogen
+                        fg_del_inds = [x for x in fg_hydrogens_inds if x not in fg_delete_inds][:bond_orders[i][j]]
+
+                    fg_delete_inds += fg_del_inds
 
                 mol_delete_inds = sorted(mol_delete_inds)[::-1]
                 fg_delete_inds = sorted(fg_delete_inds)[::-1]
@@ -1827,7 +1837,8 @@ class Molecule:
                     newkey = tuple(newkey)
                     newligbodict.update({newkey:val})
                 for j,fg_mol_ind in enumerate(functional_group_mol_ind):
-                    newligbodict.update({(idx[j]+1,natoms+1+fg_mol_ind):bond_orders[i][j]})
+                    tmpind = idx[j] - len(np.where(np.array(mol_delete_inds) <= idx[j])[0])
+                    newligbodict.update({(tmpind+1,natoms+1+fg_mol_ind):bond_orders[i][j]})
 
                 self.ase_atoms += funct_mol.ase_atoms
                 self.atom_types += funct_mol.atom_types
@@ -1847,11 +1858,11 @@ class Molecule:
             freeze_indices = None
         if uff_opt:
             tmpmol = self.write_mol2('temp.mol2',writestring=True)
-            obmol_opt = CalcExecutor(tmpmol,relax=True,method='UFF',fix_indices=freeze_indices)
+            obmol_opt = CalcExecutor(tmpmol, relax=True, method='UFF', fix_indices=freeze_indices)
             self.ase_atoms.set_positions(obmol_opt.mol.ase_atoms.get_positions())
         if xtb_opt:
             tmpmol = self.write_mol2('temp.mol2',writestring=True)
-            obmol_opt = CalcExecutor(tmpmol,relax=True,
+            obmol_opt = CalcExecutor(tmpmol, relax=True,
                                      method='GFN2-xTB',
                                      fix_indices=freeze_indices)
             self.ase_atoms.set_positions(obmol_opt.mol.ase_atoms.get_positions())
