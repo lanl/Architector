@@ -649,7 +649,7 @@ class Molecule:
         self.xtb_uhf = int(xtb_uhf)
         self.xtb_charge = int(charge)
 
-    def find_metal(self,debug=False):
+    def find_metal(self, debug=False):
         """find_metal 
         pull out the metal index in a complex
 
@@ -1583,6 +1583,7 @@ class Molecule:
                          functionalization_inds=[],
                          bond_orders=[],
                          functional_group_mol_inds=[],
+                         remove_hydrogens_when_adding=[],
                          uff_opt=True,
                          xtb_opt=False,
                          core_frozen=True):
@@ -1624,6 +1625,8 @@ class Molecule:
             bond orders of the functional group added to the initial molecule, by default [1]
         functional_group_mol_inds : list(list(int)), optional
             which atoms in the functional group that should be bound to the metal, by default [0]
+        remove_hydrogens_when_adding : list(bool), optional
+            remove hydrogens when adding this functionalization?, by default True for all bonds added.
         uff_opt : bool, optional
             Relax with UFF/openbabel (turning off NOT suggested), by default True
         xtb_opt : bool, optional
@@ -1646,12 +1649,18 @@ class Molecule:
                     functional_group_mol_inds.append(0)
                 else:
                     functional_group_mol_inds[i] = 0
+                if len(remove_hydrogens_when_adding) < i+1:
+                    remove_hydrogens_when_adding.append(True)
+                else:
+                    remove_hydrogens_when_adding[i] = True
             else:
                 new_functional_groups.append(fg)
                 if len(bond_orders) < i+1:
                     bond_orders.append(1)
                 if len(functional_group_mol_inds) < i+1:
                     functional_group_mol_inds.append(0)
+                if len(remove_hydrogens_when_adding) < i+1:
+                    remove_hydrogens_when_adding.append(True)
 
         init_n_atoms = len(self.ase_atoms)
         removed_indices = []
@@ -1688,38 +1697,40 @@ class Molecule:
 
                 funct_mol.ase_atoms.set_positions(funct_coords)
 
-                fg_hydrogens_inds = np.intersect1d(np.nonzero(funct_mol.graph[functional_group_mol_ind])[0],
-                                                np.where(np.array(funct_anums) == 1)[0])
-                
-                mol_hydrogens_inds = np.intersect1d(np.nonzero(self.graph[idx])[0],
-                                                    np.where(np.array(mol_anums) == 1)[0])
-                
-                if (len(mol_hydrogens_inds) < bond_orders[i]):
-                    raise ValueError('Molecule atom {} bound by fewer hydrogen atoms than needed!'.format(idx))
-                elif (len(fg_hydrogens_inds) < bond_orders[i]):
-                    raise ValueError('Functional group atom 0 bound by fewer hydrogen atoms than needed!')
-                
-                # Distance from FG for molecule
-                mol_hydrogen_dists = np.linalg.norm(mol_coords[mol_hydrogens_inds] - np.array((0.,0.,2.)),
-                                                    axis=1)
-                # Distance from molecule for FG
-                fg_hydrogen_dists = np.linalg.norm(funct_coords[fg_hydrogens_inds],
-                                                    axis=1)
-                
-                mol_delete_inds = sorted(mol_hydrogens_inds[mol_hydrogen_dists.argsort()[:bond_orders[i]]])[::-1]
+                if remove_hydrogens_when_adding[i]: # Only if remove_hydrogens requested.
 
-                for j in mol_delete_inds:
-                    self.remove_atom(j)
+                    fg_hydrogens_inds = np.intersect1d(np.nonzero(funct_mol.graph[functional_group_mol_ind])[0],
+                                                    np.where(np.array(funct_anums) == 1)[0])
+                    
+                    mol_hydrogens_inds = np.intersect1d(np.nonzero(self.graph[idx])[0],
+                                                        np.where(np.array(mol_anums) == 1)[0])
+                    
+                    if (len(mol_hydrogens_inds) < bond_orders[i]):
+                        raise ValueError('Molecule atom {} bound by fewer hydrogen atoms than needed!'.format(idx))
+                    elif (len(fg_hydrogens_inds) < bond_orders[i]):
+                        raise ValueError('Functional group atom 0 bound by fewer hydrogen atoms than needed!')
+                    
+                    # Distance from FG for molecule
+                    mol_hydrogen_dists = np.linalg.norm(mol_coords[mol_hydrogens_inds] - np.array((0.,0.,2.)),
+                                                        axis=1)
+                    # Distance from molecule for FG
+                    fg_hydrogen_dists = np.linalg.norm(funct_coords[fg_hydrogens_inds],
+                                                        axis=1)
+                    
+                    mol_delete_inds = sorted(mol_hydrogens_inds[mol_hydrogen_dists.argsort()[:bond_orders[i]]])[::-1]
 
-                # Shift removed inds back to original index frame.
-                removed_inds = [x+len(np.where(removed_indices <= x)[0]) for x in mol_delete_inds]
-                removed_indices = removed_indices.tolist()
-                removed_indices += removed_inds
+                    for j in mol_delete_inds:
+                        self.remove_atom(j)
 
-                fg_delete_inds = sorted(fg_hydrogens_inds[fg_hydrogen_dists.argsort()[:bond_orders[i]]])[::-1]
+                    # Shift removed inds back to original index frame.
+                    removed_inds = [x+len(np.where(removed_indices <= x)[0]) for x in mol_delete_inds]
+                    removed_indices = removed_indices.tolist()
+                    removed_indices += removed_inds
 
-                for j in fg_delete_inds:
-                    funct_mol.remove_atom(j)
+                    fg_delete_inds = sorted(fg_hydrogens_inds[fg_hydrogen_dists.argsort()[:bond_orders[i]]])[::-1]
+
+                    for j in fg_delete_inds:
+                        funct_mol.remove_atom(j)
 
                 natoms = len(self.ase_atoms)
                 newligbodict = dict()
@@ -1745,10 +1756,18 @@ class Molecule:
                 idx = np.array([int(x) for x in idx])
                 functional_group = new_functional_groups[i]
                 functional_group_mol_ind = functional_group_mol_inds[i]
+                remove_hydrogens = remove_hydrogens_when_adding[i]
+                if not isinstance(remove_hydrogens,(list,np.ndarray)): # Recast list with default True.
+                    remove_hydrogens = [True]*len(functional_group_mol_ind)
 
                 if len(idx) != len(functional_group_mol_ind):
                     raise ValueError('Functionalization Indices must match functional_group_mol_ind in shape! \n{}!={}!'.format(
                         len(functional_group_mol_ind),len(idx)
+                    ))
+                
+                if len(idx) != len(remove_hydrogens):
+                    raise ValueError('Remove hydrogens bools must match functional_group_mol_ind in shape! \n{}!={}!'.format(
+                        len(remove_hydrogens),len(idx)
                     ))
 
                 removed_indices = np.array(removed_indices)
@@ -1782,51 +1801,53 @@ class Molecule:
                 fg_delete_inds = []
 
                 for j,fg_mol_ind in enumerate(functional_group_mol_ind):
-                    fg_hydrogens_inds = np.intersect1d(np.nonzero(funct_mol.graph[fg_mol_ind])[0],
-                                                    np.where(np.array(funct_anums) == 1)[0])
-                    
-                    mol_hydrogens_inds = np.intersect1d(np.nonzero(self.graph[idx[j]])[0],
-                                                        np.where(np.array(mol_anums) == 1)[0])
-                    
-                    if (len(mol_hydrogens_inds) < bond_orders[i][j]):
-                        raise ValueError('Molecule atom {} bound by fewer hydrogen atoms than needed!'.format(idx))
-                    elif (len(fg_hydrogens_inds) < bond_orders[i][j]):
-                        raise ValueError('Functional group atom 0 bound by fewer hydrogen atoms than needed!')
-                    
-                    # Distance from FG for molecule
-                    mol_hydrogen_dists = np.linalg.norm(mol_coords[mol_hydrogens_inds] - np.array((0.,0.,2.)),
-                                                        axis=1)
-                    # Distance from molecule for FG
-                    fg_hydrogen_dists = np.linalg.norm(funct_coords[fg_hydrogens_inds],
-                                                        axis=1)
-                    
-                    mol_del_inds = mol_hydrogens_inds[mol_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
+                    if remove_hydrogens[j]: # Only if removing hydrogens requested
+                        fg_hydrogens_inds = np.intersect1d(np.nonzero(funct_mol.graph[fg_mol_ind])[0],
+                                                        np.where(np.array(funct_anums) == 1)[0])
+                        
+                        mol_hydrogens_inds = np.intersect1d(np.nonzero(self.graph[idx[j]])[0],
+                                                            np.where(np.array(mol_anums) == 1)[0])
+                        
+                        if (len(mol_hydrogens_inds) < bond_orders[i][j]):
+                            raise ValueError('Molecule atom {} bound by fewer hydrogen atoms than needed!'.format(idx))
+                        elif (len(fg_hydrogens_inds) < bond_orders[i][j]):
+                            raise ValueError('Functional group atom 0 bound by fewer hydrogen atoms than needed!')
+                        
+                        # Distance from FG for molecule
+                        mol_hydrogen_dists = np.linalg.norm(mol_coords[mol_hydrogens_inds] - np.array((0.,0.,2.)),
+                                                            axis=1)
+                        # Distance from molecule for FG
+                        fg_hydrogen_dists = np.linalg.norm(funct_coords[fg_hydrogens_inds],
+                                                            axis=1)
+                        
+                        mol_del_inds = mol_hydrogens_inds[mol_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
 
-                    if len([x for x in mol_del_inds if x in mol_delete_inds]) > 0: # Repeated deleted hydrogen
-                        mol_del_inds = [x for x in mol_hydrogens_inds if x not in mol_delete_inds][:bond_orders[i][j]]
-                    
-                    mol_delete_inds += mol_del_inds
+                        if len([x for x in mol_del_inds if x in mol_delete_inds]) > 0: # Repeated deleted hydrogen
+                            mol_del_inds = [x for x in mol_hydrogens_inds if x not in mol_delete_inds][:bond_orders[i][j]]
+                        
+                        mol_delete_inds += mol_del_inds
 
-                    fg_del_inds = fg_hydrogens_inds[fg_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
+                        fg_del_inds = fg_hydrogens_inds[fg_hydrogen_dists.argsort()[:bond_orders[i][j]]].tolist()
 
-                    if len([x for x in fg_del_inds if x in fg_delete_inds]) > 0: # Repeated deleted hydrogen
-                        fg_del_inds = [x for x in fg_hydrogens_inds if x not in fg_delete_inds][:bond_orders[i][j]]
+                        if len([x for x in fg_del_inds if x in fg_delete_inds]) > 0: # Repeated deleted hydrogen
+                            fg_del_inds = [x for x in fg_hydrogens_inds if x not in fg_delete_inds][:bond_orders[i][j]]
 
-                    fg_delete_inds += fg_del_inds
+                        fg_delete_inds += fg_del_inds
 
-                mol_delete_inds = sorted(mol_delete_inds)[::-1]
-                fg_delete_inds = sorted(fg_delete_inds)[::-1]
+                if np.any(remove_hydrogens):
+                    mol_delete_inds = sorted(mol_delete_inds)[::-1]
+                    fg_delete_inds = sorted(fg_delete_inds)[::-1]
 
-                for j in mol_delete_inds:
-                    self.remove_atom(j)
+                    for j in mol_delete_inds:
+                        self.remove_atom(j)
 
-                # Shift removed inds back to original index frame.
-                removed_inds = [x+len(np.where(removed_indices <= x)[0]) for x in mol_delete_inds]
-                removed_indices = removed_indices.tolist()
-                removed_indices += removed_inds
+                    # Shift removed inds back to original index frame.
+                    removed_inds = [x+len(np.where(removed_indices <= x)[0]) for x in mol_delete_inds]
+                    removed_indices = removed_indices.tolist()
+                    removed_indices += removed_inds
 
-                for j in fg_delete_inds:
-                    funct_mol.remove_atom(j)
+                    for j in fg_delete_inds:
+                        funct_mol.remove_atom(j)
 
                 natoms = len(self.ase_atoms)
                 newligbodict = dict()
@@ -1837,7 +1858,10 @@ class Molecule:
                     newkey = tuple(newkey)
                     newligbodict.update({newkey:val})
                 for j,fg_mol_ind in enumerate(functional_group_mol_ind):
-                    tmpind = idx[j] - len(np.where(np.array(mol_delete_inds) <= idx[j])[0])
+                    if np.any(remove_hydrogens):
+                        tmpind = idx[j] - len(np.where(np.array(mol_delete_inds) <= idx[j])[0])
+                    else:
+                        tmpind = idx[j]
                     newligbodict.update({(tmpind+1,natoms+1+fg_mol_ind):bond_orders[i][j]})
 
                 self.ase_atoms += funct_mol.ase_atoms
