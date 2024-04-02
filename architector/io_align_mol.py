@@ -64,19 +64,19 @@ def permutation_cost_mat(pt_list1, pt_list2, label1, label2, costtype='xyz'):
     """
     npt = len(pt_list1)
     cost_mat = np.zeros([npt, npt])
-    pt_list1_com = np.mean(pt_list1,axis=0)
-    pt_list2_com = np.mean(pt_list2,axis=0)
+    pt_list1_com = np.mean(pt_list1, axis=0)
+    pt_list2_com = np.mean(pt_list2, axis=0)
     for i, (xyz1, label1_t) in enumerate(zip(pt_list1, label1)):
         for j, (xyz2, label2_t) in enumerate(zip(pt_list2, label2)):
             if label1_t != label2_t:
                 # permutation between different element is not allowed
-                cost_mat[i,j] = np.inf
+                cost_mat[i, j] = np.inf
             else:
                 if costtype == 'xyz':
                     diffvec = xyz1 - xyz2
                 elif costtype == 'COM':
                     diffvec = (xyz1-pt_list1_com) - (xyz2-pt_list2_com)
-                cost_mat[i,j] = np.dot(diffvec, diffvec)
+                cost_mat[i, j] = np.dot(diffvec, diffvec)
     return cost_mat
 
 def simple_rmsd(tarmol, insrcmol):
@@ -274,8 +274,9 @@ def reorder_align_rmsd(tarmol, srcmol, sample=300,
         return final_out, min_rmsd
 
 
-def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=None,
-              return_structures=False, rmsd_type='simple',override=False, debug=False): 
+def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
+              return_structures=False, rmsd_type='simple',
+              override=False, debug=False): 
     """calc_rmsd 
     Calculate the rmsd by different methods for this molecule compared to another.
 
@@ -293,8 +294,6 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
         number of iterations per time on permutation/alignment routine, by default 1
     sample : int, optional
         number of random rotations to sample initially to ensure best mapping between cores, by default 30
-    atom_types: list, optional
-        which atom types to consider for alignment - will default to full alignment, default None
     return_structures : bool, optional
         whether or not to return the rotated versions of the core and full structures, by defualt False
     override : bool, optional
@@ -312,6 +311,11 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300, atom_types=
 
     genMol = convert_io_molecule(genMol)
     compareMol = convert_io_molecule(compareMol)
+
+    if len(genMol.graph) == 0:
+        genMol.create_mol_graph()
+    if len(compareMol.graph) == 0:
+        compareMol.create_mol_graph()
 
     # Check that these are stoichiometrically identical molecules.
     if np.any(sorted(genMol.ase_atoms.get_atomic_numbers()) != sorted(compareMol.ase_atoms.get_atomic_numbers())):
