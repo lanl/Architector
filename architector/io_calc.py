@@ -10,10 +10,12 @@ import time
 import copy
 import os
 # import architector.io_xtb_calc as io_xtb_calc
+import architector
 import architector.io_obabel as io_obabel
 from architector.io_align_mol import simple_rmsd
 import architector.arch_context_manage as arch_context_manage
 import architector.io_molecule as io_molecule
+import ase
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
 from ase.constraints import (FixAtoms, FixBondLengths)
@@ -88,7 +90,7 @@ class CalcExecutor:
                 detect_spin_charge=False, fix_m_neighbors=False, fix_indices=None,
                 default_params=params, ase_opt_method=None, ase_opt_kwargs={}, species_run=False,
                 intermediate=False, skip_spin_assign=False, save_trajectories=False,
-                store_results=False,
+                store_results=False, use_constraints=False,
                 calculator=None, debug=False):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
@@ -143,6 +145,8 @@ class CalcExecutor:
             Skip the re-assignment of spin to a molcule during the calculation, by default False
         save_trajectories : bool, optional
             Save the optimization trajectory, by default False
+        use_constraints : bool, optional 
+            Copy the constraints from input ase.atoms.Atoms or architector molecule to optimization, by default False.
         store_results : bool, optional
             Store the "QM" results to calculator object, by default False.
         calculator : ase.calculators Calculator, optional
@@ -153,6 +157,13 @@ class CalcExecutor:
 
         self.in_struct = structure
         self.mol = io_molecule.convert_io_molecule(structure)
+        if use_constraints:
+            if isinstance(self.in_struct, ase.atoms.Atoms):
+                if len(self.in_struct.constraints) > 0:
+                    self.mol.ase_atoms.set_constraint(self.in_struct.constraints)
+            elif isinstance(self.in_struct, architector.io_molecule.Molecule):
+                if len(self.in_struct.ase_atoms.constraints) > 0:
+                    self.mol.ase_atoms.set_constraint(self.in_struct.ase_atoms.constraints)
         self.method = method
         default_params = params.copy()
         default_params['debug'] = debug
@@ -161,7 +172,7 @@ class CalcExecutor:
         self.parameters = default_params
         if len(self.parameters) > 0:
             for key,val in self.parameters.items():
-                setattr(self,key,val)
+                setattr(self, key, val)
         self.init_sanity_check = init_sanity_check
         self.final_sanity_check = final_sanity_check
         self.calculator = calculator
@@ -394,9 +405,11 @@ class CalcExecutor:
                             self.errors.append(e)
                             if self.parameters['debug']:
                                 print('Warning - method did not converge!',e)
-                                print('Mol XTB Charge {} Spin {}\n'.format(self.mol.xtb_charge,self.mol.xtb_uhf))
-                                print('Mol ase Charge {} Spin {}\n'.format(self.mol.ase_atoms.get_initial_charges().sum(),
-                                            self.mol.ase_atoms.get_initial_magnetic_moments().sum()))
+                                print('Mol XTB Charge {} Spin {}\n'.format(self.mol.xtb_charge,
+                                                                           self.mol.xtb_uhf))
+                                print('Mol ase Charge {} Spin {}\n'.format(
+                                    self.mol.ase_atoms.get_initial_charges().sum(),
+                                    self.mol.ase_atoms.get_initial_magnetic_moments().sum()))
                             self.energy = 10000
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
@@ -404,8 +417,8 @@ class CalcExecutor:
                 if self.relax:
                     try:
                         self.init_energy = io_obabel.obmol_energy(self.mol)
-                        out_atoms, energy = io_obabel.obmol_opt(self.mol, center_metal=True, 
-                                fix_m_neighbors=self.fix_m_neighbors,fix_indices=self.fix_indices, # Note - fixing metal neighbors in UFF
+                        out_atoms, energy = io_obabel.obmol_opt(self.mol, center_metal=True,
+                                fix_m_neighbors=self.fix_m_neighbors,fix_indices=self.fix_indices,  # Note - fixing metal neighbors in UFF
                                     # Done to maintain metal center symmetry
                                     return_energy=True)
                         self.successful = True
@@ -444,8 +457,8 @@ class CalcExecutor:
             self.mol.swap_actinide(debug=self.parameters['debug'])
 
         if self.final_sanity_check:
-            self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
-            self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
+            self.mol.dist_sanity_checks(params=self.parameters, assembly=self.assembly)
+            self.mol.graph_sanity_checks(params=self.parameters, assembly=self.assembly)
 
         # Reset structure to inital state to avoid nans in output structures.
         if np.any(np.isnan(self.mol.ase_atoms.get_positions())):
