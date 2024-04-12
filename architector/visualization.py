@@ -20,6 +20,7 @@ import architector
 from architector.io_molecule import convert_io_molecule
 import architector.io_ptable as io_ptable
 from architector.io_align_mol import reorder_align_rmsd
+from ase.io import read
 
 def type_convert(structures):
     """Handle multiple types of structures passed. List of xyz, mol2 files,
@@ -33,11 +34,28 @@ def type_convert(structures):
     """
     outlist = []
     if isinstance(structures,str):
-        out = convert_io_molecule(structures)
-        if isinstance(out,(np.ndarray,list)): # Read in traj.
-            structures=out
+        if ('.traj' in structures) or ('.gz' in structures):
+            structures = read(structures,index=':')
+        elif ('.xyz' in structures):
+            things = read(structures,index=':')
+            if len(things) > 1:
+                structures = things
+        if isinstance(structures,list) and (len(structures) > 1):
+            outlist = []
+            for i,x in enumerate(structures):
+                try:
+                    mol = convert_io_molecule(x)
+                    outlist.append(mol)
+                except:
+                    raise ValueError('Not Recognized Structure Type for index: ' + str(i))
+        elif isinstance(structures,list):
+            structures = [convert_io_molecule(structures[0])]
         else:
-            structures = [out]
+            out = convert_io_molecule(structures)
+            if isinstance(out, (np.ndarray,list)):  # Read in traj.
+                structures=out
+            else:
+                structures = [out]
     elif isinstance(structures,(ase.atoms.Atoms,architector.io_molecule.Molecule)):
         structures = [convert_io_molecule(structures)]
     elif isinstance(structures,dict):
