@@ -75,7 +75,7 @@ def convert_io_molecule(structure,
                 output.append(convert_io_molecule(ats))
             return output
         elif isinstance(structure,str) and (len(structure.split('\n')) > 3) and (structure.split('\n')[0].replace(' ','').isnumeric()) \
-            and ('FORCES' in structure) and ('ENERGY' in structure): # RXYZ string.
+            and (('FORCES' in structure) or ('ENERGY' in structure)): # RXYZ string.
             mol.read_rxyz(structure,readstring=True)
         # checking for number at start of string -> indicates xyz string
         elif isinstance(structure,str) and (len(structure.split('\n')) > 3) and (structure.split('\n')[0].replace(' ','').isnumeric()):
