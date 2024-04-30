@@ -33,14 +33,14 @@ def type_convert(structures):
         mol2 strings, mol2 files, xyz strings, xyz files, or mol3D objects
     """
     outlist = []
-    if isinstance(structures,str):
+    if isinstance(structures, str):
         if ('.traj' in structures) or ('.gz' in structures):
-            structures = read(structures,index=':')
+            structures = read(structures, index=':')
         elif ('.xyz' in structures):
-            things = read(structures,index=':')
+            things = read(structures, index=':')
             if len(things) > 1:
                 structures = things
-        if isinstance(structures,list) and (len(structures) > 1):
+        if isinstance(structures, list) and (len(structures) > 1):
             outlist = []
             for i,x in enumerate(structures):
                 try:
@@ -48,36 +48,36 @@ def type_convert(structures):
                     outlist.append(mol)
                 except:
                     raise ValueError('Not Recognized Structure Type for index: ' + str(i))
-        elif isinstance(structures,list):
+        elif isinstance(structures, list):
             structures = [convert_io_molecule(structures[0])]
         else:
             out = convert_io_molecule(structures)
-            if isinstance(out, (np.ndarray,list)):  # Read in traj.
-                structures=out
+            if isinstance(out, (np.ndarray, list)):  # Read in traj.
+                structures = out
             else:
                 structures = [out]
-    elif isinstance(structures,(ase.atoms.Atoms,architector.io_molecule.Molecule)):
+    elif isinstance(structures, (ase.atoms.Atoms, architector.io_molecule.Molecule)):
         structures = [convert_io_molecule(structures)]
-    elif isinstance(structures,dict):
+    elif isinstance(structures, dict):
         try:
-            structures = [val['mol2string'] for key,val in structures.items()]
+            structures = [val['mol2string'] for key, val in structures.items()]
         except:
             raise ValueError('Not recognized type for this dictionary to visualize!')
     else: # Convert other array-like arguments to a list.
         structures = list(structures)
-    if isinstance(structures,list):
+    if isinstance(structures, list):
         for i,x in enumerate(structures):
-            try: 
+            try:
                 mol = convert_io_molecule(x)
                 outlist.append(mol)
             except:
-                raise ValueError('Not Recognized Structure Type for index: ' +str(i))
+                raise ValueError('Not Recognized Structure Type for index: ' + str(i))
     return outlist
 
-def add_bonds(view_ats, 
-              mol, 
+def add_bonds(view_ats,
+              mol,
               labelsize=12,
-              distvisradius=0.3, 
+              distvisradius=0.3,
               distatompairs=None,
               distcolor='black',
               distskin=0.3,
@@ -140,14 +140,14 @@ def add_bonds(view_ats,
                 tcolor = distcolor
             starting = mol.ase_atoms.get_positions()[row['atom_pair'][0]] # Should be metal.
             ending = mol.ase_atoms.get_positions()[row['atom_pair'][1]]
-            sx= starting[0]
-            sy= starting[1]
-            sz= starting[2]
-            ex= ending[0]
-            ey= ending[1]
-            ez= ending[2]
+            sx = starting[0]
+            sy = starting[1]
+            sz = starting[2]
+            ex = ending[0]
+            ey = ending[1]
+            ez = ending[2]
             dxyz = np.array([ex-sx,ey-sy,ez-sz])
-            vector = {'start': {'x':sx, 'y':sy, 'z':sz}, 'end': {'x':ex, 'y':ey, 'z':ez},
+            vector = {'start': {'x': sx, 'y': sy, 'z': sz}, 'end': {'x': ex, 'y': ey, 'z': ez},
                 'radius':distvisradius,'color':tcolor,'opacity':distopacity}
             lposit = starting + distlabelposit * dxyz
             if viewer is None:
@@ -171,7 +171,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                  labels=False, labelinds=None, labelatoms=False, vector=None, sphere_scale=0.3, stick_scale=0.25,
                  metal_scale=0.75, modes=None, trajectory=False, interval=200, vis_distances=None,
                  distvisradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3, distradius=None,
-                 distlabelposit=1.0, distatompairs=None, stack=False, stack_align=True):
+                 distlabelposit=1.0, distatompairs=None, stack=False, stack_align=True, hydrogens=True):
     """view_structures
     Jupyter-notebook-based visualization of molecular structures.
 
@@ -256,16 +256,18 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
         Stack all the images in a single viewer, default False.
     stack_align : bool,
         Align all the molecules by rmsd for stacking, default True.
+    hydrogens : bool,
+        Keep the hydrogens?, default True.
     """
     mols = type_convert(structures)
     if len(mols) == 1:
-        view_ats = py3Dmol.view(width=w,height=h)
+        view_ats = py3Dmol.view(width=w, height=h)
         mol = mols[0]
-        if isinstance(labels,str):
+        if isinstance(labels, str):
             label = labels
-        elif isinstance(labels,list):
+        elif isinstance(labels, list):
             label = labels[0]
-        elif isinstance(labels,bool):
+        elif isinstance(labels, bool):
             if labels:
                 label = mol.ase_atoms.get_chemical_formula()
             else:
@@ -286,10 +288,11 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
             coords = mol.write_mol2('tmp.mol2', writestring=True)
         if representation == 'ball_stick':
             if modes is not None:
-                view_ats.addModel(xyz,'xyz',{'vibrate': {'frames':10,'amplitude':1}})
+                view_ats.addModel(xyz,'xyz',{'keepH':hydrogens, 'vibrate':{
+                                                         'frames':10,'amplitude':1}})
                 view_ats.animate({'loop': 'backAndForth'})
             else:
-                view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+                view_ats.addModel(coords.replace('un','1'),'mol2',{'keepH':hydrogens}) # Add the molecule
             view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
             msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_ind]
             for ms in set(msyms):
@@ -303,10 +306,11 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                     'fontColor':"white",'inFront':'true'})
         else:
             if modes is not None:
-                view_ats.addModel(xyz,'xyz',{'vibrate':{'frames':10,'amplitude':1}})
+                view_ats.addModel(xyz,'xyz',{'vibrate':{'keepH':hydrogens,
+                                                        'frames':10,'amplitude':1}})
                 view_ats.animate({'loop':'backAndForth'})
             else:
-                view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+                view_ats.addModel(coords.replace('un','1'),'mol2',{'keepH':hydrogens}) # Add the molecule
             if representation == 'stick':
                 view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}})
             elif representation == 'sphere':
@@ -394,10 +398,12 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                 coords = mol.write_mol2('tmp.mol2', writestring=True)
             if representation == 'ball_stick':
                 if modes is not None:
-                    view_ats.addModel(xyz,'xyz',{'vibrate':{'frames':10,'amplitude':1}},viewer=(x,y))
+                    view_ats.addModel(xyz,'xyz',{'vibrate': {'frames':10,'amplitude':1},
+                                                 'keepH':hydrogens}, viewer=(x,y))
                     view_ats.animate({'loop':'backAndForth'},viewer=(x,y))
                 else:
-                    view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
+                    view_ats.addModel(coords.replace('un','1'),'mol2',
+                                      {'keepH':hydrogens}, viewer=(x,y)) # Add the molecule
                 view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}},viewer=(x,y)) 
                 msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
                 for ms in set(msyms):
@@ -434,10 +440,12 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                             'fontColor':"white",'inFront':'true'}, viewer=(x,y))
             else:
                 if modes is not None:
-                    view_ats.addModel(xyz,'xyz',{'vibrate':{'frames':10,'amplitude':1}},viewer=(x,y))
+                    view_ats.addModel(xyz,'xyz',{'keepH':hydrogens,
+                                                 'vibrate':{'frames':10,'amplitude':1}},viewer=(x,y))
                     view_ats.animate({'loop':'backAndForth'},viewer=(x,y))
                 else:
-                    view_ats.addModel(coords.replace('un','1'),'mol2',viewer=(x,y)) # Add the molecule
+                    view_ats.addModel(coords.replace('un','1'),'mol2',
+                                      {'keepH':hydrogens}, viewer=(x,y)) # Add the molecule
                 if representation == 'stick':
                     view_ats.setStyle({representation:{'colorscheme':'Jmol','radius':stick_scale}},viewer=(x,y))
                 elif representation == 'sphere':
@@ -501,7 +509,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
             xyz += f"{len(atom_coords)}\n\n"
             for i,sym in enumerate(syms):
                 xyz += f"{sym} {atom_coords[i][0]} {atom_coords[i][1]} {atom_coords[i][2]} \n"
-        view_ats.addModelsAsFrames(xyz,'xyz')
+        view_ats.addModelsAsFrames(xyz,'xyz',{'keepH':hydrogens})
         if representation == 'ball_stick':
             view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
             msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
@@ -543,7 +551,8 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                 mol = newmol
             coords = mol.write_mol2('thing',writestring=True)
             coords = coords.replace('un','1')
-            view_ats.addModel(coords.replace('un','1'),'mol2') # Add the molecule
+            view_ats.addModel(coords.replace('un','1'),'mol2',
+                              {'keepH':hydrogens}) # Add the molecule
         if representation == 'ball_stick':
             view_ats.addStyle({'sphere':{'colorscheme':'Jmol','scale':sphere_scale}}) 
             msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
