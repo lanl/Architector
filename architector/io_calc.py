@@ -28,13 +28,13 @@ except:
 ### Add any other ASE calculator here.
 # To extend to other methods.
 from xtb.ase.calculator import XTB
-from tblite.ase import TBLite #-> No GFN-FF nor solvent support yet
+from tblite.ase import TBLite  #-> No GFN-FF nor solvent support yet
 
 params={
 "save_trajectories": False, # Only on XTB methods
+"save_first_n":1, # Number of trajectory steps to save to json database.
 "dump_ase_atoms": False,
-"ase_atoms_db_name": 
-    'architector_ase_db.json',
+"ase_atoms_db_name":'architector_ase_db.json',
 "temp_prefix":"/tmp/",
 "ase_db_tmp_name":"/tmp/architector_ase_db.json",
 # Cutoff parameters
@@ -413,7 +413,7 @@ class CalcExecutor:
                             self.energy = 10000
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
-            else: 
+            else:
                 if self.relax:
                     try:
                         self.init_energy = io_obabel.obmol_energy(self.mol)
@@ -429,7 +429,7 @@ class CalcExecutor:
                     except Exception as e:
                         self.errors.append(e)
                         if self.parameters['debug']:
-                            print('Warning - method did not converge!',e)
+                            print('Warning - method did not converge!', e)
                 else:
                     try:
                         self.energy = io_obabel.obmol_energy(self.mol)
@@ -438,7 +438,7 @@ class CalcExecutor:
                     except Exception as e:
                         self.errors.append(e)
                         if self.parameters['debug']:
-                            print('Warning - method did not converge!',e)
+                            print('Warning - method did not converge!', e)
             if (not self.successful) and (self.force_generation):
                 try:
                     self.energy = io_obabel.obmol_energy(self.mol)
@@ -447,7 +447,7 @@ class CalcExecutor:
                 except Exception as e:
                     self.errors.append(e)
                     if self.parameters['debug']:
-                        print('Warning - method did not converge!',e)
+                        print('Warning - method did not converge!', e)
             self.calc_time = time.time() - self.calc_time
             self.done = True
         else:
@@ -457,8 +457,10 @@ class CalcExecutor:
             self.mol.swap_actinide(debug=self.parameters['debug'])
 
         if self.final_sanity_check:
-            self.mol.dist_sanity_checks(params=self.parameters, assembly=self.assembly)
-            self.mol.graph_sanity_checks(params=self.parameters, assembly=self.assembly)
+            self.mol.dist_sanity_checks(params=self.parameters,
+                                        assembly=self.assembly)
+            self.mol.graph_sanity_checks(params=self.parameters,
+                                         assembly=self.assembly)
 
         # Reset structure to inital state to avoid nans in output structures.
         if np.any(np.isnan(self.mol.ase_atoms.get_positions())):
@@ -467,28 +469,39 @@ class CalcExecutor:
 
         if self.replace_trics:
             self.ase_opt_kwargs['sella_internal_trics'] = True
-        
-        if self.parameters['save_trajectories'] and (self.trajectory is not None) and (self.parameters['dump_ase_atoms']):
+
+        if self.parameters['save_trajectories'] and \
+            (self.trajectory is not None) and \
+                (self.parameters['dump_ase_atoms']):
             self.dump_traj()
         elif self.parameters['save_trajectories']:
             pass
-        elif self.parameters['dump_ase_atoms'] and (self.mol.ase_atoms.calc is not None) and \
-            (not self.assembly):
-            self.parameters['ase_db'].write(self.mol.ase_atoms,relaxed=self.relax)
-            
+        elif self.parameters['dump_ase_atoms'] and (self.mol.ase_atoms.calc is not None) and (not self.assembly):
+            self.parameters['ase_db'].write(self.mol.ase_atoms,
+                                            mol2string=self.mol.write_mol2('final',
+                                                                           writestring=True),
+                                            relaxed=self.relax)
 
     def read_traj(self):
         pwd = os.path.abspath('.')
-        traj = Trajectory(os.path.join(pwd,'temp.traj'))
-        self.trajectory = [x for x in traj] # Convert to atoms
+        traj = Trajectory(os.path.join(pwd, 'temp.traj'))
+        self.trajectory = [x for x in traj]  # Convert to atoms
 
     def dump_traj(self):
-        for i,ats in enumerate(self.trajectory):
-            end = i
-        for i,ats in enumerate(self.trajectory):
-            if i < end:
-                self.parameters['ase_db'].write(ats,geo_step=i,relaxed=False)
-            else:
-                self.parameters['ase_db'].write(ats,geo_step=i,relaxed=True)
-
-
+        if self.successful:
+            for i, ats in enumerate(self.trajectory):
+                end = i
+            for i, ats in enumerate(self.trajectory):
+                self.mol.ase_atoms = ats
+                if (i < end) and (i < self.parameters['save_first_n']):
+                    self.parameters['ase_db'].write(ats,
+                                                    geo_step=i,
+                                                    mol2string=self.mol.write_mol2('intermediate',
+                                                                                   writestring=True),
+                                                    relaxed=False)
+                elif i == end:
+                    self.parameters['ase_db'].write(ats,
+                                                    geo_step=i,
+                                                    mol2string=self.mol.write_mol2('final',
+                                                                                   writestring=True),
+                                                    relaxed=True)
