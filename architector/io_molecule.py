@@ -650,7 +650,7 @@ class Molecule:
         self.xtb_charge = int(charge)
 
     def find_metal(self, debug=False):
-        """find_metal 
+        """find_metal
         pull out the metal index in a complex
 
         Returns
@@ -680,10 +680,10 @@ class Molecule:
         metals : list
             indices of all the metals in the molecule
         """
-        metals = [i for i,x in enumerate(self.ase_atoms) if (x.symbol in io_ptable.all_metals)]
+        metals = [i for i, x in enumerate(self.ase_atoms) if (x.symbol in io_ptable.all_metals)]
         return metals
 
-    def remove_atom(self,ind):
+    def remove_atom(self, ind):
         """remove_atom delete an atom from the molecule with ind
 
         Parameters
@@ -692,11 +692,12 @@ class Molecule:
             index to remove
         """
         del self.ase_atoms[ind]
-        self.graph = np.delete(np.delete(self.graph,ind,0),ind,1)
+        if len(self.graph) > 0:
+            self.graph = np.delete(np.delete(self.graph, ind, 0), ind, 1)
         del self.atom_types[ind]
-        BO_dict_tmp = {x:y for x,y in self.BO_dict.items() if (ind+1 not in x)}
+        BO_dict_tmp = {x: y for x, y in self.BO_dict.items() if (ind+1 not in x)}
         bo_dict_out = dict()
-        for x,y in BO_dict_tmp.items():
+        for x, y in BO_dict_tmp.items():
             newx = []
             if x[0] > ind+1:
                 newx.append(x[0] - 1)
@@ -711,14 +712,21 @@ class Molecule:
         self.BO_dict = bo_dict_out
 
     def remove_metals(self):
-        """remove_metals 
+        """remove_metals
         remove all metals from the molecule
         """
         metals = self.find_metals()
         for i in sorted(metals)[::-1]:
             self.remove_atom(i)
 
-    def remove_atoms(self,inds):
+    def remove_hydrogens(self):
+        """remove hydrogens from the model
+        """
+        hydrogens = [i for i,x in enumerate(self.ase_atoms.get_atomic_numbers()) if x == 1]
+        for i in sorted(hydrogens)[::-1]:
+            self.remove_atom(i)
+
+    def remove_atoms(self, inds):
         """Delete the indices passed from the molecule.
 
         Parameters
@@ -739,7 +747,7 @@ class Molecule:
                 inds))
                 
     def create_mol_graph(self, cutoffs=True, skin=0.2, allow_mm_bonds=False):
-        """create_mol_graph 
+        """create_mol_graph
         Create molecular graph based on cutoffs, default skin=0.2
 
         Parameters
