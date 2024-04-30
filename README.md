@@ -150,6 +150,9 @@ inputDict = {
     # To run multiple searches if something is failing.
     # Dump all possible intermediate xtb calculations to separate ASE database
     "dump_ase_atoms": False, # or True
+    "save_trajectories": False, # If True, dump trajectory to database.
+    "save_first_n":1, # Number of initial trajectory steps to save to json database in addition to the relaxed
+    # structures.
     "ase_atoms_db_name": 'architector_ase_db_{uid}.json', # Possible to name the databse filename
     # Will default to a "uid" included name.
     "temp_prefix":"/tmp/", # Default here - for MPI running on HPC suggested /scratch/$USER/
@@ -182,7 +185,7 @@ inputDict = {
     "force_trans_oxos":True, # Force trans configurations for oxos (Useful for actinyls)
     # Will only be activated when actinides are present - otherwise will not force trans oxos.
     "override_oxo_opt":False, # Override no relaxation of oxo groups (not generally suggested)
-    "lig_assignment":'bruteforce', # or "similarity" - How to automatically assign ligand types.
+    "lig_assignment":'default', # or "similarity","bruteforce" - How to automatically assign ligand types.
 
     ######### Sanity check parameters ########
     "assemble_sanity_checks":True, # Turn on/off assembly sanity checks.
