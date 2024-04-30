@@ -17,6 +17,7 @@ import copy
 import os
 import mendeleev
 from ase.db import connect
+from ase import Atoms
 
 def isnotebook():
     """isnotebook
@@ -38,10 +39,11 @@ def isnotebook():
         return False      # Probably standard Python interpreter
 
 
-def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covrad_metal=None, vdwrad_metal=None):
-    """assign_ligType_bruteforce
-    Assign the ligtype based on best average rotational loss when being assigned 
-    to coordination sites corresponding to the ligand type.
+def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
+                           covrad_metal=None, vdwrad_metal=None, debug=False):
+    """assign_ligType_default
+    Assign the ligtype(s) based on best average rotational loss when being
+    assigned to coordination sites corresponding to the ligand type.
 
     Parameters
     ----------
@@ -57,6 +59,133 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
         covalent radii of the metal, default None
     vdwrad_metal : float
         vdw radii of the metal, default None
+    debug : bool
+        print debug statements?, default False
+
+    Returns
+    -------
+    ligType : str
+        The lowest-rotational loss ligand type(s).
+
+    Raises
+    ------
+    ValueError
+        Will flag if this ligand/metal/core geometry can't
+        generate any valid conformations.
+    """
+    tmetal, _ = io_ptable.convert_actinides_lanthanides(metal)
+    OBmol = io_obabel.get_obmol_smiles(ligsmiles)
+    rings = OBmol.GetSSSR()
+    is_cp = False
+    for ring in rings:
+        if all(ring.IsInRing(x+1) for x in ligcoords) and (len(ligcoords) > 2) and (ring.IsAromatic()):
+            is_cp = True
+    total_edge_bound = 0  # Check for coordination atoms that are neighbors of each other.
+    for i, ca1 in enumerate(ligcoords[:-1]):
+        at1 = OBmol.GetAtom(int(ca1+1))
+        for ca2 in ligcoords[i+1:]:
+            at2 = OBmol.GetAtom(int(ca2+1))
+            if at1.GetBond(at2) is not None:
+                total_edge_bound += 1
+    if is_cp:
+        return 'sandwich'
+    elif len(ligcoords) > 9:  # 10-12 are saved under these monikers.
+        return str(len(ligcoords))
+    elif len(ligcoords) == 1:
+        return 'mono'
+    elif total_edge_bound > 1:
+        msg = """Error: Edge ligands with more than 2 coordination
+        sites are yet-unsupported in Architector."""
+        raise ValueError(msg)
+    elif total_edge_bound == 1:
+        return 'edge_bi_cis'
+    else:
+        tcore_geo_class = copy.deepcopy(core_geo_class)
+        tcore_geo_class.get_lig_ref_inds_dict(metal,
+                                              tolerance=30)
+        lig_denticity = len(ligcoords)
+        possible_Ligtypes = tcore_geo_class.cn_ligType_dict[lig_denticity]
+        rot_vals = []
+        possible_saves = []
+        conformers = []
+        for ligtype in possible_Ligtypes:
+            rot_vals.append(None)
+            possible_saves.append(False)
+            conformers.append(False)
+            best_dict = tcore_geo_class.best_liglist_geos.get(ligtype, False)
+            if isinstance(best_dict, dict):
+                corecoordList = best_dict.get('corecoordList', None)
+                core_cons = best_dict.get('coreInds', None)
+                tmp_ligList = []
+                for i in range(len(ligcoords)):
+                    tmp_ligList.append([ligcoords[i], core_cons[i]])
+                # Test mapping on just single ligand conformation.
+                # Minval represents the loss
+                conf_list, val_list, _, _, _, _, _ = io_lig.find_conformers(
+                    ligsmiles,
+                    tmp_ligList,
+                    corecoordList,
+                    metal,
+                    ligtype=ligtype,
+                    covrad_metal=covrad_metal,
+                    vdwrad_metal=vdwrad_metal
+                )
+                if len(conf_list) > 0:
+                    minind = np.argmin(val_list)
+                    rot_vals[-1] = val_list[minind]
+                    possible_saves[-1] = True
+                    conf = conf_list[minind]
+                    conf = conf + Atoms(symbols=[metal], positions=[(0, 0, 0)])
+                    conformers[-1] = conf
+        save_inds = [i for i, x in enumerate(possible_saves) if x]
+        conformers = [x for i, x in enumerate(conformers) if (i in save_inds)]
+        possible_Ligtypes = [x for i, x in enumerate(
+            possible_Ligtypes) if (i in save_inds)]
+        out_types = []
+        confidences = []
+        min_losses = []
+        all_out_types = []
+        all_losses = []
+        for i, conf in enumerate(conformers):
+            ltype, minloss, confidence, _, _ = io_core.classify_ligtype(conf,
+                                                                ligcoords)
+            all_out_types.append(ltype)
+            all_losses.append(minloss)
+            if (ltype == possible_Ligtypes[i]):
+                out_types.append(ltype)
+                min_losses.append(minloss)
+                confidences.append(confidence)
+        if debug:
+            print('Out Types:', all_out_types, possible_Ligtypes)
+            print('OUt Losses', all_losses)
+        if len(out_types) < 1:
+            out_types = [all_out_types[all_losses.index(min(all_losses))]]
+        return out_types
+
+
+def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal,
+                              covrad_metal=None, vdwrad_metal=None,
+                              debug=False):
+    """assign_ligType_bruteforce
+    Assign the ligtype based on best average rotational loss when being
+    assigned to coordination sites corresponding to the ligand type.
+
+    Parameters
+    ----------
+    core_geo_class : architector.io_core.Geometries
+        core geometries class with ligandType maps already calculated.
+    ligsmiles : str
+        ligand smiles
+    ligcoords : list
+        1D ligand coordinating atom list
+    metal : str
+        metal
+    covrad_metal : float
+        covalent radii of the metal, default None
+    vdwrad_metal : float
+        vdw radii of the metal, default None
+    debug : bool
+        print debug statements?, default False
 
     Returns
     -------
@@ -66,9 +195,10 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
     Raises
     ------
     ValueError
-        Will flag if this ligand/metal/core geometry can't generate any valid conformations.
+        Will flag if this ligand/metal/core geometry can't
+        generate any valid conformations.
     """
-    ## First check for cp rings -> all indices in shared ring.
+    # First check for cp rings -> all indices in shared ring.
     tmetal, _ = io_ptable.convert_actinides_lanthanides(metal)
     OBmol = io_obabel.get_obmol_smiles(ligsmiles)
     rings = OBmol.GetSSSR()
@@ -76,8 +206,8 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
     for ring in rings:
         if all(ring.IsInRing(x+1) for x in ligcoords) and (len(ligcoords) > 2) and (ring.IsAromatic()):
             is_cp = True
-    total_edge_bound = 0 # Check for coordination atoms that are neighbors of each other.
-    for i,ca1 in enumerate(ligcoords[:-1]):
+    total_edge_bound = 0  # Check for coordination atoms that are neighbors of each other.
+    for i, ca1 in enumerate(ligcoords[:-1]):
         at1 = OBmol.GetAtom(int(ca1+1))
         for ca2 in ligcoords[i+1:]:
             at2 = OBmol.GetAtom(int(ca2+1))
@@ -85,7 +215,7 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
                 total_edge_bound += 1
     if is_cp:
         return 'sandwich'
-    elif len(ligcoords) > 9: # 10-12 are saved under these monikers.
+    elif len(ligcoords) > 9:  # 10-12 are saved under these monikers.
         return str(len(ligcoords))
     elif len(ligcoords) == 1:
         return 'mono'
@@ -98,8 +228,9 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
         possible_Ligtypes = core_geo_class.cn_ligType_dict[lig_denticity]
         rot_vals = []
         possible_saves = []
-        print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
-        print('Warning: can take a while depending on the size of the ligand.')
+        if debug:
+            print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
+            print('Warning: can take a while depending on the size of the ligand.')
         # Test by attempting to place the ligand on pre-calculated cores!
         for ligtype in possible_Ligtypes:
             rot_vals.append([])
@@ -114,15 +245,11 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
                 # Test mapping on just single ligand conformation.
                 # Minval represents the loss
                 _, minval, sane, _, _, _, _ = io_lig.get_aligned_conformer(
-                            ligsmiles, tmp_ligList, corecoordList, metal=tmetal, 
+                            ligsmiles, tmp_ligList, corecoordList, metal=tmetal,
                             covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
                 if sane:
                     rot_vals[-1].append(minval)
                     possible_saves[-1] = True
-                else:
-                    _, minval, sane, _, _, _, _ = io_lig.get_aligned_conformer(
-                            ligsmiles, tmp_ligList, corecoordList, metal=tmetal, 
-                            covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
         scores = [np.mean(x) for x in rot_vals]
         min_ind = np.argsort(scores)[0]
         if not possible_saves[min_ind]: # Try with larger radii
@@ -130,8 +257,9 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
             tvdwrad_metal = io_ptable.rvdw[io_ptable.elements.index(tmetal)] * 1.3
             rot_vals = []
             possible_saves = []
-            print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
-            print('Warning: can take a while depending on the size of the ligand.')
+            if debug:
+                print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
+                print('Warning: can take a while depending on the size of the ligand.')
             # Test by attempting to place the ligand on pre-calculated cores!
             for ligtype in possible_Ligtypes:
                 rot_vals.append([])
@@ -142,11 +270,11 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
                     core_cons = core_geo_class.liglist_geo_map_dict[ligtype][coreType][0]
                     tmp_ligList = []
                     for i in range(len(ligcoords)):
-                        tmp_ligList.append([ligcoords[i],core_cons[i]])
+                        tmp_ligList.append([ligcoords[i], core_cons[i]])
                     # Test mapping on just single ligand conformation.
                     # Minval represents the loss
                     _, minval, sane, _, _, _, _ = io_lig.get_aligned_conformer(
-                                ligsmiles, tmp_ligList, corecoordList, metal=tmetal, 
+                                ligsmiles, tmp_ligList, corecoordList, metal=tmetal,
                                 covrad_metal=tcovrad_metal, vdwrad_metal=tvdwrad_metal)
                     if sane:
                         rot_vals[-1].append(minval)
@@ -158,8 +286,9 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
             tvdwrad_metal = io_ptable.rvdw[io_ptable.elements.index(tmetal)] * 0.8
             rot_vals = []
             possible_saves = []
-            print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
-            print('Warning: can take a while depending on the size of the ligand.')
+            if debug:
+                print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
+                print('Warning: can take a while depending on the size of the ligand.')
             # Test by attempting to place the ligand on pre-calculated cores!
             for ligtype in possible_Ligtypes:
                 rot_vals.append([])
@@ -174,7 +303,7 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
                     # Test mapping on just single ligand conformation.
                     # Minval represents the loss
                     _, minval, sane, _, _, _, _ = io_lig.get_aligned_conformer(
-                                ligsmiles, tmp_ligList, corecoordList, metal=metal, 
+                                ligsmiles, tmp_ligList, corecoordList, metal=metal,
                                 covrad_metal=tcovrad_metal, vdwrad_metal=tvdwrad_metal)
                     if sane:
                         rot_vals[-1].append(minval)
@@ -182,14 +311,15 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal, covra
             scores = [np.mean(x) for x in rot_vals]
             min_ind = np.argsort(scores)[0]
         if possible_saves[min_ind]:
-            print('Assigning lig {} to ligType {}!'.format(ligsmiles,possible_Ligtypes[min_ind]))
+            if debug:
+                print('Assigning lig {} to ligType {}!'.format(ligsmiles, possible_Ligtypes[min_ind]))
             return possible_Ligtypes[min_ind]
         else:
             raise ValueError('Cannot assign lig {} to any ligType!'.format(ligsmiles))
 
 
 def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_diff_factor=0.5,
-                              full_diff_factor=0.9):
+                              full_diff_factor=0.9, debug=False):
     """assign_ligType_similarity
     Assign the ligand type based on similarity to reference ligands.
 
@@ -215,8 +345,9 @@ def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_
     ligmol2 : str
         ligmol2 of the similarity-matched ligand from the training set.
     """
-    print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
-    print('Possibly slow - using similarity to training data for assignment!')
+    if debug:
+        print('ligType not specified for {} - testing ligand placement to determine ligType!'.format(ligsmiles))
+        print('Possibly slow - using similarity to training data for assignment!')
     OBmol = io_obabel.get_obmol_smiles(ligsmiles)
     tmetal, _ = io_ptable.convert_actinides_lanthanides(metal)
     rings = OBmol.GetSSSR()
@@ -224,8 +355,9 @@ def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_
     for ring in rings:
         if all(ring.IsInRing(x+1) for x in ligcoords) and (len(ligcoords) > 2) and (ring.IsAromatic()):
             is_cp = True
-    total_edge_bound = 0 # Check for coordination atoms that are neighbors of each other.
-    for i,ca1 in enumerate(ligcoords[:-1]):
+    # Check for coordination atoms that are neighbors of each other.
+    total_edge_bound = 0
+    for i, ca1 in enumerate(ligcoords[:-1]):
         at1 = OBmol.GetAtom(int(ca1+1))
         for ca2 in ligcoords[i+1:]:
             at2 = OBmol.GetAtom(int(ca2+1))
@@ -249,34 +381,41 @@ def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_
         lig_obmol = io_obabel.get_obmol_smiles(ligsmiles)
         ligfp = io_obabel.get_fingerprint(lig_obmol)
         ligrefdf = pd.read_csv(data_path)
-        ligrefdf = ligrefdf[['cn','mol2string','geotype_label']] # Downselect for only needed info
+        ligrefdf = ligrefdf[['cn', 'mol2string', 'geotype_label']]
+        # Downselect for only needed info
         # Add in reference ligands (search through first)
         tmp_list = list()
-        for _,row in io_ptable.ligands_dict.items():
+        for _, row in io_ptable.ligands_dict.items():
             refdict = dict()
             refdict['cn'] = len(row['coordList'])
             complexMol = io_obabel.smiles2Atoms('['+tmetal+']', addHydrogens=False)
-            mol = io_molecule.Molecule() # Initialize molecule.
-            mol.load_ase(complexMol.copy(),atom_types=[complexMol[0].symbol])
-            obmollig = io_obabel.get_obmol_smiles(row['smiles'],addHydrogens=True,neutralize=False,build=False)
-            bestConformer = io_obabel.convert_obmol_ase(obmollig,posits=None,set_zero=True)
-            io_obabel.add_dummy_metal(obmollig,row['coordList'])
+            mol = io_molecule.Molecule()  # Initialize molecule.
+            mol.load_ase(complexMol.copy(), atom_types=[complexMol[0].symbol])
+            obmollig = io_obabel.get_obmol_smiles(row['smiles'], addHydrogens=True,
+                                                  neutralize=False, build=False)
+            bestConformer = io_obabel.convert_obmol_ase(obmollig,
+                                                        posits=None,
+                                                        set_zero=True)
+            io_obabel.add_dummy_metal(obmollig, row['coordList'])
             bo_dict, atypes = io_obabel.get_OBMol_bo_dict_atom_types(obmollig)
-            mol.append_ligand({'ase_atoms':bestConformer,'bo_dict':bo_dict, 
-                                        'atom_types':atypes})
-            refdict['mol2string'] = mol.write_mol2('cool',writestring=True)
+            mol.append_ligand({'ase_atoms': bestConformer,
+                               'bo_dict': bo_dict,
+                               'atom_types': atypes})
+            refdict['mol2string'] = mol.write_mol2('cool', writestring=True)
             refdict['geotype_label'] = row['ligType']
             tmp_list.append(refdict)
         newdf = pd.DataFrame(tmp_list)
-        ligrefdf = pd.concat([newdf,ligrefdf])
+        ligrefdf = pd.concat([newdf, ligrefdf])
         ligrefdf = ligrefdf[ligrefdf.cn == len(ligcoords)]
         if covrad_metal is None:
             covrad_metal = io_ptable.rcov1[io_ptable.elements.index(tmetal)]
         max_diff_covrad = max(io_ptable.rcov1) - min(io_ptable.rcov1)
         min_full_diff = 0
-        for _,row in ligrefdf.iterrows():
+        for _, row in ligrefdf.iterrows():
             refobmol = io_obabel.convert_mol2_obmol(row['mol2string'])
-            _, anums, _ = io_obabel.get_OBMol_coords_anums_graph(refobmol, return_coords=False, get_types=False)
+            _, anums, _ = io_obabel.get_OBMol_coords_anums_graph(refobmol,
+                                                                 return_coords=False,
+                                                                 get_types=False)
             syms = [io_ptable.elements[x] for x in anums]
             refmet = [x for x in syms if x in io_ptable.all_metals][0]
             ref_cov_radii = io_ptable.rcov1[io_ptable.elements.index(refmet)]
@@ -285,9 +424,9 @@ def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_
             tanimoto_sim = refpf | ligfp # Returns tanomoto similarity between two fingerprints
             m_sim = 1 - np.abs(ref_cov_radii - covrad_metal)/max_diff_covrad
             full_diff = tanimoto_sim + m_diff_factor*m_sim
-            ##Debug
+            # Debug
             # print(io_obabel.canonicalize_smiles(ligsmiles),io_obabel.get_smiles_obmol(refobmol,canonicalize=True),full_diff)
-            if isnotebook(): # Hack to handle OBmol weirdness inside jupyter. Really not sure why needed.
+            if isnotebook():  # Hack to handle OBmol weirdness inside jupyter.
                 print()
             if full_diff > min_full_diff:
                 ligtype = row['geotype_label']
@@ -295,10 +434,11 @@ def assign_ligType_similarity(ligsmiles, ligcoords, metal, covrad_metal=None, m_
                 min_full_diff = full_diff
                 if min_full_diff > full_diff_factor:
                     break
-    print('Assigning lig {} to ligType {}!'.format(ligsmiles,ligtype))
-    return ligtype,ligmol2
+    if debug:
+        print('Assigning lig {} to ligType {}!'.format(ligsmiles, ligtype))
+    return ligtype, ligmol2
 
-    
+
 def inparse(inputDict):
     """inparse parse all of the input!
 
@@ -318,6 +458,7 @@ def inparse(inputDict):
     """
     newinpDict = inputDict.copy()
     u_id = str(uuid.uuid4())
+    min_n_conformers = 1
     # Adding logging
     # logging.config.fileConfig('/path/to/logging.conf')
     if (('core' in inputDict) and (('ligands' in inputDict) or ('ligandList' in inputDict))) or ('mol2string' in inputDict):
@@ -436,49 +577,66 @@ def inparse(inputDict):
             newliglist = []
 
             if isinstance(ligList, list):
+                tdebug = newinpDict.get('parameters',{}).get('debug',False)
                 for ligDict in ligList:
                     newdict = dict()
-                    if isinstance(ligDict,dict):
+                    if isinstance(ligDict, dict):
                         if ('smiles' in ligDict) and ('coordList' in ligDict) and ('ligType' in ligDict):
-                            newdict.update({'smiles':ligDict['smiles']})
+                            newdict.update({'smiles': ligDict['smiles']})
                             if (ligDict['smiles'] == '[H-]')or (ligDict['smiles'] == '[O-2]'): # Handle hydrides
                                 newinpDict['parameters']['relax'] = False
                                 # newinpDict['parameters']['metal_spin'] = 0 # Set to low_spin
                             if (ligDict['ligType'] in core_geo_class.liglist_geo_map_dict.keys()) or (ligDict['ligType'] == 'mono'):
                                 newdict.update({'ligType':ligDict['ligType']})
+                            elif isinstance(ligDict['ligType'],list):
+                                good_list = []
+                                for lt in ligDict['ligType']:
+                                    if (lt in core_geo_class.liglist_geo_map_dict.keys()) or (lt == 'mono') or ('edge' in lt):
+                                        good_list.append(lt)
+                                    else:
+                                        raise ValueError('Error: {} ligType not recognized!'.format(lt))
+                                if len(good_list) > min_n_conformers:
+                                    min_n_conformers = len(good_list)
+                                newdict.update({'ligType': good_list})
                             elif ('edge' in ligDict['ligType']):
-                                lt = assign_ligType_bruteforce(core_geo_class, ligDict['smiles'], ligDict['coordList'], metal,
-                                                              covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
-                                newdict.update({'ligType':lt})
+                                lt = assign_ligType_default(core_geo_class, ligDict['smiles'], ligDict['coordList'], metal,
+                                                              covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal,
+                                                              debug=tdebug)
+                                if len(lt) > min_n_conformers:
+                                    min_n_conformers = len(good_list)
+                                newdict.update({'ligType': lt})
                             else:
                                 print('Error: {} ligand type not recognized!'.format(ligDict['ligType']))
                                 print('Valid ligand types: ', core_geo_class.liglist_geo_map_dict.keys(), ' + mono')
                                 raise ValueError
                             if ('edge' in newdict['ligType']): # Duplicate test of edge type ligands in case somethin unsuppored requested.
-                                lt = assign_ligType_bruteforce(core_geo_class, ligDict['smiles'], ligDict['coordList'], metal,
-                                                                covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
-                                newdict.update({'ligType':lt})
-                            if isinstance(ligDict['coordList'][0],(int,float)):
-                                newdict.update({'coordList':[int(x) for x in ligDict['coordList']]})
+                                lt = assign_ligType_default(core_geo_class, ligDict['smiles'], ligDict['coordList'], metal,
+                                                                covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal,
+                                                                debug=tdebug)
+                                if len(lt) > min_n_conformers:
+                                    min_n_conformers = len(good_list)
+                                newdict.update({'ligType': lt})
+                            if isinstance(ligDict['coordList'][0], (int, float)):
+                                newdict.update({'coordList': [int(x) for x in ligDict['coordList']]})
                             elif isinstance(ligDict['coordList'][0],list):
-                                newdict.update({'coordList':ligDict['coordList']})
+                                newdict.update({'coordList': ligDict['coordList']})
                             else:
                                 raise ValueError('Error: {} ligand coordList not recognized!'.format(ligDict['coordList']))
                         elif ('smiles' in ligDict) and ('coordList' in ligDict):
                             # Need specific ligand mapping
-                            newdict.update({'smiles':ligDict['smiles']})
+                            newdict.update({'smiles': ligDict['smiles']})
                             if (ligDict['smiles'] == '[H-]') or (ligDict['smiles'] == '[O-2]'): # Handle hydrides
                                 newinpDict['parameters']['relax'] = False
                                 # newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
                             if isinstance(ligDict['coordList'][0],list):
-                                newdict.update({'coordList':ligDict['coordList']})
+                                newdict.update({'coordList': ligDict['coordList']})
                                 # Assign ligType arbitrarily -> will be ignored by io_symmetry if list of lists
-                                newdict.update({'ligType':'mono'})
-                            elif len(ligDict['coordList']) == 1: # Monodentate
-                                newdict.update({'coordList':ligDict['coordList']})
-                                newdict.update({'ligType':'mono'})
-                            elif len(ligDict['coordList']) > 1: # Handle other cases with bruteforce assignemnt of ligandType!
-                                newdict.update({'coordList':ligDict['coordList']})
+                                newdict.update({'ligType': 'mono'})
+                            elif len(ligDict['coordList']) == 1:  # Monodentate
+                                newdict.update({'coordList': ligDict['coordList']})
+                                newdict.update({'ligType': 'mono'})
+                            elif len(ligDict['coordList']) > 1:  # Handle other cases with bruteforce assignemnt of ligandType!
+                                newdict.update({'coordList': ligDict['coordList']})
                                 bruteforce = True
                                 for tdict in newliglist: # Check other ligands if ligType already assigned.
                                     if (tdict['smiles'] == newdict['smiles']) and (sorted(tdict['coordList']) == sorted(newdict['coordList'])):
@@ -488,16 +646,24 @@ def inparse(inputDict):
                                 if bruteforce:
                                     ###### Currently have the bruteforce ligand type assignemnt and similarity routine for 2D to 3D.
                                     if 'lig_assignment' in newinpDict['parameters']:
-                                        if newinpDict['parameters']['lig_assignment'] == 'bruteforce':
+                                        if newinpDict['parameters']['lig_assignment'] == 'default':
+                                            tmp_ligType = assign_ligType_default(core_geo_class, newdict['smiles'], newdict['coordList'], metal,
+                                                                                    covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal,
+                                                                                    debug=tdebug)
+                                        elif newinpDict['parameters']['lig_assignment'] == 'bruteforce':
                                             tmp_ligType = assign_ligType_bruteforce(core_geo_class, newdict['smiles'], newdict['coordList'], metal,
-                                                                                    covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
+                                                                                    covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal,
+                                                                                    debug=tdebug)
                                         elif newinpDict['parameters']['lig_assignment'] == 'similarity':
-                                            tmp_ligType,_ = assign_ligType_similarity(newdict['smiles'], newdict['coordList'], 
-                                                                                     covrad_metal=covrad_metal)
+                                            tmp_ligType,_ = assign_ligType_similarity(newdict['smiles'], newdict['coordList'],
+                                                                                      covrad_metal=covrad_metal, debug=tdebug)
                                     else:
-                                        tmp_ligType = assign_ligType_bruteforce(core_geo_class, newdict['smiles'], newdict['coordList'], metal,
-                                                covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal)
-                                    newdict.update({'ligType':tmp_ligType})
+                                        tmp_ligType = assign_ligType_default(core_geo_class, newdict['smiles'], newdict['coordList'], metal,
+                                                covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal, debug=tdebug)
+                                    if isinstance(tmp_ligType, list):
+                                        if len(tmp_ligType) > min_n_conformers:
+                                            min_n_conformers = len(tmp_ligType)
+                                    newdict.update({'ligType': tmp_ligType})
                             else:
                                 raise ValueError('Error: {} ligand coordList not recognized!'.format(ligDict['coordList']))
                         elif ('smiles' in ligDict): # Handle simple ligands without needed specs.
@@ -615,7 +781,8 @@ def inparse(inputDict):
                 lig_smiles,coord_atoms = io_obabel.obmol_lig_split(inputDict['mol2string'])
                 newliglist = list()
                 for i,lig_smiles in enumerate(lig_smiles):
-                    tligdict = {'smiles':lig_smiles,'coordList':coord_atoms[i]}
+                    tligdict = {'smiles': lig_smiles, 
+                                'coordList': coord_atoms[i]}
                     if (tligdict['smiles'] == '[H-]') or (tligdict['smiles'] == '[O-2]'): # Handle hydrides
                         newinpDict['parameters']['relax'] = False
                         # newinpDict['parameters']['metal_spin'] = 0 # Set to low-spin for oxos
@@ -655,6 +822,11 @@ def inparse(inputDict):
             for lig in newinpDict['ligands']: # Check that all ligands can map to this geometry
                 if lig['ligType'] == 'mono':
                     good = True
+                elif isinstance(lig['ligType'],list):
+                    good = False
+                    for lt in lig['ligType']:
+                        if coreType in core_geo_class.liglist_geo_map_dict[lt].keys():
+                            good = True
                 elif (coreType not in core_geo_class.liglist_geo_map_dict[lig['ligType']].keys()):
                     good=False
             if good:
@@ -697,7 +869,7 @@ def inparse(inputDict):
         #######################################################################
 
         default_parameters = {
-            "n_conformers":1, # Number of metal-core symmetries at each core to save / relax
+            "n_conformers":min_n_conformers, # Number of metal-core symmetries at each core to save / relax
             "return_only_1":False, # Only return single relaxed conformer (do not test multiple conformations)
             "n_symmetries":10, # Total metal-center symmetrys to build, NSymmetries should be >= n_conformers
             # 'n_lig_combos':1, # Number of randomized ligand conformations to run/return for each conformer -> possibly add back
@@ -729,14 +901,14 @@ def inparse(inputDict):
             
             # Ligand parameters
             # Ligand to finish filling out coordination environment if underspecified.
-            "fill_ligand": "water", 
+            "fill_ligand": "water",
             # Secondary fill ligand will be a monodentate ligand to fill out coordination environment
             # in case the fill_ligand and specified ligands list cannot fully map to the coordination environment.
             "secondary_fill_ligand": "water",
             # or integer index in reference to the ligand list!!
-            "force_trans_oxos":True, # Force trans configurations for oxos (Useful for actinyls)
-            "override_oxo_opt":False, # Override no relaxation of oxo groups (not generally suggested)
-            "lig_assignment":'bruteforce', # or "similarity" How to automatically assign ligand types.
+            "force_trans_oxos": True, # Force trans configurations for oxos (Useful for actinyls)
+            "override_oxo_opt": False, # Override no relaxation of oxo groups (not generally suggested)
+            "lig_assignment": 'default', # or "similarity" How to automatically assign ligand types.
 
             # Cutoff parameters
             "assemble_sanity_checks":True, # Turn on/off assembly sanity checks.

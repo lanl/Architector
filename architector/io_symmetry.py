@@ -9,7 +9,7 @@ import itertools
 import architector.io_obabel as io_obabel
 
 def test_combos(combs, occupied):
-    """test_combos 
+    """test_combos
     Check if a remaining combo (combos) is already occupied!
 
     Parameters
@@ -28,7 +28,7 @@ def test_combos(combs, occupied):
     return combs[~np.any(np.isin(combs, occupied), axis=1)]
 
 def flatten(S):
-    """flatten 
+    """flatten
     Flatten recursive list of lists
 
     Parameters
@@ -47,10 +47,36 @@ def flatten(S):
         return flatten(S[0]) + flatten(S[1:])
     return S[:1] + flatten(S[1:])
 
+
+def chain_zip(input_lst, history=[]):
+    """chain_zip
+    Combine an input list retaining the order
+
+    Parameters
+    ----------
+    input_lst : list
+        list of lists
+    history : list, optional
+        list of lists
+
+    Returns:
+        combined: ordered input list history.
+    """
+    lengths = [len(x) for x in input_lst]
+    minlength = min(lengths)
+    newinp_lst = [x[:minlength] for x in input_lst]
+    additionals = [x[minlength:] for x in input_lst if len(x) > minlength]
+    combined = history + list(itertools.chain.from_iterable(zip(*newinp_lst)))
+    if len(additionals) == 0:
+        return combined
+    else:
+        return chain_zip(additionals, history=combined)
+
+
 def generate_good_combos(sel_input_lst, sel_ind, prev_lig, occupied_max):
-    """generate_good_combos 
+    """generate_good_combos
     Generate the "good" combinations of ligands mapped to the given core.
-    Map list of lists to generate all sets of lists without 
+    Map list of lists to generate all sets of lists without
 
     Parameters
     ----------
@@ -68,7 +94,7 @@ def generate_good_combos(sel_input_lst, sel_ind, prev_lig, occupied_max):
     all_lig : list
         recursive list of lists with info
     """
-    if len(prev_lig) > 0 and isinstance(prev_lig[0], (list, np.ndarray)): 
+    if len(prev_lig) > 0 and isinstance(prev_lig[0], (list, np.ndarray)):
         occupied = np.hstack(np.array(prev_lig, dtype=object).flatten())
     else:
         occupied = np.array(prev_lig, dtype=object).flatten()
@@ -79,19 +105,19 @@ def generate_good_combos(sel_input_lst, sel_ind, prev_lig, occupied_max):
             # itertools 
             prev_lig_tmp = prev_lig[:]
             prev_lig_tmp.append(r)
-            lst = generate_good_combos(sel_input_lst=sel_input_lst, 
-                                       sel_ind=sel_ind+1, 
-                                       prev_lig=prev_lig_tmp, 
+            lst = generate_good_combos(sel_input_lst=sel_input_lst,
+                                       sel_ind=sel_ind+1,
+                                       prev_lig=prev_lig_tmp,
                                        occupied_max=occupied_max)
             if len(lst) > 0:
                 all_lig.append(lst)
         return all_lig
     return prev_lig
 
-def map_repeat_to_highdent(sel_con_list,nlig,denticity):
+def map_repeat_to_highdent(sel_con_list, nlig, denticity):
     """map_repeat_to_highdent Take in a selected connection list
-    for identical ligands (repeats) and return all possible 
-    locations for ligands as though they were a 
+    for identical ligands (repeats) and return all possible
+    locations for ligands as though they were a
     "high denticity" single ligand.
 
     Parameters
@@ -112,7 +138,7 @@ def map_repeat_to_highdent(sel_con_list,nlig,denticity):
     pseudo_dent : int
         temporary 'denticity' of ligands
     """
-    all_combos = [x for x in itertools.combinations(sel_con_list,nlig)]
+    all_combos = [x for x in itertools.combinations(sel_con_list, nlig)]
     highdents = np.array(all_combos)
     out = highdents.flatten()
     out = out.reshape(int(out.shape[0]/(nlig*denticity)),
@@ -121,9 +147,9 @@ def map_repeat_to_highdent(sel_con_list,nlig,denticity):
     reshape_out = []
     refdict = dict()
     pseudo_dent = nlig*denticity
-    for i,item in enumerate(out):
+    for i, item in enumerate(out):
         item.sort()
-        _,counts = np.unique(item,return_counts=True)
+        _, counts = np.unique(item, return_counts=True)
         if not np.any(counts > 1):
             reshape_out.append(item.tolist())
             refdict[tuple(item)] = highdents[i]
@@ -179,23 +205,24 @@ def map_all_repeat_to_highdent(uinds, uinv, ucounts, denticities,
                 selected_con_lists_intermediate.append(reshape_out)
                 pseudo_denticites.append(pseudo_dent)
                 inv_dicts_intermediate.append(refdict)
-        dent_order = np.argsort(pseudo_denticites)[::-1] # Sort in decreasing order
+        dent_order = np.argsort(pseudo_denticites)[::-1]  # Sort in decreasing order
         out_dents = []
         selected_con_lists_out = []
         inv_dicts_out = dict()
-        for i,j in enumerate(dent_order):
+        for i, j in enumerate(dent_order):
             out_dents.append(pseudo_denticites[j])
             inv_dicts_out[i] = inv_dicts_intermediate[i]
-            selected_con_lists_out.append(np.array(selected_con_lists_intermediate[j]))
+            selected_con_lists_out.append(
+                np.array(selected_con_lists_intermediate[j]))
         inv_inds = []
         hist = dict()
         dent_order = dent_order.tolist()
-        for item in uinv: # Make sure full history tracked since order will change
+        for item in uinv:  # Make sure full history tracked since order will change
             if item in hist:
                 hist[item] += 1
             else:
                 hist[item] = 0
-            inv_inds.append([item,dent_order.index(item),hist[item]])
+            inv_inds.append([item, dent_order.index(item), hist[item]])
         return inv_dicts_out, selected_con_lists_out, out_dents, inv_inds
 
 def inv_map_highdent_to_repeat(incombo, inv_dicts, inv_inds):
@@ -229,7 +256,7 @@ def inv_map_highdent_to_repeat(incombo, inv_dicts, inv_inds):
     return fixed
 
 def select_cons(ligInputDicts, coreType, core_geo_class, params):
-    """select_cons 
+    """select_cons
     Use the core geometry and ligand input dictionaries to select
     coordination atoms in line with specified molecular geometry
 
@@ -288,9 +315,23 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
     # print('Ligs: ',newLigInputDicts)
     goods = []
     denticities = []
-    trans = 0 # Currently just oxos!
-    for k,ligInput in enumerate(newLigInputDicts):
-        if (len(ligInput['coordList']) > 1) and (ligInput['ligType'] in core_geo_class.liglist_geo_map_dict.keys()):
+    trans = 0  # Currently just oxos!
+    for k, ligInput in enumerate(newLigInputDicts):
+        if (len(ligInput['coordList']) > 1) and (isinstance(ligInput['ligType'], list)):
+            possible_core_cons = []
+            for lt in ligInput['ligType']:
+                if coreType in core_geo_class.liglist_geo_map_dict[lt]:  # Check if ligand can be mapped.
+                    possible_core_cons.append(core_geo_class.liglist_geo_map_dict[lt][coreType])
+                else:
+                    pass
+            if len(possible_core_cons) > 0:
+                possible_core_cons = chain_zip(possible_core_cons)
+                denticities.append(len(possible_core_cons[0]))
+                goods.append(True)
+            else:
+                goods.append(False)
+                denticities.append(0)
+        elif (len(ligInput['coordList']) > 1) and (ligInput['ligType'] in core_geo_class.liglist_geo_map_dict.keys()):
             # print('N>1: ',k)
             if coreType in core_geo_class.liglist_geo_map_dict[ligInput['ligType']]: # Check if ligand can be mapped.
                 possible_core_cons = core_geo_class.liglist_geo_map_dict[ligInput['ligType']][coreType]
@@ -301,10 +342,11 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
                 goods.append(False)
                 denticities.append(0)
                 possible_core_cons = []
-        elif (len(ligInput['coordList']) == 1): # Handle monodentates
+        elif (len(ligInput['coordList']) == 1):  # Handle monodentates
             # print('N==1: ',k)
-            if isinstance(ligInput['coordList'][0],list):
-                possible_core_cons = [[ligInput['coordList'][0][1]]] # Exactly specify when exactly specified by user.
+            if isinstance(ligInput['coordList'][0], list):
+                # Exactly specify when exactly specified by user.
+                possible_core_cons = [[ligInput['coordList'][0][1]]] 
                 ligInput['possible_core_cons'] = possible_core_cons
                 ligInput['coordList'] = [val[0] for val in ligInput['coordList']]
                 denticities.append(1)
@@ -339,7 +381,7 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
             goods.append(True)
         else:
             raise ValueError('{} not in known ligTypes'.format(ligInput['ligType']))
-        ligobmol = io_obabel.get_obmol_smiles(ligInput['smiles']) # Get obmol for each lig 
+        ligobmol = io_obabel.get_obmol_smiles(ligInput['smiles']) # Get obmol for each lig
         lig_charges.append(ligobmol.GetTotalCharge()) # Calculate total charge.
         lig_zs=[]
         for atom in io_obabel.ob.OBMolAtomIter(ligobmol):
@@ -377,8 +419,8 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
     
     # Map to "higher-denticity" ligands to reduce computational overhead when recursively
     # Searching symmetries
-    inv_dicts, selected_con_lists, denticities, inv_inds = map_all_repeat_to_highdent(uinds, 
-                                                                                      uinv, 
+    inv_dicts, selected_con_lists, denticities, inv_inds = map_all_repeat_to_highdent(uinds,
+                                                                                      uinv,
                                                                                       ucounts,
                                                                                       denticities,
                                                                                       selected_con_lists)
@@ -464,7 +506,7 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
                                 tligList.append([i,list(selected_con_list)])
                         else:
                             for i,x in enumerate(selected_con_list):
-                                tligList.append([newLigInputDicts[j]['coordList'][i],int(x)])
+                                tligList.append([newLigInputDicts[j]['coordList'][i], int(x)])
                         tligLists.append(tligList)
                     out_liglists.append(tligLists)
         else:
@@ -475,5 +517,5 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
         if params['debug']:
             print('Not all individual ligands can map to this {} - Not generating!'.format(coreType))
     if params['debug']:
-        print('Total valid symmetries for core {}: '.format(coreType),len(out_liglists))
+        print('Total valid symmetries for core {}: '.format(coreType), len(out_liglists))
     return newLigInputDicts, out_liglists, total_unique_symmetries, good
