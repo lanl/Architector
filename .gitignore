@@ -8,3 +8,4 @@
 *.traj
 *__pycache__*
 **/.vscode/
+meta_production_sample.pkl
