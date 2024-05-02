@@ -680,7 +680,7 @@ def build_complex(inputDict):
         newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=True) # Run with larger radii
         if tmp_inputDict['parameters']['debug']:
             print('Trying with larger scaled metal radii.')
-        temp_ordered_conf_dict = build_complex_driver(newinpdict)
+        temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(newinpdict)
         newdict_append = dict()
         for key,val in temp_ordered_conf_dict.items():
             newdict_append[key+'_larger_scaled'] = val
@@ -697,7 +697,7 @@ def build_complex(inputDict):
             if tmp_inputDict['parameters']['debug']:
                 print('Trying with smaller scaled metal radii.')
             newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=False)
-            temp_ordered_conf_dict = build_complex_driver(newinpdict)
+            temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(newinpdict)
             newdict_append = dict()
             for key,val in temp_ordered_conf_dict.items():
                 newdict_append[key+'_smaller_scaled'] = val
@@ -830,7 +830,8 @@ def build_complex_2D(inputDict):
         bo_dict, atypes = io_obabel.get_OBMol_bo_dict_atom_types(obmollig)
 
         mol.append_ligand({'ase_atoms':bestConformer,'bo_dict':bo_dict, 
-                                    'atom_types':atypes,'ca_metal_dist_constraints':ligand.get('ca_metal_dist_constraints',None)})
+                            'atom_types':atypes,
+                            'ca_metal_dist_constraints':ligand.get('ca_metal_dist_constraints',None)})
     
     # Charge -> charges already assigned to components during assembly
     if (inputDict['parameters']['full_charge'] is not None):
@@ -849,8 +850,7 @@ def build_complex_2D(inputDict):
     else:
         if inputDict['parameters']['debug']:
             print('No metals - continuing anyway!')
-    
-    
+
     # Handle spin / magnetism
     even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms])-mol_charge) % 2
     if (inputDict['parameters']['full_spin'] is not None):
