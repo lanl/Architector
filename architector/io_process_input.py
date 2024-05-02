@@ -157,7 +157,7 @@ def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
                 out_types.append(ltype)
                 min_losses.append(minloss)
                 confidences.append(confidence)
-        out_types = np.unique(all_out_types).tolist()
+        out_types = np.unique(all_out_types + possible_Ligtypes).tolist()
         if debug:
             print('Out Types:', all_out_types, possible_Ligtypes)
             print('OUt Losses', all_losses)
