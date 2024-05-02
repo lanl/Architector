@@ -1266,7 +1266,7 @@ def set_position_align(ase_atoms, ligcoordList, corecoordList, isCp=False, debug
                         r = outr
                         save_ordering = ordering
                         minval = r[1]
-                if (not isCp) and (debug):
+                if (not isCp) and (debug > 1):
                     print('Warning: Your suggested connection sites and ligand cannot form an approximate guess.')
                     print('For this ligand/coord sites a possible suggested ordering for the selected connecting indices is: ')
                     print(con_inds[save_ordering])
@@ -1472,12 +1472,12 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 L, V = get_3_eigs(G, natoms)
                 X = np.dot(V, L)  # get projection
             except:
-                if debug:
+                if debug > 1:
                     print('Gen Exception.')
                 X = np.array([np.nan])
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
-                if debug:
+                if debug > 1:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
                 if count > 200:
@@ -1489,7 +1489,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 status = True
                 fail_gen = False # Worked!
     if fail_gen:
-        if debug:
+        if debug > 1:
             print('Trying More Dist Geom with 0.2 Bond Tol LB, 0.2 Angle tol LB, and Loosened Metal_Center Constraints')
         status = False
         count = 0
@@ -1510,12 +1510,12 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 L, V = get_3_eigs(G, natoms)
                 X = np.dot(V, L)  # get projection
             except:
-                if debug:
+                if debug > 1:
                     print('Gen Exception.')
                 X = np.array([np.nan])
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
-                if debug:
+                if debug > 1:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
                 if count > 200:
@@ -1548,12 +1548,12 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 L, V = get_3_eigs(G, natoms)
                 X = np.dot(V, L)  # get projection
             except:
-                if debug:
+                if debug > 1:
                     print('Gen Exception.')
                 X = np.array([np.nan])
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
-                if debug:
+                if debug > 1:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
                 if count > 200:
@@ -1565,7 +1565,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 status = True
                 fail_gen = False # Worked!
     if fail_gen:
-        if debug:
+        if debug > 1:
             print('Trying more Dist Geom with Dirty LB')
         LB, UB = get_bounds_matrix(allcoords, graph, natoms, 
                                     catoms, shape, 
@@ -1591,7 +1591,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
                 X = np.array([np.nan])
                 
             if np.any(np.isnan(X)): # If any are not nan continue!
-                if debug:
+                if debug > 1:
                     # print('V: ',V, 'L: ', L, 'X: ',X)
                     print('DG iteration passing.')
                 if count > 200:
@@ -1611,7 +1611,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
         res1 = optimize.fmin_cg(distance_error, x, fprime=dist_error_gradient,
                                 gtol=0.1, args=(LB, UB, natoms), disp=0)
         if np.any(np.isnan(res1)):
-            if debug:
+            if debug > 1:
                 print('Dist Geom produced Nan. - Skipping!')
             Conf3D_out = io_obabel.convert_obmol_ase(Conf3D, add_hydrogens=add_hydrogens)
             final_relax = False
@@ -1645,7 +1645,7 @@ def get_aligned_conformer(ligsmiles, ligcoordList, corecoordList, metal='Fe',
             # Set charges from total charge from OBmol
             Conf3D_out.set_initial_charges(init_charges_lig)
     else:
-        if debug:
+        if debug >1:
             print('Dist Geom Failed entirely!')
         Conf3D_out = io_obabel.convert_obmol_ase(Conf3D,add_hydrogens=add_hydrogens)
         final_relax = True
