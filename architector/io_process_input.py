@@ -102,45 +102,47 @@ def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
     else:
         tcore_geo_class = copy.deepcopy(core_geo_class)
         tcore_geo_class.get_lig_ref_inds_dict(metal,
-                                              tolerance=30)
+                                              tolerance=20)
         lig_denticity = len(ligcoords)
         possible_Ligtypes = tcore_geo_class.cn_ligType_dict[lig_denticity]
-        rot_vals = []
-        possible_saves = []
-        conformers = []
-        for ligtype in possible_Ligtypes:
-            rot_vals.append(None)
-            possible_saves.append(False)
-            conformers.append(False)
-            best_dict = tcore_geo_class.best_liglist_geos.get(ligtype, False)
-            if isinstance(best_dict, dict):
-                corecoordList = best_dict.get('corecoordList', None)
-                core_cons = best_dict.get('coreInds', None)
-                tmp_ligList = []
-                for i in range(len(ligcoords)):
-                    tmp_ligList.append([ligcoords[i], core_cons[i]])
-                # Test mapping on just single ligand conformation.
-                # Minval represents the loss
-                conf_list, val_list, _, _, _, _, _ = io_lig.find_conformers(
-                    ligsmiles,
-                    tmp_ligList,
-                    corecoordList,
-                    metal,
-                    ligtype=ligtype,
-                    covrad_metal=covrad_metal,
-                    vdwrad_metal=vdwrad_metal
-                )
-                if len(conf_list) > 0:
-                    minind = np.argmin(val_list)
-                    rot_vals[-1] = val_list[minind]
-                    possible_saves[-1] = True
-                    conf = conf_list[minind]
-                    conf = conf + Atoms(symbols=[metal], positions=[(0, 0, 0)])
-                    conformers[-1] = conf
-        save_inds = [i for i, x in enumerate(possible_saves) if x]
-        conformers = [x for i, x in enumerate(conformers) if (i in save_inds)]
-        possible_Ligtypes = [x for i, x in enumerate(
-            possible_Ligtypes) if (i in save_inds)]
+        exitloop=False
+        while not exitloop:
+            rot_vals = []
+            possible_saves = []
+            conformers = []
+            count = 0
+            for ligtype in possible_Ligtypes:
+                if debug:
+                    print('Ligtype testing: ', count, ligtype)
+                count += 1
+                rot_vals.append(None)
+                possible_saves.append(False)
+                conformers.append(False)
+                best_dict = tcore_geo_class.best_liglist_geos.get(ligtype, False)
+                if isinstance(best_dict, dict):
+                    corecoordList = best_dict.get('corecoordList', None)
+                    core_cons = best_dict.get('coreInds', None)
+                    tmp_ligList = []
+                    for i in range(len(ligcoords)):
+                        tmp_ligList.append([ligcoords[i], core_cons[i]])
+                    # Test mapping on just single ligand conformation.
+                    # Minval represents the loss
+                    conf, minval, sane, _, _, _, _ = io_lig.get_aligned_conformer(
+                                ligsmiles, tmp_ligList, corecoordList, metal=tmetal,
+                                covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal,
+                                ligtype=ligtype)
+                    if sane:
+                        rot_vals[-1] = minval
+                        possible_saves[-1] = True
+                        conf = conf + Atoms(symbols=[metal], positions=[(0, 0, 0)])
+                        conformers[-1] = conf
+            save_inds = [i for i, x in enumerate(possible_saves) if x]
+            conformers = [x for i, x in enumerate(conformers) if (i in save_inds)]
+            tpossible_Ligtypes = [x for i, x in enumerate(
+                possible_Ligtypes) if (i in save_inds)]
+            if len(tpossible_Ligtypes) > 0:
+                possible_Ligtypes = tpossible_Ligtypes
+                exitloop=True
         out_types = []
         confidences = []
         min_losses = []
@@ -155,6 +157,7 @@ def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
                 out_types.append(ltype)
                 min_losses.append(minloss)
                 confidences.append(confidence)
+        out_types = np.unique(all_out_types).tolist()
         if debug:
             print('Out Types:', all_out_types, possible_Ligtypes)
             print('OUt Losses', all_losses)
@@ -576,8 +579,11 @@ def inparse(inputDict):
                 raise ValueError('Need a inputDict["ligands"] list passed')
             newliglist = []
 
+            tdebug = newinpDict.get('parameters',{}).get('debug',False)
+            if tdebug:
+                print('Starting Ligand Assignment')
+
             if isinstance(ligList, list):
-                tdebug = newinpDict.get('parameters',{}).get('debug',False)
                 for ligDict in ligList:
                     newdict = dict()
                     if isinstance(ligDict, dict):
@@ -586,9 +592,7 @@ def inparse(inputDict):
                             if (ligDict['smiles'] == '[H-]')or (ligDict['smiles'] == '[O-2]'): # Handle hydrides
                                 newinpDict['parameters']['relax'] = False
                                 # newinpDict['parameters']['metal_spin'] = 0 # Set to low_spin
-                            if (ligDict['ligType'] in core_geo_class.liglist_geo_map_dict.keys()) or (ligDict['ligType'] == 'mono'):
-                                newdict.update({'ligType':ligDict['ligType']})
-                            elif isinstance(ligDict['ligType'],list):
+                            if isinstance(ligDict['ligType'], list):
                                 good_list = []
                                 for lt in ligDict['ligType']:
                                     if (lt in core_geo_class.liglist_geo_map_dict.keys()) or (lt == 'mono') or ('edge' in lt):
@@ -598,6 +602,8 @@ def inparse(inputDict):
                                 if len(good_list) > min_n_conformers:
                                     min_n_conformers = len(good_list)
                                 newdict.update({'ligType': good_list})
+                            elif (ligDict['ligType'] in core_geo_class.liglist_geo_map_dict.keys()) or (ligDict['ligType'] == 'mono'):
+                                newdict.update({'ligType':ligDict['ligType']})
                             elif ('edge' in ligDict['ligType']):
                                 lt = assign_ligType_default(core_geo_class, ligDict['smiles'], ligDict['coordList'], metal,
                                                               covrad_metal=covrad_metal, vdwrad_metal=vdwrad_metal,
@@ -815,6 +821,9 @@ def inparse(inputDict):
                 raise ValueError('Either less than 1 or more than 1 metal in this mol2string passed.')
 
         newinpDict['ligands'] = newliglist
+
+        if tdebug:
+            print('Finished Ligand Assignment')
 
         coreTypes_run = []
         for coreType in coreTypes:
