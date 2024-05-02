@@ -37,6 +37,7 @@ params={
 "ase_atoms_db_name":'architector_ase_db.json',
 "temp_prefix":"/tmp/",
 "ase_db_tmp_name":"/tmp/architector_ase_db.json",
+"architector_run_label":'arch_run_0',
 # Cutoff parameters
 "assemble_sanity_checks":True, # Turn on/off assembly sanity checks.
 "assemble_graph_sanity_cutoff":1.8,
@@ -478,6 +479,7 @@ class CalcExecutor:
             pass
         elif self.parameters['dump_ase_atoms'] and (self.mol.ase_atoms.calc is not None) and (not self.assembly):
             self.parameters['ase_db'].write(self.mol.ase_atoms,
+                                            architector_run_label=self.parameters['architector_run_label'],
                                             mol2string=self.mol.write_mol2('final',
                                                                            writestring=True),
                                             relaxed=self.relax)
@@ -495,12 +497,14 @@ class CalcExecutor:
                 self.mol.ase_atoms = ats
                 if (i < end) and (i < self.parameters['save_first_n']):
                     self.parameters['ase_db'].write(ats,
+                                                    architector_run_label=self.parameters['architector_run_label'],
                                                     geo_step=i,
                                                     mol2string=self.mol.write_mol2('intermediate',
                                                                                    writestring=True),
                                                     relaxed=False)
                 elif i == end:
                     self.parameters['ase_db'].write(ats,
+                                                    architector_run_label=self.parameters['architector_run_label'],
                                                     geo_step=i,
                                                     mol2string=self.mol.write_mol2('final',
                                                                                    writestring=True),

@@ -155,7 +155,8 @@ inputDict = {
     # structures.
     "ase_atoms_db_name": 'architector_ase_db_{uid}.json', # Possible to name the databse filename
     # Will default to a "uid" included name.
-    "temp_prefix":"/tmp/", # Default here - for MPI running on HPC suggested /scratch/$USER/
+    "temp_prefix": "/tmp/", # Default here - for MPI running on HPC suggested /scratch/$USER/
+    "architector_run_label": "run_0", # Name stored to ASE json files.
 
     ####### Conformer parameters ########
     "n_conformers": 1, # Number of metal-core symmetries at each core to save / relax

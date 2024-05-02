@@ -907,6 +907,7 @@ def inparse(inputDict):
             "dump_ase_atoms": False, # or True
             "ase_atoms_db_name": 'architector_{}_ase_db_'.format(newinpDict['core']['metal']) + u_id + '.json',
             "temp_prefix":"/tmp/", # Default here - for MPI running on HPC suggested /scratch/$USER/
+            "architector_run_label":"run_0", # Name stored to ASE json files.
             
             # Ligand parameters
             # Ligand to finish filling out coordination environment if underspecified.
