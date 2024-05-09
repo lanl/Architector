@@ -18,7 +18,7 @@ import architector.io_molecule as io_molecule
 import ase
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
-from ase.constraints import (FixAtoms, FixBondLengths)
+from ase.constraints import (FixAtoms, FixBondLengths, FixInternals)
 has_sella = True
 try:
     from sella import Internals
@@ -91,7 +91,7 @@ class CalcExecutor:
                 detect_spin_charge=False, fix_m_neighbors=False, fix_indices=None,
                 default_params=params, ase_opt_method=None, ase_opt_kwargs={}, species_run=False,
                 intermediate=False, skip_spin_assign=False, save_trajectories=False,
-                store_results=False, use_constraints=False,
+                store_results=False, use_constraints=False, trans_oxo_triples=[],
                 calculator=None, debug=False):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
@@ -165,6 +165,8 @@ class CalcExecutor:
             elif isinstance(self.in_struct, architector.io_molecule.Molecule):
                 if len(self.in_struct.ase_atoms.constraints) > 0:
                     self.mol.ase_atoms.set_constraint(self.in_struct.ase_atoms.constraints)
+        else:
+            self.mol.ase_atoms.constraints = []
         self.method = method
         default_params = params.copy()
         default_params['debug'] = debug
@@ -196,8 +198,8 @@ class CalcExecutor:
         self.force_generation = False
         self.force_oxo_relax = False
         self.replace_trics = False
+        self.trans_oxo_triples = trans_oxo_triples
         self.results = None
-        
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
             for key,val in parameters.items():
@@ -304,8 +306,10 @@ class CalcExecutor:
                         #    verbosity=0)
                 # Difference of more than 1. Still perform a ff_preoptimization if requested.
                 if (np.abs(self.mol.xtb_charge - self.mol.charge) > 1):
-                    if ((not self.override_oxo_opt) or (self.assembly)) and (not self.force_oxo_relax):
-                        self.relax = False # E.g - don't relax if way off in oxdiation states (III) vs (V or VI)
+                    if len(self.trans_oxo_triples) > 0:
+                        pass
+                    elif ((not self.override_oxo_opt) or (self.assembly)) and (not self.force_oxo_relax):
+                        self.relax = False # E.g - don't relax if way off in oxidation states (III) vs (V or VI)
                     elif self.assembly: # FF more stable for highly charged assembly complexes.
                         self.method = 'GFN-FF'
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
@@ -323,25 +327,44 @@ class CalcExecutor:
             if not obabel_ff_requested:
                 self.mol.ase_atoms.calc = calc
                 if self.relax:
-                    if self.parameters.get("freeze_molecule_add_species",False) and self.species_run:
+                    cs = self.mol.ase_atoms.constraints
+                    if self.parameters.get("freeze_molecule_add_species",
+                                           False) and self.species_run:
                         if self.parameters['debug']:
                             print('Fixing first component!')
                         fix_inds = self.mol.find_component_indices(component=0)
                         c = FixAtoms(indices=fix_inds.tolist())
-                        self.mol.ase_atoms.set_constraint(c)
-                    elif isinstance(self.fix_indices,list):
+                        cs.append(c)
+                    elif isinstance(self.fix_indices, list):
                         c = FixAtoms(indices=self.fix_indices)
-                        self.mol.ase_atoms.set_constraint(c)
+                        cs.append(c)
                     if len(self.mol.ase_constraints) > 0:
-                        fix_list = [[x[0],x[1]] for x in self.mol.ase_constraints]
+                        fix_list = [[x[0], x[1]] for x in self.mol.ase_constraints]
                         c = FixBondLengths(fix_list)
-                        self.mol.ase_atoms.set_constraint(c)
+                        cs.append(c)
+                    if len(self.trans_oxo_triples) > 0:
+                        bonds = []
+                        angles_degs = []
+                        for triple in self.trans_oxo_triples:
+                            if not isinstance(self.fix_indices,list):
+                                tlist = []
+                            else:
+                                tlist = self.fix_indices
+                            if (triple[0] not in tlist) or (triple[1] not in tlist):
+                                bonds.append([self.mol.ase_atoms.get_distance(triple[0],triple[1]),
+                                        [triple[0],triple[1]]])
+                                bonds.append([self.mol.ase_atoms.get_distance(triple[2],triple[1]),
+                                        [triple[2],triple[1]]])
+                                angles_degs.append([180.0,list(triple)])
+                        c = FixInternals(bonds=bonds, angles_deg=angles_degs)
+                        cs.append(c)
+                    self.mol.ase_atoms.set_constraint(cs)
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
                         if has_sella and self.ase_opt_kwargs.get('sella_internal_trics',False):
                             if self.debug:
                                 print('Adding Internals....')
-                            ints = Internals(self.mol.ase_atoms,allow_fragments=True)
+                            ints = Internals(self.mol.ase_atoms, allow_fragments=True)
                             del self.ase_opt_kwargs['sella_internal_trics']
                             self.replace_trics = True
                             ints.find_all_bonds()
@@ -352,12 +375,12 @@ class CalcExecutor:
                             self.init_energy = copy.deepcopy(self.mol.ase_atoms.get_total_energy())
                             if self.parameters['save_trajectories']:
                                 if self.logfile is not None:
-                                    dyn = self.opt_method(self.mol.ase_atoms, 
+                                    dyn = self.opt_method(self.mol.ase_atoms,
                                                         trajectory='temp.traj',
                                                         logfile=self.logfile,
                                                         **self.ase_opt_kwargs)
                                 else:
-                                    dyn = self.opt_method(self.mol.ase_atoms, 
+                                    dyn = self.opt_method(self.mol.ase_atoms,
                                                         trajectory='temp.traj',
                                                         **self.ase_opt_kwargs)
                             else:
@@ -389,10 +412,11 @@ class CalcExecutor:
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
                     # Remove constraint
-                    if self.parameters.get("freeze_molecule_add_species",False) and (self.species_run):
+                    if self.parameters.get("freeze_molecule_add_species",
+                                           False) and (self.species_run):
                         if self.parameters['debug']:
                             print('Removing fixing first component!')
-                        self.mol.ase_atoms.set_constraint() 
+                        self.mol.ase_atoms.set_constraint()
                 else:
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
@@ -419,9 +443,11 @@ class CalcExecutor:
                     try:
                         self.init_energy = io_obabel.obmol_energy(self.mol)
                         out_atoms, energy = io_obabel.obmol_opt(self.mol, center_metal=True,
-                                fix_m_neighbors=self.fix_m_neighbors,fix_indices=self.fix_indices,  # Note - fixing metal neighbors in UFF
+                                fix_m_neighbors=self.fix_m_neighbors,
+                                fix_indices=self.fix_indices,  # Note - fixing metal neighbors in UFF
                                     # Done to maintain metal center symmetry
-                                    return_energy=True)
+                                trans_oxo_triples=self.trans_oxo_triples,
+                                return_energy=True)
                         self.successful = True
                         self.energy = energy
                         self.mol.ase_atoms.set_positions(out_atoms.get_positions())

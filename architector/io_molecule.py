@@ -1585,6 +1585,36 @@ class Molecule:
             mols.append(newmol)
         return mols
     
+    def detect_trans_oxos(self):
+        """Detect and flag trans_oxos.
+
+        Returns:
+            trans_oxo_triples: list(tuple (3))
+                List of tuples of indices of oxo1-metal-oxo2.
+        """
+        if len(self.graph) < 1:
+            self.create_mol_graph()
+        info_dict = self.split_ligs()
+        oxo_inds = []
+        for i,lig in enumerate(info_dict['lig_smiles']):
+            if lig == '[O-2]':
+                oxo_inds.append(i)
+        trans_oxo_triples = []
+        if isinstance(info_dict['metal_ind'],(int,float)):
+            info_dict['metal_ind'] = [info_dict['metal_ind']]
+        for m_ind in info_dict['metal_ind']:
+            toxinds = []
+            for oxind in oxo_inds:
+                if m_ind in info_dict['bound_metal_inds'][oxind]:
+                    toxinds.append(oxind)
+            if len(toxinds) > 1:
+                for pair in itertools.combinations(toxinds,2):
+                    ind0 = info_dict['original_lig_inds'][pair[0]][0]
+                    ind1 = info_dict['original_lig_inds'][pair[1]][0]
+                    angle = self.ase_atoms.get_angle(ind0,m_ind,ind1)
+                    if angle > 179:
+                        trans_oxo_triples.append((ind0,m_ind,ind1))
+        return trans_oxo_triples
 
     def functionalize_3D(self,
                          functional_groups=['carboxyllic_acid'],
@@ -1643,7 +1673,6 @@ class Molecule:
             Keep the existing structure frozen, by default True
         """
         from architector.io_calc import CalcExecutor
-
         new_functional_groups = []
         for i,fg in enumerate(functional_groups):
             if fg in io_ptable.functional_groups_dict:
@@ -1754,10 +1783,22 @@ class Molecule:
                 self.atom_types += funct_mol.atom_types
                 if funct_mol.charge is not None:
                     self.charge += funct_mol.charge # Add charge for charged functional groups.
-                    if isinstance(self.xtb_charge,int):
-                        self.xtb_charge += funct_mol.charge
+                    if isinstance(self.xtb_charge, (int,float)):
+                        if isinstance(funct_mol.xtb_charge, (int,float)):
+                            self.xtb_charge += funct_mol.xtb_charge
+                        else:
+                            self.xtb_charge += funct_mol.charge
                     else:
-                        self.xtb_charge = funct_mol.charge
+                        if isinstance(funct_mol.xtb_charge, (int,float)):
+                            self.xtb_charge = funct_mol.xtb_charge
+                if funct_mol.uhf is not None:
+                    self.uhf += funct_mol.uhf
+                    if isinstance(self.xtb_uhf, (int,float)):
+                        if isinstance(funct_mol.xtb_uhf, (int,float)):
+                            self.xtb_uhf += funct_mol.xtb_uhf
+                    else:
+                        if isinstance(funct_mol.xtb_uhf, (int,float)):
+                            self.xtb_uhf = funct_mol.xtb_uhf
                 self.BO_dict.update(newligbodict)
                 self.create_graph_from_bo_dict()
             elif isinstance(idx,(np.ndarray,list)):
@@ -1876,10 +1917,22 @@ class Molecule:
                 self.atom_types += funct_mol.atom_types
                 if funct_mol.charge is not None:
                     self.charge += funct_mol.charge # Add charge for charged functional groups.
-                    if isinstance(self.xtb_charge,int):
-                        self.xtb_charge += funct_mol.charge
+                    if isinstance(self.xtb_charge, (int,float)):
+                        if isinstance(funct_mol.xtb_charge, (int,float)):
+                            self.xtb_charge += funct_mol.xtb_charge
+                        else:
+                            self.xtb_charge += funct_mol.charge
                     else:
-                        self.xtb_charge = funct_mol.charge
+                        if isinstance(funct_mol.xtb_charge, (int,float)):
+                            self.xtb_charge = funct_mol.xtb_charge
+                if funct_mol.uhf is not None:
+                    self.uhf += funct_mol.uhf
+                    if isinstance(self.xtb_uhf, (int,float)):
+                        if isinstance(funct_mol.xtb_uhf, (int,float)):
+                            self.xtb_uhf += funct_mol.xtb_uhf
+                    else:
+                        if isinstance(funct_mol.xtb_uhf, (int,float)):
+                            self.xtb_uhf = funct_mol.xtb_uhf
                 self.BO_dict.update(newligbodict)
                 self.create_graph_from_bo_dict()
             else:
@@ -1890,13 +1943,16 @@ class Molecule:
             freeze_indices = None
         if uff_opt:
             tmpmol = self.write_mol2('temp.mol2',writestring=True)
-            obmol_opt = CalcExecutor(tmpmol, relax=True, method='UFF', fix_indices=freeze_indices)
+            obmol_opt = CalcExecutor(tmpmol, relax=True, method='UFF', fix_indices=freeze_indices,
+                                     trans_oxo_triples=self.detect_trans_oxos())
             self.ase_atoms.set_positions(obmol_opt.mol.ase_atoms.get_positions())
         if xtb_opt:
             tmpmol = self.write_mol2('temp.mol2',writestring=True)
             obmol_opt = CalcExecutor(tmpmol, relax=True,
                                      method='GFN2-xTB',
-                                     fix_indices=freeze_indices)
+                                     fix_indices=freeze_indices,
+                                     trans_oxo_triples=self.detect_trans_oxos()
+                                     )
             self.ase_atoms.set_positions(obmol_opt.mol.ase_atoms.get_positions())
 
 
