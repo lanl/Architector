@@ -403,6 +403,8 @@ class CalcExecutor:
                             self.successful = True
                         except Exception as e:
                             self.errors.append(e)
+                            if self.parameters['save_trajectories']:
+                                self.read_traj()
                             if self.parameters['debug']:
                                 print('Warning - method did not converge!',e)
                                 print('Mol XTB Charge {} Spin {}\n'.format(self.mol.xtb_charge,self.mol.xtb_uhf))
