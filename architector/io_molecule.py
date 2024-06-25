@@ -1386,7 +1386,7 @@ class Molecule:
         ml_dist_dicts = []
         index = 0
         # Metal charges
-        if len(atoms) > 0:
+        if (len(atoms) > 0) or (atom_pairs is not None) or (atom_type_pairs is not None):
             distmat = self.ase_atoms.get_all_distances()
             ligsmiles , _ , info_dict, = io_obabel.obmol_lig_split(
                 self.write_mol2('temp.mol2',writestring=True),
@@ -1477,7 +1477,7 @@ class Molecule:
                                                 io_ptable.rcov1[io_ptable.elements.index(symbols[i1])],
                                 'atom_symbols':'{}-{}'.format(symbols[i0],symbols[i1])
                                 })
-            elif (atom_type_pairs is not None):
+            elif (atom_type_pairs is not None) and (len(metals) > 0):
                 for pair_type in atom_type_pairs:
                     type1s = pair_type[0]
                     type2s = pair_type[1]
@@ -1544,7 +1544,31 @@ class Molecule:
                                             'atom_symbols':'{}-{}'.format(symbols[t1],symbols[c])
                                             })
                                         index += 1
-
+            elif (atom_type_pairs is not None):
+                for pair_type in atom_type_pairs:
+                    type1s = pair_type[0]
+                    type2s = pair_type[1]
+                    type1inds = np.where(symarray == type1s)[0]
+                    type2inds = np.where(symarray == type2s)[0]
+                    for t1 in type1inds:
+                        all_dists = distmat[t1]
+                        for c in type2inds:
+                            if self.graph[t1][c] == 1:
+                                bond_type = 'explicit_bond'
+                            else:
+                                bond_type = 'implicit_bond'
+                            ml_dist_dicts.append({
+                                'atom_pair':(t1,c),
+                                'bond_type':bond_type,
+                                'smiles':ligsmiles[0],
+                                'smiles_index':None,
+                                'distance':all_dists[c],
+                                'sum_cov_radii':io_ptable.rcov1[io_ptable.elements.index(symbols[t1])] + \
+                                                io_ptable.rcov1[io_ptable.elements.index(symbols[c])],
+                                'atom_symbols':'{}-{}'.format(symbols[t1],symbols[c])
+                                })
+        else:
+            raise ValueError('Need at least ref_ind, a metal, or atom_pairs, or atom_type_pairs specified!')
         df = pd.DataFrame(ml_dist_dicts)
         visited_keys = set()
         duplicates = []
