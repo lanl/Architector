@@ -117,7 +117,7 @@ polarizability = (0.00,
 )
 
 # Filled valence numbers
-filled_valence_electrons=(2,8,18,32)
+filled_valence_electrons=(2, 8, 18, 32)
 
 # XTB/GFN-2 limitation - Z <= 86
 limited_rcov1 = rcov1[0:87]
@@ -125,12 +125,12 @@ limited_elements = elements[0:87]
 limited_rvdw = rvdw[0:87]
        
 lanthanides = ['La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy',
-                    'Ho', 'Er', 'Tm', 'Yb', 'Lu']
+               'Ho', 'Er', 'Tm', 'Yb', 'Lu']
 
 limited_lanthanides = [x for x in lanthanides if x in limited_elements]
 
 actinides = ['Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf',
-                    'Es', 'Fm', 'Md', 'No', 'Lr']
+             'Es', 'Fm', 'Md', 'No', 'Lr']
 
 limited_actinides = [x for x in actinides if x in limited_elements]
 
@@ -162,21 +162,24 @@ alkali_and_alkaline_earth = [
             'Fr', 'Ra'
             ]
 
-alkali_metals = ['Li','Na','K','Rb','Cs','Fr']
+alkali_metals = ['Li', 'Na', 'K', 'Rb', 'Cs', 'Fr']
 
-alkaline_earth_metals = ['Be','Mg','Ca','Sr','Ba','Ra']
+alkaline_earth_metals = ['Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Ra']
 
-metalloids = ['B','Si','Ge','As','Sb','Te']
+metalloids = ['B', 'Si', 'Ge', 'As', 'Sb', 'Te']
 
-limited_alkali_and_alkaline_earth = [x for x in alkali_and_alkaline_earth if x in limited_elements]
+limited_alkali_and_alkaline_earth = [
+    x for x in alkali_and_alkaline_earth if x in limited_elements]
 
 heavy_metals = lanthanides + actinides
 
 limited_heavy_metals = limited_lanthanides + limited_actinides
 
-all_metals = lanthanides + actinides + alkali_and_alkaline_earth + post_transition_metals + transition_metals
+all_metals = lanthanides + actinides + alkali_and_alkaline_earth + \
+    post_transition_metals + transition_metals
 
-limited_all_metals = limited_lanthanides + limited_actinides + limited_alkali_and_alkaline_earth \
+limited_all_metals = limited_lanthanides + limited_actinides + \
+    limited_alkali_and_alkaline_earth \
     + limited_post_transition_metals + limited_transition_metals
 
 # Dictionary for common charges of metals
@@ -202,7 +205,7 @@ metal_charge_dict = {
     'Tl': 3, 'Pb': 2, 'Bi': 3, 
     'Nh': 1, 'Fl': 2, 'Mc': 1, 'Lv': 2,
     # Alkali/earth metals
-    'Li': 1, 'Be': 2 , 
+    'Li': 1, 'Be': 2, 
     'Na': 1, 'Mg': 2, 
     'K': 1, 'Ca': 2, 
     'Rb': 1, 'Sr': 2, 

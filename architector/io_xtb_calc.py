@@ -7,16 +7,12 @@
 # """
 
 import numpy as np
-
 from xtb.ase.calculator import XTB
-# from tblite.ase import TBLite -> No GFN-FF support yet
-
 from architector import arch_context_manage, io_molecule
 import architector.io_ptable as io_ptable
-
 import ase
 from ase.optimize import BFGSLineSearch
-from ase.atoms import Atom,Atoms
+from ase.atoms import Atom, Atoms
 
 def set_XTB_calc(ase_atoms, parameters=dict(), assembly=False, isCp_lig=False):
     """set_XTB_calc 

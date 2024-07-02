@@ -6,28 +6,27 @@ Developed by Dan Burril and Michael Taylor
 
 # Imports
 import ase
+from ase.io import read
+from ase import units
 import numpy as np
 import architector
 import architector.io_ptable as io_ptable
 import warnings
-
-from ase.io import read
-from ase import units
+from io import StringIO
 from openbabel import openbabel as ob
 from openbabel import pybel
-from io import StringIO
 from scipy.sparse import csgraph
-import numpy as np
 from pynauty import Graph as pnGraph
 from pynauty import canon_label
 
 # ob.obErrorLog.SetOutputLevel(0) # Set warnings to only critical.
-ob.obErrorLog.StopLogging() # Turn off ALL openbabel logging.
+ob.obErrorLog.StopLogging()  # Turn off ALL openbabel logging.
 
-warnings.filterwarnings('ignore') # Supress warnings.
+warnings.filterwarnings('ignore')  # Supress warnings.
+
 
 # Functions
-def smiles2xyz(smilesStr,addHydrogens=True):
+def smiles2xyz(smilesStr, addHydrogens=True):
     '''smiles2xyz
     Convert smiles string to xyz string.
 
@@ -45,7 +44,8 @@ def smiles2xyz(smilesStr,addHydrogens=True):
 
     return obConversion.WriteString(obmol).strip()
 
-def smiles2Atoms(smilesStr,addHydrogens=True):
+
+def smiles2Atoms(smilesStr, addHydrogens=True):
     """smiles2Atoms
     Convert SMILES string to Atoms object.
 
@@ -67,7 +67,7 @@ def smiles2Atoms(smilesStr,addHydrogens=True):
     posList = []        # Hold atomic positions
 
     # Convert smiles to xyz
-    xyzStr = smiles2xyz(smilesStr,addHydrogens=addHydrogens).split("\n")[2:]
+    xyzStr = smiles2xyz(smilesStr, addHydrogens=addHydrogens).split("\n")[2:]
 
     # Get symbols and positions
     for line in xyzStr:
@@ -80,11 +80,12 @@ def smiles2Atoms(smilesStr,addHydrogens=True):
         posList.append(pos) 
 
     # Create Atoms object
-    ats = ase.Atoms("".join(symList),positions=posList)
+    ats = ase.Atoms("".join(symList), positions=posList)
 
     # Center at COM
     ats.translate(-ats.get_center_of_mass())
     return ats
+
 
 def get_OBMol_coords_anums_graph(OBMol, return_coords=True, get_types=False):
     """get_OBMol_coords_anums_graph 
@@ -118,16 +119,17 @@ def get_OBMol_coords_anums_graph(OBMol, return_coords=True, get_types=False):
     coords = []
     if return_coords:
         for i, atom in enumerate(ob.OBMolAtomIter(OBMol)):
-            vect = (atom.GetX(),atom.GetY(),atom.GetZ())
+            vect = (atom.GetX(), atom.GetY(), atom.GetZ())
             coords.append(vect)
-    outgraph = np.zeros((len(anums),len(anums)))
+    outgraph = np.zeros((len(anums), len(anums)))
     for obbond in ob.OBMolBondIter(OBMol):
-        outgraph[obbond.GetBeginAtomIdx()-1,obbond.GetEndAtomIdx()-1] = 1
-        outgraph[obbond.GetEndAtomIdx()-1,obbond.GetBeginAtomIdx()-1] = 1
+        outgraph[obbond.GetBeginAtomIdx()-1, obbond.GetEndAtomIdx()-1] = 1
+        outgraph[obbond.GetEndAtomIdx()-1, obbond.GetBeginAtomIdx()-1] = 1
     coords = np.array(coords)
     return coords, anums, outgraph
 
-def get_OBMol_bo_dict_atom_types(OBMol,metal_passed=True):
+
+def get_OBMol_bo_dict_atom_types(OBMol, metal_passed=True):
     """get_OBMol_coords_anums_graph 
     Mine obmol structure for BO dict and atom types
 
@@ -144,7 +146,7 @@ def get_OBMol_bo_dict_atom_types(OBMol,metal_passed=True):
     atypes : list
         Atom types of the non-metal atoms
     """
-    
+
     atypes = []
     ttab = ob.OBTypeTable()
     ttab.SetFromType('INT')
@@ -152,7 +154,7 @@ def get_OBMol_bo_dict_atom_types(OBMol,metal_passed=True):
     natoms = OBMol.NumAtoms()
     for i, atom in enumerate(ob.OBMolAtomIter(OBMol)):
         atypes.append(ttab.Translate(atom.GetType()))
-    atypes = atypes[:-1] # Get rid of last atom (will always be metal)
+    atypes = atypes[:-1]  # Get rid of last atom (will always be metal)
     bo_dict = dict()
     for obbond in ob.OBMolBondIter(OBMol):
         bo = obbond.GetBondOrder()
@@ -168,15 +170,16 @@ def get_OBMol_bo_dict_atom_types(OBMol,metal_passed=True):
             else:
                 j = 1 + j
             if i > j:
-                bo_dict.update({(j,i):bo})
+                bo_dict.update({(j, i): bo})
             else:
-                bo_dict.update({(i,j):bo})
+                bo_dict.update({(i, j): bo})
         else:
             if i > j:
-                bo_dict.update({(j,i):bo})
+                bo_dict.update({(j, i): bo})
             else:
-                bo_dict.update({(i,j):bo})
+                bo_dict.update({(i, j): bo})
     return bo_dict, atypes
+
 
 def check_mmff_okay(OBMol):
     """check_mmff_okay 
@@ -192,14 +195,17 @@ def check_mmff_okay(OBMol):
     mmff94good : bool
         whether this structure is okay to evaluate with mmff94.
     """
-    mmff94_good_elements = ['C','H','N','O','F','Si','P','S','Br', 'Cl', 'I']
-    mmff94_good_anums = [io_ptable.elements.index(x) for x in mmff94_good_elements]
+    mmff94_good_elements = ['C', 'H', 'N', 'O',
+                            'F', 'Si', 'P', 'S',
+                            'Br', 'Cl', 'I']
+    mmff94_good_anums = [
+        io_ptable.elements.index(x) for x in mmff94_good_elements]
     mmff94good = True
     for i, atom in enumerate(ob.OBMolAtomIter(OBMol)):
         if atom.GetAtomicNum() not in mmff94_good_anums:
             mmff94good = False
     return mmff94good
-            
+
 
 def Neutralize(OBmol):
     """Neutralize 
@@ -223,10 +229,10 @@ def Neutralize(OBmol):
 
 
 def get_obmol_smiles(smilesStr,
-                    addHydrogens=True,
-                    neutralize=False,
-                    build=True,
-                    functionalizations=None):
+                     addHydrogens=True,
+                     neutralize=False,
+                     build=True,
+                     functionalizations=None):
     """get_obmol_smiles
     convert smiles to OBmol instance
 
@@ -264,25 +270,25 @@ def get_obmol_smiles(smilesStr,
 
     if (functionalizations is not None):
         for fg in functionalizations:
-            tOBmol = functionalize(tOBmol, 
-                                  functional_group=fg['functional_group'],
-                                  smiles_inds=fg['smiles_inds'])
+            tOBmol = functionalize(tOBmol,
+                                   functional_group=fg['functional_group'],
+                                   smiles_inds=fg['smiles_inds'])
 
     if neutralize:
         _ = Neutralize(tOBmol)
 
     # Add hydrogens
-    if (addHydrogens == True):
+    if (addHydrogens):
         tOBmol.AddHydrogens()
 
     if build:
-        tOBmol = build_3D(tOBmol,addHydrogens=addHydrogens)
+        tOBmol = build_3D(tOBmol, addHydrogens=addHydrogens)
         return tOBmol
     else:
         return tOBmol
 
 
-def get_smiles_obmol(OBmol,canonicalize=False):
+def get_smiles_obmol(OBmol, canonicalize=False):
     """get_smiles_obmol
     convert smiles to OBmol instance
 
@@ -292,7 +298,7 @@ def get_smiles_obmol(OBmol,canonicalize=False):
         Built openbabel molecule
     canonicalize : bool, optional
         canonicalize the smiles?
-    
+
     Returns
     -------
     smiles : str
@@ -315,7 +321,7 @@ def canonicalize_smiles(insmiles):
     ----------
     insmiles : str
         smiles of the moleucle
-    
+
     Returns
     -------
     can_smiles : str
@@ -331,7 +337,7 @@ def canonicalize_smiles(insmiles):
     return can_smiles
 
 
-def build_3D(OBmol,addHydrogens=True):
+def build_3D(OBmol, addHydrogens=True):
     """build_3D take a 2D OBmol structure and build to 3D
 
     Parameters
@@ -347,7 +353,7 @@ def build_3D(OBmol,addHydrogens=True):
         3D Built OBmol structure
     """
     # Generate 3d structure
-    if (addHydrogens == True):
+    if (addHydrogens):
         OBmol.AddHydrogens()
     builder = ob.OBBuilder()
     builder.Build(OBmol)
@@ -362,20 +368,22 @@ def build_3D(OBmol,addHydrogens=True):
     FF.Setup(OBmol)
 
     # Optimize energy
-    FF.ConjugateGradients(2000,1e-6)
+    FF.ConjugateGradients(2000, 1e-6)
     FF.GetCoordinates(OBmol)
     return OBmol
 
 
-def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000, energy_cutoff=50.0, 
-        confab_verbose = False, output_format='mol2', neutralize=False, functionalizations=None,
-        fix_m_neighbors=True,
-        return_energies = False):
+def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000,
+                              energy_cutoff=50.0, confab_verbose=False,
+                              output_format='mol2', neutralize=False,
+                              functionalizations=None, fix_m_neighbors=True,
+                              return_energies=False):
     """generate_obmol_conformers 
     generate conformers with openbabel for given smiles
     using confab conformer generation routine
-    O'Boyle NM, Vandermeersch T, Flynn CJ, Maguire AR, Hutchison GR. Confab 
-    - Systematic generation of diverse low-energy conformers. Journal of Cheminformatics. 
+    O'Boyle NM, Vandermeersch T, Flynn CJ, Maguire AR, Hutchison GR. Confab
+    - Systematic generation of diverse low-energy conformers.
+    Journal of Cheminformatics.
     2011;3:8. doi:10.1186/1758-2946-3-8.
 
     Parameters
@@ -410,25 +418,28 @@ def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000, ener
     """
     if isinstance(structure, str):
         if 'TRIPOS' in structure:
-            obmol = convert_mol2_obmol(structure,readstring=True)
+            obmol = convert_mol2_obmol(structure, readstring=True)
         elif structure[-5:] == '.mol2':
-            obmol = convert_mol2_obmol(structure,readstring=False)
+            obmol = convert_mol2_obmol(structure, readstring=False)
         elif ('.xyz' in structure):
-            obmol = convert_xyz_obmol(structure,readstring=False)
-        elif isinstance(structure,str) and (len(structure.split('\n')) > 3) and (structure.split('\n')[0].replace(' ','').isnumeric()):
-            obmol = convert_xyz_obmol(structure,readstring=True)
+            obmol = convert_xyz_obmol(structure, readstring=False)
+        elif isinstance(structure, str) and (len(structure.split('\n')) > 3) and (structure.split('\n')[0].replace(' ','').isnumeric()):
+            obmol = convert_xyz_obmol(structure, readstring=True)
         else: # Smiles
             obmol = get_obmol_smiles(structure,
-                                    neutralize=neutralize,
-                                    functionalizations=functionalizations)
+                                     neutralize=neutralize,
+                                     functionalizations=functionalizations)
     elif isinstance(structure, ob.OBMol):
         obmol = structure
     elif isinstance(structure, architector.io_molecule.Molecule):
-        obmol = convert_mol2_obmol(structure.write_mol2('example',writestring=True))
+        obmol = convert_mol2_obmol(structure.write_mol2('example',
+                                                        writestring=True))
     else:
-        raise ValueError('Unrecognized type for structure,',type(structure))
+        raise ValueError('Unrecognized type for structure,',
+                         type(structure))
     ### Swap actinides for lanthanides
-    _,anums,graph = get_OBMol_coords_anums_graph(obmol, return_coords=False, get_types=False)
+    _, anums, graph = get_OBMol_coords_anums_graph(obmol, return_coords=False,
+                                                   get_types=False)
     syms = [io_ptable.elements[x] for x in anums]
     act_inds = [i for i,x in enumerate(syms) if x in io_ptable.actinides]
     swapped=False
@@ -461,7 +472,7 @@ def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000, ener
         elif len(mets) == 0:
             constr = ob.OBFFConstraints()
             # print('No Metals present for FF optimization.')
-        FF.Setup(obmol,constr)
+        FF.Setup(obmol, constr)
     # Run Diverse conformer generation
     FF.DiverseConfGen(rmsd_cutoff, conf_cutoff, energy_cutoff, confab_verbose)
     FF.GetConformers(obmol)
@@ -493,12 +504,12 @@ def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000, ener
                     j+=1
         output_strings.append(obconversion.WriteString(obmol))
     if return_energies:
-        return output_strings,output_energies
+        return output_strings, output_energies
     else:
         return output_strings
 
 
-def functionalize(OBmol,functional_group='C',smiles_inds=[0]):
+def functionalize(OBmol, functional_group='C', smiles_inds=[0]):
     """functionalize functionalization routine
 
     Parameters
@@ -519,25 +530,33 @@ def functionalize(OBmol,functional_group='C',smiles_inds=[0]):
     if functional_group in io_ptable.functional_groups_dict:
         functional_group = io_ptable.functional_groups_dict[functional_group]
 
-    second_mol = get_obmol_smiles(functional_group,build=False,neutralize=False,addHydrogens=False)
+    second_mol = get_obmol_smiles(functional_group,
+                                  build=False,
+                                  neutralize=False,
+                                  addHydrogens=False)
 
     for idx in smiles_inds:
         start_index = OBmol.NumAtoms()
-        for i,atom in enumerate(ob.OBMolAtomIter(second_mol)):
+        for i, atom in enumerate(ob.OBMolAtomIter(second_mol)):
             OBmol.AddAtom(atom)
             
         for obbond in ob.OBMolBondIter(second_mol):
-            OBmol.AddBond(obbond.GetBeginAtomIdx()+start_index,obbond.GetEndAtomIdx()+start_index,obbond.GetBondOrder())
+            OBmol.AddBond(obbond.GetBeginAtomIdx()+start_index,
+                          obbond.GetEndAtomIdx()+start_index,
+                          obbond.GetBondOrder())
             
-        OBmol.AddBond(start_index+1,idx+1,1)
-        for i,atom in enumerate(ob.OBMolAtomIter(OBmol)):
+        OBmol.AddBond(start_index+1, idx+1, 1)
+        for i, atom in enumerate(ob.OBMolAtomIter(OBmol)):
             if (i == start_index) or (i == idx):
                 atom.SetImplicitHCount(atom.GetImplicitHCount()-1)
 
     return OBmol
 
 
-def convert_obmol_ase(OBMol,posits=None,set_zero=False,add_hydrogens=False):
+def convert_obmol_ase(OBMol,
+                      posits=None,
+                      set_zero=False,
+                      add_hydrogens=False):
     """convert_obmol_ase 
     convert obmol to ase
 
@@ -557,17 +576,19 @@ def convert_obmol_ase(OBMol,posits=None,set_zero=False,add_hydrogens=False):
     ase_atoms : ase.Atoms
         converted OBmol
     """
-    if hasattr(posits,'__len__'):
+    if hasattr(posits, '__len__'):
         last_atom_index = OBMol.NumAtoms()
         # Set metal to zero
-        metal_coords = (posits[last_atom_index-1,0],posits[last_atom_index-1,1],posits[last_atom_index-1,2])
+        metal_coords = (posits[last_atom_index-1, 0],
+                        posits[last_atom_index-1, 1],
+                        posits[last_atom_index-1, 2])
         # set coordinates using OBMol to keep bonding info
         for i, atom in enumerate(ob.OBMolAtomIter(OBMol)):
             atom.SetVector(posits[i, 0]-metal_coords[0], posits[i, 1]-metal_coords[1], posits[i, 2]-metal_coords[2])
     if set_zero:
         for i, atom in enumerate(ob.OBMolAtomIter(OBMol)):
             atom.SetVector(0.0, 0.0, 0.0)
-    
+
     if add_hydrogens:
         OBMol.AddHydrogens()
         mmff94_ok = check_mmff_okay(OBMol)
@@ -580,7 +601,7 @@ def convert_obmol_ase(OBMol,posits=None,set_zero=False,add_hydrogens=False):
         FF.Setup(OBMol)
 
         # Optimize energy
-        FF.ConjugateGradients(2000,1e-6)
+        FF.ConjugateGradients(2000, 1e-6)
         FF.GetCoordinates(OBMol)
 
     # Convert to ASE
@@ -588,7 +609,7 @@ def convert_obmol_ase(OBMol,posits=None,set_zero=False,add_hydrogens=False):
     obConversion.SetOutFormat('xyz')
     xyzStr = obConversion.WriteString(OBMol).strip()
     f = StringIO(xyzStr)
-    ase_atoms = read(f,format='xyz',parallel=False)
+    ase_atoms = read(f, format='xyz', parallel=False)
     return ase_atoms
 
 
@@ -611,7 +632,7 @@ def convert_ase_obmol(ase_atoms):
     for atom in ase_atoms:
         obatom = ob.OBAtom()
         obatom.SetAtomicNum(int(atom.number))
-        obatom.SetVector(atom.x,atom.y,atom.z)
+        obatom.SetVector(atom.x, atom.y, atom.z)
         OBMol.AddAtom(obatom)
     return OBMol
 
@@ -644,14 +665,14 @@ def obmol_opt(structure, center_metal=False, fix_m_neighbors=True,
     energy : float, optional
         energy of the structure in UFF / MMFF94 if applicable.
     """
-    if isinstance(structure,ase.atoms.Atoms):
+    if isinstance(structure, ase.atoms.Atoms):
         OBMol = convert_ase_obmol(structure)
-    elif isinstance(structure,str):
+    elif isinstance(structure, str):
         if 'TRIPOS' in structure:
             OBMol = convert_mol2_obmol(structure, readstring=True)
         elif structure[-5:] == '.mol2':
             OBMol = convert_mol2_obmol(structure, readstring=False)
-    elif isinstance(structure,architector.io_molecule.Molecule):
+    elif isinstance(structure, architector.io_molecule.Molecule):
         mol2str = structure.write_mol2('cool.mol2', writestring=True)
         OBMol = convert_mol2_obmol(mol2str, readstring=True)
 
@@ -670,19 +691,29 @@ def obmol_opt(structure, center_metal=False, fix_m_neighbors=True,
         if len(trans_oxo_triples) > 0:
             for triple in trans_oxo_triples:
                 if (triple[0] not in fix_indices) or (triple[2] not in fix_indices):
-                    constr.AddAngleConstraint(int(triple[0])+1,int(triple[1])+1,int(triple[2])+1,180.0)
+                    constr.AddAngleConstraint(int(triple[0])+1,
+                                              int(triple[1])+1,
+                                              int(triple[2])+1,
+                                              180.0)
                     at1 = OBMol.GetAtom(int(triple[1])+1)
                     dist0 = at1.GetDistance(int(triple[0])+1)
-                    constr.AddDistanceConstraint(int(triple[0])+1,int(triple[1])+1,dist0)
+                    constr.AddDistanceConstraint(int(triple[0])+1,
+                                                 int(triple[1])+1,
+                                                 dist0)
                     dist2 = at1.GetDistance(int(triple[2])+1)
-                    constr.AddDistanceConstraint(int(triple[2])+1,int(triple[1])+1,dist2)
+                    constr.AddDistanceConstraint(int(triple[2])+1,
+                                                 int(triple[1])+1,
+                                                 dist2)
         FF.Setup(OBMol, constr)
     elif fix_m_neighbors:
-        _,anums,graph = get_OBMol_coords_anums_graph(OBMol, return_coords=False, get_types=False)
+        _, anums, graph = get_OBMol_coords_anums_graph(OBMol,
+                                                       return_coords=False,
+                                                       get_types=False)
         syms = [io_ptable.elements[x] for x in anums]
-        mets = [i for i,x in enumerate(syms) if x in io_ptable.all_metals]
-        if len(mets) == 1: # Freeze metal and neighbor positions - relax ligands
-            frozen_atoms = [mets[0]+1] + (np.nonzero(np.ravel(graph[mets[0]]))[0] + 1).tolist()
+        mets = [i for i, x in enumerate(syms) if x in io_ptable.all_metals]
+        if len(mets) == 1:  # Freeze metal and neighbor positions - relax ligands
+            frozen_atoms = [mets[0]+1] + (
+                np.nonzero(np.ravel(graph[mets[0]]))[0] + 1).tolist()
             constr = ob.OBFFConstraints()
             for j in frozen_atoms:
                 constr.AddAtomConstraint(int(j))
@@ -696,18 +727,25 @@ def obmol_opt(structure, center_metal=False, fix_m_neighbors=True,
     elif len(trans_oxo_triples) > 0:
         constr = ob.OBFFConstraints()
         for triple in trans_oxo_triples:
-            constr.AddAngleConstraint(int(triple[0])+1,int(triple[1])+1,int(triple[2])+1,180.0)
+            constr.AddAngleConstraint(int(triple[0])+1,
+                                      int(triple[1])+1,
+                                      int(triple[2])+1,
+                                      180.0)
             at1 = OBMol.GetAtom(int(triple[1])+1)
             dist0 = at1.GetDistance(int(triple[0])+1)
-            constr.AddDistanceConstraint(int(triple[0])+1,int(triple[1])+1,dist0)
+            constr.AddDistanceConstraint(int(triple[0])+1,
+                                         int(triple[1])+1,
+                                         dist0)
             dist2 = at1.GetDistance(int(triple[2])+1)
-            constr.AddDistanceConstraint(int(triple[2])+1,int(triple[1])+1,dist2)
+            constr.AddDistanceConstraint(int(triple[2])+1,
+                                         int(triple[1])+1,
+                                         dist2)
         FF.Setup(OBMol, constr)
     else:
         FF.Setup(OBMol)
 
     # Optimize energy
-    FF.ConjugateGradients(2000,1e-6)
+    FF.ConjugateGradients(2000, 1e-6)
     FF.GetCoordinates(OBMol)
     energy = FF.Energy()
     if mmff94_ok:
@@ -716,12 +754,13 @@ def obmol_opt(structure, center_metal=False, fix_m_neighbors=True,
         energy = energy * units.kJ / units.mol
     out_atoms = convert_obmol_ase(OBMol)
     if center_metal:
-        m_ind = [i for i,x in enumerate(out_atoms.get_chemical_symbols()) if x in io_ptable.all_metals]
-        if len(m_ind)  == 1:
-            new_posits = out_atoms.get_positions()-out_atoms.get_positions()[m_ind]
+        m_ind = [i for i, x in enumerate(out_atoms.get_chemical_symbols()) if x in io_ptable.all_metals]
+        if len(m_ind) == 1:
+            new_posits = out_atoms.get_positions()-out_atoms.get_positions()[
+                m_ind]
             out_atoms.set_positions(new_posits)
     if return_energy:
-        return out_atoms,energy
+        return out_atoms, energy
     else:
         return out_atoms
 
@@ -735,14 +774,14 @@ def obmol_energy(structure):
     structure : ase.atoms.Atoms
         UFF / mmff94 optimized structure.
     """
-    if isinstance(structure,ase.atoms.Atoms):
+    if isinstance(structure, ase.atoms.Atoms):
         OBMol = convert_ase_obmol(structure)
-    elif isinstance(structure,str):
+    elif isinstance(structure, str):
         if 'TRIPOS' in structure:
-            OBMol = convert_mol2_obmol(structure,readstring=True)
+            OBMol = convert_mol2_obmol(structure, readstring=True)
         elif structure[-5:] == '.mol2':
-            OBMol = convert_mol2_obmol(structure,readstring=False)
-    elif isinstance(structure,architector.io_molecule.Molecule):
+            OBMol = convert_mol2_obmol(structure, readstring=False)
+    elif isinstance(structure, architector.io_molecule.Molecule):
         mol2str = structure.write_mol2('cool.mol2', writestring=True)
         OBMol = convert_mol2_obmol(mol2str, readstring=True)
 
@@ -755,7 +794,7 @@ def obmol_energy(structure):
         FF = ob.OBForceField.FindForceField('UFF')
 
     energy = FF.Energy()
-    if mmff94_ok: # Convert to eV
+    if mmff94_ok:  # Convert to eV
         energy = energy * units.kcal / units.mol
     else:
         energy = energy * units.kJ / units.mol
@@ -763,7 +802,7 @@ def obmol_energy(structure):
     return energy    
 
 
-def add_dummy_metal(Conf3D,coordList):
+def add_dummy_metal(Conf3D, coordList):
     """add_dummy_metal add a dummy metal to a conformer
 
     Parameters
@@ -773,9 +812,9 @@ def add_dummy_metal(Conf3D,coordList):
     coordList : list
         coordination sites of the ligand to the metal
     """
-    dummy_metal = ob.OBAtom() # Add the dummy metal to the OBmol
-    dummy_metal.SetAtomicNum(26) # Add arbitrary dummy metal - Fe for now - will be removed later
-    ttab = ob.OBTypeTable() # Reset types for replication purposes
+    dummy_metal = ob.OBAtom()  # Add the dummy metal to the OBmol
+    dummy_metal.SetAtomicNum(26)  # Add arbitrary dummy metal - Fe for now - will be removed later
+    ttab = ob.OBTypeTable()  # Reset types for replication purposes
     ttab.SetFromType('INT')
     ttab.SetToType('INT')
     atypes_old = []
@@ -789,7 +828,7 @@ def add_dummy_metal(Conf3D,coordList):
         Conf3D.AddBond(int(i+1), Conf3D.NumAtoms(), 1)
 
 
-def convert_mol2_obmol(mol2,readstring=True):
+def convert_mol2_obmol(mol2, readstring=True):
     """convert_mol2_obmol
     mol2 to OBMol
 
@@ -809,13 +848,13 @@ def convert_mol2_obmol(mol2,readstring=True):
     obmol = ob.OBMol()
     conv.SetInFormat('mol2')
     if readstring:
-        conv.ReadString(obmol,mol2)
+        conv.ReadString(obmol, mol2)
     else:
-        conv.ReadFile(obmol,mol2)
+        conv.ReadFile(obmol, mol2)
     return obmol
 
 
-def convert_mol_obmol(mol,readstring=True):
+def convert_mol_obmol(mol, readstring=True):
     """convert_mol_obmol
     mol2 to OBMol
 
@@ -835,13 +874,13 @@ def convert_mol_obmol(mol,readstring=True):
     obmol = ob.OBMol()
     conv.SetInFormat('mol')
     if readstring:
-        conv.ReadString(obmol,mol)
+        conv.ReadString(obmol, mol)
     else:
-        conv.ReadFile(obmol,mol)
+        conv.ReadFile(obmol, mol)
     return obmol
 
 
-def convert_cif_obmol(cif,readstring=True):
+def convert_cif_obmol(cif, readstring=True):
     """convert_mol2_obmol
     mol2 to OBMol
 
@@ -861,9 +900,9 @@ def convert_cif_obmol(cif,readstring=True):
     obmol = ob.OBMol()
     conv.SetInFormat('cif')
     if readstring:
-        conv.ReadString(obmol,cif)
+        conv.ReadString(obmol, cif)
     else:
-        conv.ReadFile(obmol,cif)
+        conv.ReadFile(obmol, cif)
     return obmol
 
 
@@ -879,7 +918,7 @@ def convert_obmol_mol2(OBmol):
     Returns
     -------
     mol2str : str
-        mol2 str of the OBmol 
+        mol2 str of the OBmol
     """
     conv = ob.OBConversion()
     conv.SetOutFormat('mol2')
@@ -907,7 +946,7 @@ def convert_obmol_mol(OBmol):
     return mol2str
 
 
-def convert_xyz_obmol(xyz,readstring=True):
+def convert_xyz_obmol(xyz, readstring=True):
     """convert_xyz_obmol
     xyz to OBMol
 
@@ -927,9 +966,9 @@ def convert_xyz_obmol(xyz,readstring=True):
     obmol = ob.OBMol()
     conv.SetInFormat('xyz')
     if readstring:
-        conv.ReadString(obmol,xyz)
+        conv.ReadString(obmol, xyz)
     else:
-        conv.ReadFile(obmol,xyz)
+        conv.ReadFile(obmol, xyz)
     return obmol
 
 
@@ -964,15 +1003,17 @@ def obmol_lig_split(mol2string,
                     allow_radicals=False,
                     calc_all=False):
     """obmol_lig_split 
-    Take in a mol2string and use openbabel to split into ligands, convert to smiles, 
-    and calculate metal-ligand coordinating atoms implicit in the mol2string.
+    Take in a mol2string and use openbabel to split into ligands,
+    convert to smiles, and calculate metal-ligand coordinating atoms
+    implicit in the mol2string.
 
     Parameters
     ----------
     mol2string : str
        mol2string of ideally mononuclear metal complex.
     return_info : bool, optional
-        return information dictionary as well with metal,ligand_charges,coordAt symbols, default False
+        return information dictionary as well with
+        metal,ligand_charges,coordAt symbols, default False
     calc_coord_atoms : bool, optional
         return the coordination atoms for smiles, default True
     calc_all : bool, optional
@@ -986,31 +1027,32 @@ def obmol_lig_split(mol2string,
         list of coordinating atom indices for the smiles str
     """
     if 'un' in mol2string:
-        mol2string = mol2string.replace('un','0')
+        mol2string = mol2string.replace('un', '0')
         obmol = convert_mol2_obmol(mol2string)
         obmol.ConvertZeroBonds()
     else:
         obmol = convert_mol2_obmol(mol2string)
-    _,anums,graph = get_OBMol_coords_anums_graph(obmol)
-    bo_dict, _ = get_OBMol_bo_dict_atom_types(obmol,metal_passed=False)
-    met_inds = [i for i,x in enumerate(anums) if (io_ptable.elements[x] in io_ptable.all_metals)]
+    _, anums, graph = get_OBMol_coords_anums_graph(obmol)
+    bo_dict, _ = get_OBMol_bo_dict_atom_types(obmol, metal_passed=False)
+    met_inds = [i for i, x in enumerate(anums) if (
+        io_ptable.elements[x] in io_ptable.all_metals)]
     shape = graph.shape
     only_mets_graph = np.zeros(shape)
     init_graph = graph.copy()
     # Create 2 graphs - one with metals removed, one with only the metals graphs
     for ind in sorted(met_inds):
-        only_mets_graph[:,ind] = graph[ind]
-        only_mets_graph[ind,:] = graph[ind]
+        only_mets_graph[:, ind] = graph[ind]
+        only_mets_graph[ind, :] = graph[ind]
         # Zero out the deleted inds
-        init_graph[ind,:] = np.zeros(shape[0])
-        init_graph[:,ind] = np.zeros(shape[0])
+        init_graph[ind, :] = np.zeros(shape[0])
+        init_graph[:, ind] = np.zeros(shape[0])
     csg = csgraph.csgraph_from_dense(init_graph)
     # Break apart zeroed graph into connected components
     disjoint_components = csgraph.connected_components(csg)[1]
     ligs_inds = []
-    for ind in sorted(list(set(disjoint_components))): # sort for reproducability
+    for ind in sorted(list(set(disjoint_components))):  # sort for reproducability
         subgraph = np.where(disjoint_components == ind)[0]
-        sg = np.array([x for x in subgraph if x not in met_inds]) # Check not deleted atoms
+        sg = np.array([x for x in subgraph if x not in met_inds])  # Check not deleted atoms
         sg.sort()
         if len(sg) > 0:
             ligs_inds.append(sg)
@@ -1021,121 +1063,142 @@ def obmol_lig_split(mol2string,
         lig = lig.tolist()
         ligobmol = ob.OBMol()
         coord_atom_list = []
-        for i,atom_ind in enumerate(lig):
+        for i, atom_ind in enumerate(lig):
             atom_ind += 1
             for l, atom in enumerate(ob.OBMolAtomIter(obmol)):
-                if (l+1 == atom_ind): 
+                if (l+1 == atom_ind):
                     ligobmol.AddAtom(atom)
             for k in bo_dict.keys():
                 if (atom_ind in k):
-                    other_ind = [x for x in k if x!=atom_ind][0] - 1
+                    other_ind = [x for x in k if x != atom_ind][0] - 1
                     if other_ind in met_inds:
                         coord_atom_list.append(i)
         for k in bo_dict.keys():
             if (k[0]-1 in lig) and (k[1]-1 in lig):
                 start_ind = lig.index(k[0]-1) + 1
                 end_ind = lig.index(k[1]-1) + 1
-                ligobmol.AddBond(start_ind,end_ind,bo_dict[k])
+                ligobmol.AddBond(start_ind, end_ind, bo_dict[k])
         ligobmol.PerceiveBondOrders()
         # Key block for catching where coordinating atoms were deprotonated
-        ### WORKING -> Does not work great for nitrogen compounds.
+        # WORKING -> Does not work great for nitrogen compounds.
         for l, atom in enumerate(ob.OBMolAtomIter(ligobmol)):
             if (l in coord_atom_list) and (len(lig) > 1):
                 total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
-                close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
-                if atom.GetFormalCharge() > 0: # Coordinating atoms rarely +ve
+                close = np.argmin(np.abs(
+                    np.array(io_ptable.filled_valence_electrons)-total_val))
+                if atom.GetFormalCharge() > 0:  # Coordinating atoms rarely +ve
                     atom.SetFormalCharge(0)
                 else:
-                    newcharge = int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val))
-                    if (newcharge != int(atom.GetFormalCharge())) and (newcharge > 0):
+                    newcharge = int(atom.GetFormalCharge()-(
+                        io_ptable.filled_valence_electrons[close]-total_val))
+                    if (newcharge != int(
+                        atom.GetFormalCharge())) and (newcharge > 0):
                         atom.SetFormalCharge(0)
-                    elif (newcharge < 0) and (atom.GetAtomicNum() not in [4,5,13]):
+                    elif (newcharge < 0) and (atom.GetAtomicNum() not in [4,
+                                                                          5,
+                                                                          13]):
                         atom.SetFormalCharge(newcharge)
-                    elif atom.GetAtomicNum() in [5,13]: # B/Al coordinating atoms can have valence = 6
-                        if np.abs(total_val - 6) < 2: # Most likely octet-breaker or strange coordination
-                            newcharge = int(atom.GetFormalCharge()-(6-total_val))
+                    elif atom.GetAtomicNum() in [5, 13]:  # B/Al coordinating atoms can have valence = 6
+                        if np.abs(total_val - 6) < 2:  # Most likely octet-breaker or strange coordination
+                            newcharge = int(
+                                atom.GetFormalCharge()-(6-total_val))
                             atom.SetFormalCharge(newcharge)
                         else:
                             atom.SetFormalCharge(newcharge)
-                    elif atom.GetAtomicNum() == 4: # Be coordinating atoms can have valence = 4
+                    elif atom.GetAtomicNum() == 4:  # Be coordinating atoms can have valence = 4
                         if np.abs(total_val - 4) < 2:
-                            newcharge = int(atom.GetFormalCharge()-(4-total_val))
+                            newcharge = int(
+                                atom.GetFormalCharge()-(4-total_val))
                             atom.SetFormalCharge(newcharge)
                         else:
                             atom.SetFormalCharge(newcharge)
                     elif (newcharge != int(atom.GetFormalCharge())):
-                        if np.abs(total_val - 6) < 2: # Most likely octet-breaker or strange coordination
-                            newcharge = int(atom.GetFormalCharge()-(6-total_val))
+                        if np.abs(total_val - 6) < 2:  # Most likely octet-breaker or strange coordination
+                            newcharge = int(
+                                atom.GetFormalCharge()-(6-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 10) < 2: # octet breaker near 10 # R3P=0
-                            newcharge = int(atom.GetFormalCharge()-(10-total_val))
+                        elif np.abs(total_val - 10) < 2:  # octet breaker near 10 # R3P=0
+                            newcharge = int(
+                                atom.GetFormalCharge()-(10-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 12) < 2: # octet breaker near 12
-                            newcharge = int(atom.GetFormalCharge()-(12-total_val))
+                        elif np.abs(total_val - 12) < 2:  # octet breaker near 12
+                            newcharge = int(
+                                atom.GetFormalCharge()-(12-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 14) < 2: # octet breaker near 14
-                            newcharge = int(atom.GetFormalCharge()-(14-total_val))
+                        elif np.abs(total_val - 14) < 2:  # octet breaker near 14
+                            newcharge = int(
+                                atom.GetFormalCharge()-(14-total_val))
                             atom.SetFormalCharge(newcharge)
-                        elif np.abs(total_val - 16) < 2: # octet breaker near 16
-                            newcharge = int(atom.GetFormalCharge()-(16-total_val))
+                        elif np.abs(total_val - 16) < 2:  # octet breaker near 16
+                            newcharge = int(
+                                atom.GetFormalCharge()-(16-total_val))
                             atom.SetFormalCharge(newcharge)
-            elif (len(lig) == 1): # Single atom ligand.
-                atom.SetImplicitHCount(0) # No implicit hydrogens
+            elif (len(lig) == 1):  # Single atom ligand.
+                atom.SetImplicitHCount(0)  # No implicit hydrogens
                 total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
-                close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
-                if atom.GetFormalCharge() > 0: # Coordinating atoms rarely +ve
+                close = np.argmin(np.abs(np.array(
+                    io_ptable.filled_valence_electrons)-total_val))
+                if atom.GetFormalCharge() > 0:  # Coordinating atoms rarely +ve
                     atom.SetFormalCharge(0)
                 else:
-                    newcharge = int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val))
+                    newcharge = int(atom.GetFormalCharge()-(
+                        io_ptable.filled_valence_electrons[close]-total_val))
                     atom.SetFormalCharge(newcharge)
         if (not allow_radicals) and (ligobmol.GetTotalSpinMultiplicity() > 1):
             for l, atom in enumerate(ob.OBMolAtomIter(ligobmol)):
                 if l not in coord_atom_list:
                     total_val = (io_ptable.valence_electrons[atom.GetAtomicNum()] + atom.GetTotalValence())
-                    close = np.argmin(np.abs(np.array(io_ptable.filled_valence_electrons)-total_val))
-                    newcharge = int(atom.GetFormalCharge()-(io_ptable.filled_valence_electrons[close]-total_val))
-                    if (newcharge < 2) and (atom.GetAtomicNum() not in [4,5,13]): # Others most likely octet-breakers
+                    close = np.argmin(np.abs(np.array(
+                        io_ptable.filled_valence_electrons)-total_val))
+                    newcharge = int(atom.GetFormalCharge()-(
+                        io_ptable.filled_valence_electrons[close]-total_val))
+                    # Others most likely octet-breakers
+                    if (newcharge < 2) and (atom.GetAtomicNum() not in [4,
+                                                                        5,
+                                                                        13]):
                         atom.SetFormalCharge(newcharge)
-                    elif atom.GetAtomicNum() in [5,13]: # B/Al can have valence = 6
-                        if np.abs(total_val - 6) < 2: # Most likely octet-breaker or strange coordination
+                    elif atom.GetAtomicNum() in [5, 13]:  # B/Al can have valence = 6
+                        if np.abs(total_val - 6) < 2:  # Most likely octet-breaker or strange coordination
                             newcharge = int(atom.GetFormalCharge()-(6-total_val))
                             atom.SetFormalCharge(newcharge)
                         else:
                             atom.SetFormalCharge(newcharge)
-                    elif atom.GetAtomicNum() == 4: # Be atoms can have valence = 4
+                    elif atom.GetAtomicNum() == 4:  # Be atoms can have valence = 4
                         if np.abs(total_val - 4) < 2:
                             newcharge = int(atom.GetFormalCharge()-(4-total_val))
                             atom.SetFormalCharge(newcharge)
                         else:
                             atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 6) < 2: # octet-breaker near 6 B
+                    elif np.abs(total_val - 6) < 2:  # octet-breaker near 6 B
                         newcharge = int(atom.GetFormalCharge()-(6-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 10) < 2: # octet breaker near 10 # R3P=0
+                    elif np.abs(total_val - 10) < 2:  # octet breaker near 10 # R3P=0
                         newcharge = int(atom.GetFormalCharge()-(10-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 12) < 2: # octet breaker near 12
+                    elif np.abs(total_val - 12) < 2:  # octet breaker near 12
                         newcharge = int(atom.GetFormalCharge()-(12-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 14) < 2: # octet breaker near 14
+                    elif np.abs(total_val - 14) < 2:  # octet breaker near 14
                         newcharge = int(atom.GetFormalCharge()-(14-total_val))
                         atom.SetFormalCharge(newcharge)
-                    elif np.abs(total_val - 16) < 2: # octet breaker near 16
+                    elif np.abs(total_val - 16) < 2:  # octet breaker near 16
                         newcharge = int(atom.GetFormalCharge()-(16-total_val))
                         atom.SetFormalCharge(newcharge)
-        new_smiles = get_smiles_obmol(ligobmol,canonicalize=True)
+        new_smiles = get_smiles_obmol(ligobmol, canonicalize=True)
         ligand_smiles.append(new_smiles)
         if calc_all:
-            new_coord_atom_list,all_smi_inds_list = map_coord_ats_smiles(new_smiles, ligobmol, coord_atom_list, return_all=True)
+            new_coord_atom_list, all_smi_inds_list = map_coord_ats_smiles(
+                new_smiles, ligobmol, coord_atom_list, return_all=True)
             mapped_smiles_inds.append(all_smi_inds_list)
             coord_atom_lists.append(sorted(new_coord_atom_list))
         elif calc_coord_atoms:
-            new_coord_atom_list = map_coord_ats_smiles(new_smiles, ligobmol, coord_atom_list)
+            new_coord_atom_list = map_coord_ats_smiles(
+                new_smiles, ligobmol, coord_atom_list)
             coord_atom_lists.append(sorted(new_coord_atom_list))
         else:
             coord_atom_lists = []
     if not return_info:
-        return ligand_smiles,coord_atom_lists
+        return ligand_smiles, coord_atom_lists
     else:
         info_dict = dict()
         if len(met_inds) == 1:
@@ -1147,16 +1210,20 @@ def obmol_lig_split(mol2string,
         else:
             info_dict['metal'] = None
             info_dict['metal_ind'] = None
-        lig_obmols = [get_obmol_smiles(smi,addHydrogens=True,
-                    neutralize=False,
-                    build=False) for smi in ligand_smiles]
+        lig_obmols = [get_obmol_smiles(smi,
+                                       addHydrogens=True,
+                                       neutralize=False,
+                                       build=False) for smi in ligand_smiles]
         info_dict['lig_charges'] = [x.GetTotalCharge() for x in lig_obmols]
         lig_coord_ats = []
         if calc_all:
-            for i,lig_obmol in enumerate(lig_obmols):
-                _,anums,_ = get_OBMol_coords_anums_graph(lig_obmol,get_types=False)
+            for i, lig_obmol in enumerate(lig_obmols):
+                _, anums, _ = get_OBMol_coords_anums_graph(lig_obmol,
+                                                           get_types=False)
                 if len(coord_atom_lists[i]) > 0:
-                    lig_coord_ats.append(','.join([io_ptable.elements[x] for x in np.array(anums)[np.array(coord_atom_lists[i])]]))
+                    lig_coord_ats.append(','.join(
+                        [io_ptable.elements[x] for x in np.array(anums)[
+                            np.array(coord_atom_lists[i])]]))
             info_dict['lig_coord_ats'] = lig_coord_ats
             info_dict['original_lig_inds'] = ligs_inds
             info_dict['mapped_smiles_inds'] = mapped_smiles_inds
@@ -1171,8 +1238,11 @@ def obmol_lig_split(mol2string,
             info_dict['bound_metal_inds'] = bound_metal_inds
         elif calc_coord_atoms:
             for i, lig_obmol in enumerate(lig_obmols):
-                _, anums, _ = get_OBMol_coords_anums_graph(lig_obmol, get_types=False)
-                lig_coord_ats.append(','.join([io_ptable.elements[x] for x in np.array(anums)[np.array(coord_atom_lists[i])]]))
+                _, anums, _ = get_OBMol_coords_anums_graph(lig_obmol,
+                                                           get_types=False)
+                lig_coord_ats.append(','.join(
+                    [io_ptable.elements[x] for x in np.array(
+                        anums)[np.array(coord_atom_lists[i])]]))
             info_dict['lig_coord_ats'] = lig_coord_ats
         else:
             info_dict['lig_coord_ats'] = None
@@ -1183,21 +1253,21 @@ def get_canonical_label(obmol):
     """Create a canonical label for the molecule using pynauty.
     Warning - can fail/hang on particularly gnarly graphs.
     """
-    _,anums,graph = get_OBMol_coords_anums_graph(obmol,get_types=True)
+    _, anums, graph = get_OBMol_coords_anums_graph(obmol, get_types=True)
     grph = pnGraph(graph.shape[0])
-    colors = get_vertex_coloring(anums) # Color by atom_type
+    colors = get_vertex_coloring(anums)  # Color by atom_type
     for n in range(graph.shape[0]):
         neighs = np.nonzero(np.ravel(graph[n]))[0]
         grph.connect_vertex(n, neighs.tolist())
     grph.set_vertex_coloring(colors)
-    can_label = canon_label(grph) # Pynauty canonical label
+    can_label = canon_label(grph)  # Pynauty canonical label
     return can_label
 
 
 def get_vertex_coloring(anums):
     """ Create set of like atoms by atomic number for graph labelling
     """
-    if isinstance(anums,list): # Convert to array
+    if isinstance(anums, list):  # Convert to array
         anums = np.array(anums)
     sym_labels = sorted(list(set(anums)))
     out_sets = []
@@ -1232,7 +1302,8 @@ def map_coord_ats_smiles(lig_smiles, lig_obmol, coord_atoms, return_all=False):
     else:
         return smicat
 
-def get_fingerprint(obmol,fp='FP2'):
+
+def get_fingerprint(obmol, fp='FP2'):
     """get_fingerprint 
     Gets the fingerprint for an obmol molecule.
 

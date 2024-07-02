@@ -4,6 +4,7 @@ from ase.thermochemistry import IdealGasThermo
 import numpy as np
 from architector import arch_context_manage
 
+
 def vibration_analysis(atoms,
                        hess,
                        project_out_rot_trans=False,
@@ -11,7 +12,7 @@ def vibration_analysis(atoms,
     """vibration analysis
     Gives modes, energies,frequencies, reduced masses, AND force constants
     from hessian for the requested atoms system
-    
+
     Influenced by torchani code: 
     https://github.com/aiqm/torchani/blob/master/torchani/utils.py
     And ASE vibrations data class:
@@ -34,7 +35,7 @@ def vibration_analysis(atoms,
         mass_weighted_unnormalized = same ase ASE 
         mass_weighted_normalized = normalized (same as Guassian) - see 
         https://gaussian.com/vib/ 
-    
+
     Returns
     -------
     energies : np.ndarray
@@ -55,37 +56,45 @@ def vibration_analysis(atoms,
                          'the vibrated atoms. Use Atoms.set_masses()'
                          ' to set all masses to non-zero values.')
     # Hessian in eV/(Angstroms)^2
-    mass_weights = np.repeat(masses**-0.5, 3)  # Units 1/sqrt(MW)
-    mweight_H = mass_weights * hess * mass_weights[:, np.newaxis] # Units eV/(Angstroms^2)/MW
+    mass_weights = np.repeat(masses**-0.5, 3)
+    # Units 1/sqrt(MW)
+    mweight_H = mass_weights * hess * mass_weights[:, np.newaxis]
+    # Units eV/(Angstroms^2)/MW
 
-    if project_out_rot_trans: # See https://gaussian.com/vib/ 
+    if project_out_rot_trans:  # See https://gaussian.com/vib/ 
         positions = atoms.get_positions()
-        r_COM = (masses.reshape(-1,1)*positions).sum(axis=0)/(masses.sum())
+        r_COM = (masses.reshape(-1, 1)*positions).sum(axis=0)/(masses.sum())
         centered = positions - r_COM
         print(centered.shape)
-        I = np.zeros((3,3))
-        for i,centered_posit in enumerate(centered):
-            I[0,0] += masses[i]*(centered_posit[1]**2+centered_posit[2]**2)
-            I[1,0] += -masses[i]*(centered_posit[0]*centered_posit[1])
-            I[2,0] += -masses[i]*(centered_posit[0]*centered_posit[2])
-            I[0,1] += -masses[i]*(centered_posit[0]*centered_posit[1])
-            I[0,2] += -masses[i]*(centered_posit[0]*centered_posit[2])
-            I[1,1] += masses[i]*(centered_posit[0]**2+centered_posit[2]**2)
-            I[2,2] += masses[i]*(centered_posit[0]**2+centered_posit[1]**2)
-            I[1,2] += -masses[i]*(centered_posit[1]*centered_posit[2])
-            I[2,1] += -masses[i]*(centered_posit[1]*centered_posit[2])
+        I = np.zeros((3, 3))
+        for i, centered_posit in enumerate(centered):
+            I[0, 0] += masses[i]*(centered_posit[1]**2+centered_posit[2]**2)
+            I[1, 0] += -masses[i]*(centered_posit[0]*centered_posit[1])
+            I[2, 0] += -masses[i]*(centered_posit[0]*centered_posit[2])
+            I[0, 1] += -masses[i]*(centered_posit[0]*centered_posit[1])
+            I[0, 2] += -masses[i]*(centered_posit[0]*centered_posit[2])
+            I[1, 1] += masses[i]*(centered_posit[0]**2+centered_posit[2]**2)
+            I[2, 2] += masses[i]*(centered_posit[0]**2+centered_posit[1]**2)
+            I[1, 2] += -masses[i]*(centered_posit[1]*centered_posit[2])
+            I[2, 1] += -masses[i]*(centered_posit[1]*centered_posit[2])
         i_eig_values, X = np.linalg.eigh(I)
         D = np.zeros((3*n_atoms,6))
-        D[0::3,0] = np.sqrt(masses) # +X
-        D[1::3,1] = np.sqrt(masses) # +Y
-        D[2::3,2] = np.sqrt(masses) # +Z
+        D[0::3, 0] = np.sqrt(masses)  # +X
+        D[1::3, 1] = np.sqrt(masses)  # +Y
+        D[2::3, 2] = np.sqrt(masses)  # +Z
         # Rotations in the Eckart frame
         for i, mass in enumerate(masses):
             mass_12 = np.sqrt(mass)
             for j in range(3):
-                D[3*i+j,3] = mass_12 * (np.dot(centered[i],X[1])*X[j,2]-np.dot(centered[i],X[2])*X[j,1])
-                D[3*i+j,4] = mass_12 * (np.dot(centered[i],X[2])*X[j,0]-np.dot(centered[i],X[0])*X[j,2])
-                D[3*i+j,5] = mass_12 * (np.dot(centered[i],X[0])*X[j,1]-np.dot(centered[i],X[1])*X[j,0])
+                D[3*i+j, 3] = mass_12 * (
+                    np.dot(centered[i], X[1])*X[j, 2]-np.dot(
+                        centered[i], X[2])*X[j, 1])
+                D[3*i+j, 4] = mass_12 * (
+                    np.dot(centered[i], X[2])*X[j, 0]-np.dot(
+                        centered[i], X[0])*X[j, 2])
+                D[3*i+j, 5] = mass_12 * (
+                    np.dot(centered[i], X[0])*X[j, 1]-np.dot(
+                        centered[i], X[1])*X[j, 0])
 
         ### To implement, qr factorization to normal modes.
 
@@ -107,9 +116,9 @@ def vibration_analysis(atoms,
     mw_normalized = mw_normalized.reshape(n_atoms * 3, n_atoms, 3)
     md_unnormalized = md_unnormalized.reshape(n_atoms * 3, n_atoms, 3)
     md_normalized = md_normalized.reshape(n_atoms * 3, n_atoms, 3)
-    
+
     rmasses = norm_factors**2  # units are MW
-    
+
     fconstants = eig_values.astype(complex) * rmasses  # units are eV/(Angstroms)^2 to define an R
     # kB*T in ase units in units of eV. So plugging into normal mode sampling gives Angstrom.
 
@@ -126,8 +135,12 @@ def vibration_analysis(atoms,
     return energies, modes, fconstants, rmasses, frequencies
     
 
-def calc_free_energy(relaxed_atoms ,temp=298.15, pressure=101325, geometry='nonlinear'):
-    """calc_free_energy utility function to calculate free energy of relaxed structures with
+def calc_free_energy(relaxed_atoms,
+                     temp=298.15,
+                     pressure=101325,
+                     geometry='nonlinear'):
+    """calc_free_energy utility function to calculate free energy of 
+    relaxed structures with
     ASE calculators added.
 
     Uses the ideal gas rigid rotor harmonic oscillator (IGRRHO) approach

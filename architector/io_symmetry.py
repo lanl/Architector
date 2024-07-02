@@ -5,8 +5,8 @@ Developed by Jan Janssen/Michael Taylor!
 
 import numpy as np
 import itertools
-
 import architector.io_obabel as io_obabel
+
 
 def test_combos(combs, occupied):
     """test_combos
@@ -26,6 +26,7 @@ def test_combos(combs, occupied):
     """
     # Compare with numpy arrays
     return combs[~np.any(np.isin(combs, occupied), axis=1)]
+
 
 def flatten(S):
     """flatten
@@ -114,6 +115,7 @@ def generate_good_combos(sel_input_lst, sel_ind, prev_lig, occupied_max):
         return all_lig
     return prev_lig
 
+
 def map_repeat_to_highdent(sel_con_list, nlig, denticity):
     """map_repeat_to_highdent Take in a selected connection list
     for identical ligands (repeats) and return all possible
@@ -154,6 +156,7 @@ def map_repeat_to_highdent(sel_con_list, nlig, denticity):
             reshape_out.append(item.tolist())
             refdict[tuple(item)] = highdents[i]
     return reshape_out, refdict, pseudo_dent
+
 
 def map_all_repeat_to_highdent(uinds, uinv, ucounts, denticities,
                                selected_con_lists):
@@ -225,6 +228,7 @@ def map_all_repeat_to_highdent(uinds, uinv, ucounts, denticities,
             inv_inds.append([item, dent_order.index(item), hist[item]])
         return inv_dicts_out, selected_con_lists_out, out_dents, inv_inds
 
+
 def inv_map_highdent_to_repeat(incombo, inv_dicts, inv_inds):
     """inv_map_highdent_to_repeat take in a combination and invert it
     to original ligand list
@@ -254,6 +258,7 @@ def inv_map_highdent_to_repeat(incombo, inv_dicts, inv_inds):
         else:
             fixed.append(incombo[item[1]].tolist())
     return fixed
+
 
 def select_cons(ligInputDicts, coreType, core_geo_class, params):
     """select_cons
@@ -381,14 +386,14 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
             goods.append(True)
         else:
             raise ValueError('{} not in known ligTypes'.format(ligInput['ligType']))
-        ligobmol = io_obabel.get_obmol_smiles(ligInput['smiles']) # Get obmol for each lig
-        lig_charges.append(ligobmol.GetTotalCharge()) # Calculate total charge.
-        lig_zs=[]
+        ligobmol = io_obabel.get_obmol_smiles(ligInput['smiles'])  # Get obmol for each lig
+        lig_charges.append(ligobmol.GetTotalCharge())  # Calculate total charge.
+        lig_zs = []
         for atom in io_obabel.ob.OBMolAtomIter(ligobmol):
             lig_zs.append(atom.GetAtomicNum())
-        lig_num_atoms.append(np.sum(lig_zs)) # Get sum of z of atoms (estimate steric contribution)
+        lig_num_atoms.append(np.sum(lig_zs))  # Get sum of z of atoms (estimate steric contribution)
         selected_con_lists.append(possible_core_cons)
-    
+
     # Re-order so highest denticity ligand is always placed first.
     dent_order = np.argsort(denticities)[::-1]
     denticities = np.array(denticities)[dent_order].tolist()
@@ -401,10 +406,10 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
     for i in dent_order:
         ordered_lig_charges.append(lig_charges[i])
         ordered_lig_num_atoms.append(lig_num_atoms[i])
-        ordered_sel_con_lists.append(np.array(selected_con_lists[i])) # Convert to np array for good_combo generation!
+        ordered_sel_con_lists.append(np.array(selected_con_lists[i]))  # Convert to np array for good_combo generation!
         ordered_newLigInputDicts.append(newLigInputDicts[i])
-        ordered_newLigInputDicts[-1]['ligCharge'] = lig_charges[i] # Add the ligand charges to the ligands dict
-        
+        ordered_newLigInputDicts[-1]['ligCharge'] = lig_charges[i]  # Add the ligand charges to the ligands dict
+
     lig_charges = ordered_lig_charges
     lig_num_atoms = ordered_lig_num_atoms
     newLigInputDicts = ordered_newLigInputDicts
@@ -412,22 +417,24 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
 
     ordered_newLigInputDict_strs = [str(x) for x in newLigInputDicts]
 
-    _,uinds,uinv,ucounts = np.unique(ordered_newLigInputDict_strs,
-                        return_inverse=True,
-                        return_index=True,
-                        return_counts=True) # Calcuate repeat ligands
+    _, uinds, uinv, ucounts = np.unique(ordered_newLigInputDict_strs,
+                                        return_inverse=True,
+                                        return_index=True,
+                                        return_counts=True)  
+    # Calcuate repeat ligands
     
-    # Map to "higher-denticity" ligands to reduce computational overhead when recursively
-    # Searching symmetries
-    inv_dicts, selected_con_lists, denticities, inv_inds = map_all_repeat_to_highdent(uinds,
-                                                                                      uinv,
-                                                                                      ucounts,
-                                                                                      denticities,
-                                                                                      selected_con_lists)
+    # Map to "higher-denticity" ligands to reduce computational overhead when
+    # recursively Searching symmetries
+    inv_dicts, selected_con_lists, denticities, inv_inds = \
+        map_all_repeat_to_highdent(uinds,
+                                   uinv,
+                                   ucounts,
+                                   denticities,
+                                   selected_con_lists)
 
     inverse_needed = np.any(ucounts > 1)
     if not (len(selected_con_lists[0]) > 0):
-        goods.append(False) # Flag as bad.
+        goods.append(False)  # Flag as bad.
         if params['debug']:
             print('Cannot map this ligand combination to core {} - Not generating.'.format(coreType))
     # Save all selected con_lists -> test for existance of mutually exclusive sets of selected con atoms.
@@ -436,7 +443,9 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
         print('DETERMINING SYMMETRIES.')
     if all(goods):
         good_combos = generate_good_combos(sel_input_lst=selected_con_lists,
-                                            sel_ind=0, prev_lig=[], occupied_max=tmp_cn)
+                                           sel_ind=0,
+                                           prev_lig=[],
+                                           occupied_max=tmp_cn)
         if params['debug']:
             print('All SYMMETRIES Enumerated - beginning energy screening.')
             if inverse_needed:
@@ -446,34 +455,39 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
             out_energies = []
             out_combos = []
 
-            tmp = flatten(good_combos) # Recursively flatten list of items 
+            tmp = flatten(good_combos)  # Recursively flatten list of items 
             # Reshape into list of selected indices.
-            tmp = np.array(tmp).reshape(int(len(tmp)/np.sum(denticities)),int(np.sum(denticities)))
+            tmp = np.array(tmp).reshape(int(len(tmp)/np.sum(denticities)), int(
+                np.sum(denticities)))
 
             good_combos = tmp
 
-            for i,combo in enumerate(good_combos[0:10000]):
+            for i, combo in enumerate(good_combos[0:10000]):
                 tmp_combo = []
-                for j,d in enumerate(denticities): # Re-convert to list of lists matching denticities
-                    tmp_combo.append(combo[int(np.sum(denticities[0:j])):int(np.sum(denticities[0:j]))+d])
-                if inverse_needed: # Make sure to invert back to original ligand space for calculating "energies"
-                    combo = inv_map_highdent_to_repeat(tmp_combo, inv_dicts, inv_inds)
+                for j,d in enumerate(denticities):  # Re-convert to list of lists matching denticities
+                    tmp_combo.append(combo[int(
+                        np.sum(denticities[0:j])):int(
+                            np.sum(denticities[0:j]))+d])
+                if inverse_needed:  # Make sure to invert back to original ligand space for calculating "energies"
+                    combo = inv_map_highdent_to_repeat(tmp_combo,
+                                                       inv_dicts,
+                                                       inv_inds)
                 else:
                     combo = tmp_combo
                 positions = []
                 for x in combo:
-                    inds = np.array(x,dtype=np.int16) # Convert to integer array
+                    inds = np.array(x, dtype=np.int16)  # Convert to integer array
                     tmp_geos = geometry[inds]
                     posit = tmp_geos.sum(axis=0)
-                    if (not np.isclose(np.linalg.norm(posit),0.0)): # Catch when posit is close to zero (e.g. tetra_planar)
-                        posit = posit/np.linalg.norm(posit) # Unit vector
+                    if (not np.isclose(np.linalg.norm(posit), 0.0)):  # Catch when posit is close to zero (e.g. tetra_planar)
+                        posit = posit/np.linalg.norm(posit)  # Unit vector
                     positions.append(posit)
                 positions = np.array(positions)
                 out_energy = 0
                 #################################################################################
                 ####### KEY SECTION DEFINES LIGAND RELATIVE PLACEMENT ###########################
                 #################################################################################
-                for inds in itertools.combinations(list(range(len(positions))),2):
+                for inds in itertools.combinations(list(range(len(positions))), 2):
                     r = np.linalg.norm(positions[inds[0]]-positions[inds[1]])
                     # Colomb energy (without constant)
                     out_energy += (lig_charges[inds[0]]*lig_charges[inds[1]]/r)*(lig_num_atoms[inds[0]]+lig_num_atoms[inds[1]])
@@ -481,41 +495,45 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
                     out_energy += (lig_num_atoms[inds[0]]*lig_num_atoms[inds[1]])/r
                 # # Ranked order score (omit in lieu of energy loss score for symmetry considerations)
                 # out_energy += np.sum([selected_con_lists[k].index(x) for k,x in enumerate(combo)])
-                out_energy = np.round(out_energy,2)
+                out_energy = np.round(out_energy, 2)
                 #################################################################################
                 ####### KEY SECTION DEFINES LIGAND RELATIVE PLACEMENT ###########################
                 #################################################################################
 
-                if (out_energy not in out_energies): # (out_energy < (min_score)+1e10) and
+                if (out_energy not in out_energies):  # (out_energy < (min_score)+1e10) and
                     good = True
                     total_unique_symmetries += 1
                     out_combos.append(combo)
                     out_energies.append(out_energy)
                     # min_score = min(out_energies)
 
-            if good: # Only perform if a set of coord atoms is available.
+            if good:  # Only perform if a set of coord atoms is available.
                 # print(out_combos,out_energies)
-                sort_order = np.argsort(out_energies)[0:params['n_symmetries']] # Take n_symmetries
+                sort_order = np.argsort(
+                    out_energies)[0:params['n_symmetries']]  # Take n_symmetries
                 for k in sort_order[0:]:
                     out_combo = out_combos[k]
                     tligLists = []
-                    for j,selected_con_list in enumerate(out_combo):
+                    for j, selected_con_list in enumerate(out_combo):
                         tligList = []
-                        if (newLigInputDicts[j]['ligType'] == 'sandwich') or (newLigInputDicts[j]['ligType'] == 'haptic'):
+                        if (newLigInputDicts[j]['ligType'] == 'sandwich') or (
+                            newLigInputDicts[j]['ligType'] == 'haptic'):
                             for i in newLigInputDicts[j]['coordList']:
-                                tligList.append([i,list(selected_con_list)])
+                                tligList.append([i, list(selected_con_list)])
                         else:
-                            for i,x in enumerate(selected_con_list):
-                                tligList.append([newLigInputDicts[j]['coordList'][i], int(x)])
+                            for i, x in enumerate(selected_con_list):
+                                tligList.append([newLigInputDicts[j][
+                                    'coordList'][i], int(x)])
                         tligLists.append(tligList)
                     out_liglists.append(tligLists)
         else:
             good = False
             if params['debug']:
                 print('Cannot map this ligand combination to core {} - Not generating.'.format(coreType))
-    else: 
+    else:
         if params['debug']:
             print('Not all individual ligands can map to this {} - Not generating!'.format(coreType))
     if params['debug']:
-        print('Total valid symmetries for core {}: '.format(coreType), len(out_liglists))
+        print('Total valid symmetries for core {}: '.format(
+            coreType), len(out_liglists))
     return newLigInputDicts, out_liglists, total_unique_symmetries, good

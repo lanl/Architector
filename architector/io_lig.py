@@ -1,6 +1,6 @@
 """
 Implements a distance geometry conformer search routine biased to specific geometries
-Note that DG is currently performed and hydrogens are added by OBmol after 
+Note that DG is currently performed and hydrogens are added by OBmol after
 For cases where hydrogen is not a coordinating atom.
 
 Influenced by distgeom.py script from molSimplify and molassembler.
@@ -14,7 +14,7 @@ Adapted from:
 [2] G. Crippen and T. F. Havel, "Distance Geometry and Molecular Conformation", 
                                   in Chemometrics Research Studies Series, Wiley (1988)
 With concepts from:
- 
+
   [1] https://en.wikipedia.org/wiki/Kabsch_algorithm
 """
 
@@ -41,8 +41,8 @@ from xtb.ase.calculator import XTB
 # from tblite.ase import TBLite -> No GFN-FF support yet.
 import warnings
 
-warnings.filterwarnings('ignore') # Supress numpy warnings.
-warnings.simplefilter("ignore", UserWarning) # Supress SciPy warnings.
+warnings.filterwarnings('ignore')  # Supress numpy warnings.
+warnings.simplefilter("ignore", UserWarning)  # Supress SciPy warnings.
 
 # Conditional Numba import
 has_numba = True
@@ -50,6 +50,7 @@ try:
     from numba import jit
 except:
     has_numba = False
+
     def jit(nopython=True):
         return nopython
 
@@ -77,6 +78,7 @@ def conditional_decorator(dec, condition):
         return dec(func)
     return decorator
 
+
 def get_oxo_refdict():
     """get_oxo_refdict
     Pull the metal-oxo distance reference dictionary.
@@ -86,13 +88,16 @@ def get_oxo_refdict():
     ref_df : dict
         dictionary with {'type':angles(List)}
     """
-    filepath = os.path.abspath(os.path.join(__file__, "..", "data", "avg_m_oxo_dists_csd.csv"))
+    filepath = os.path.abspath(os.path.join(__file__, "..",
+                                            "data",
+                                            "avg_m_oxo_dists_csd.csv"))
     ref_df = pd.read_csv(filepath)
     refdict = dict(zip(ref_df.metal, ref_df.avg))
     return refdict
 
+
 def set_XTB_calc(ase_atoms):
-    """set_XTB_calc 
+    """set_XTB_calc
     assign xtb calculator to atoms instance!
 
     Parameters
@@ -102,17 +107,16 @@ def set_XTB_calc(ase_atoms):
     """
     ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
     ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
-    calc = XTB(method="GFN-FF")#,verbosity=0) # Default to only GFN-FF for ligand conformer relaxation.
-    #########################################################
-    ########### Calculator Now Set! #########################
-    #########################################################
+    calc = XTB(method="GFN-FF")
+    # Default to only GFN-FF for ligand conformer relaxation.
     ase_atoms.calc = calc
     return ase_atoms
+
 
 def calc_angle(a, b, c):
     """calc_angle
     Apply inverse cosine to find angle between a-b(vertex)-c
-        
+
     Parameters
     ----------
         a : np.ndarray
@@ -121,7 +125,7 @@ def calc_angle(a, b, c):
             Coordinates of b.
         c : list
             Coordinates of c.
-        
+
     Returns
     -------
         theta : float
@@ -129,8 +133,10 @@ def calc_angle(a, b, c):
     """
     v1 = np.array(a)-np.array(b)
     v2 = np.array(c)-np.array(b)
-    theta = np.degrees(np.arccos(np.dot(v1,v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))))
+    theta = np.degrees(np.arccos(
+        np.dot(v1, v2)/(np.linalg.norm(v1)*np.linalg.norm(v2))))
     return theta
+
 
 def symmetricize(arr1D):
     """symmetricize take in a 1d array and map it to 2D
@@ -148,12 +154,17 @@ def symmetricize(arr1D):
         2D array 
     """
     ID = np.arange(arr1D.size)
-    return arr1D[np.abs(ID - ID[:,None])]
+    return arr1D[np.abs(ID - ID[:, None])]
 
-def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwradii, anums,
-                      isCp=False, cp_catoms=[], bond_tol=0.1, angle_tol=0.1, ca_bond_tol=0.2,
-                      ca_angle_tol=0.1,h_bond_tol=0,h_angle_tol=0,metal_center_lb_multiplier=1,
-                      add_angle_constraints=True, edge_ligand=False):
+
+def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists,
+                      vdwradii, anums,
+                      isCp=False, cp_catoms=[],
+                      bond_tol=0.1, angle_tol=0.1, ca_bond_tol=0.2,
+                      ca_angle_tol=0.1, h_bond_tol=0, h_angle_tol=0,
+                      metal_center_lb_multiplier=1,
+                      add_angle_constraints=True,
+                      edge_ligand=False):
     """get_bounds_matrix
     Generate distance bounds matrices. The basic idea is outlined in ref [1].
     Bond constraints from mmff64-relaxed conformer used for organic section.
@@ -207,33 +218,38 @@ def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwr
         UB : np.array
             Upper bound matrix
     """
-    if isinstance(anums,list):
+    if isinstance(anums, list):
         anums = np.array(anums)
-    if isinstance(vdwradii,list):
+    if isinstance(vdwradii, list):
         vdwradii = np.array(vdwradii)
     LB = np.zeros((natoms, natoms))  # initialize lower bound
     UB = np.zeros((natoms, natoms))  # initialize upper bound, both symmetric
     # Set constraints for all bonding atoms excluding the dummy metal atom
     dummy_idx = natoms-1
 
-    depth = scipy.sparse.csgraph.dijkstra(scipy.sparse.csgraph.csgraph_from_dense(molgraph))
-    distmat = np.sqrt(np.sum((allcoords[:, np.newaxis, :] - allcoords[np.newaxis, :, :]) ** 2, axis = -1))
+    depth = scipy.sparse.csgraph.dijkstra(
+        scipy.sparse.csgraph.csgraph_from_dense(molgraph))
+    distmat = np.sqrt(np.sum((
+        allcoords[:, np.newaxis, :] - allcoords[np.newaxis, :, :]) ** 2,
+        axis=-1))
 
     next_neighs = []
     cpneighs = []
     if (not isCp):
         next_neighs = np.where(depth[dummy_idx] == 2)[0]
     else:
-        tcp = [x for x in catoms if x not in cp_catoms] # Pull out non-cp ring coords
-        for i,catom in enumerate(tcp):
+        tcp = [x for x in catoms if x not in cp_catoms]  # Pull out non-cp ring coords
+        for i, catom in enumerate(tcp):
             next_neigh = np.nonzero(np.ravel(molgraph[catom]))[0]
-            new_neighs = [x for x in next_neigh if (x not in next_neighs) and (x not in catoms)]
+            new_neighs = [x for x in next_neigh if (
+                x not in next_neighs) and (x not in catoms)]
             next_neighs += new_neighs
-        for i,catom in enumerate(cp_catoms):
+        for i, catom in enumerate(cp_catoms):
             next_neigh = np.nonzero(np.ravel(molgraph[catom]))[0]
-            new_neighs = [x for x in next_neigh if (x not in cpneighs) and (x not in catoms)]
+            new_neighs = [x for x in next_neigh if (
+                x not in cpneighs) and (x not in catoms)]
             cpneighs += new_neighs
-        
+
     # 1-2 constraints: UB = LB = BL
     H_i1j2_inds = np.where((depth == 1) & symmetricize(anums == 1))
     LB[H_i1j2_inds] = distmat[H_i1j2_inds] * (1 - h_bond_tol)
@@ -259,7 +275,7 @@ def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwr
     # LB[i1k2_inds] = distmat[i1k2_inds]* (0.8)
     # UB[i1k2_inds] = distmat[i1k2_inds]* (1.2)
 
-    vdw_summat = vdwradii + vdwradii.reshape(-1,1)
+    vdw_summat = vdwradii + vdwradii.reshape(-1, 1)
 
     # Other Depths
     H_i1z2_inds = np.where((depth > 2) & symmetricize(anums == 1))
@@ -271,12 +287,12 @@ def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwr
 
     # Set constraints for atoms bonded to the dummy metal atom
     if not edge_ligand:
-        for i,catom in enumerate(catoms):
+        for i, catom in enumerate(catoms):
             # Set 1-2 constraints
-            UB[catom,dummy_idx] = ml_dists[i] * (1 + ca_bond_tol)
-            UB[dummy_idx,catom] = ml_dists[i] * (1 + ca_bond_tol)
-            LB[catom,dummy_idx] = ml_dists[i] * (1 - ca_bond_tol)
-            LB[dummy_idx,catom] = ml_dists[i] * (1 - ca_bond_tol)
+            UB[catom, dummy_idx] = ml_dists[i] * (1 + ca_bond_tol)
+            UB[dummy_idx, catom] = ml_dists[i] * (1 + ca_bond_tol)
+            LB[catom, dummy_idx] = ml_dists[i] * (1 - ca_bond_tol)
+            LB[dummy_idx, catom] = ml_dists[i] * (1 - ca_bond_tol)
 
         if (len(catoms) > 1) and (add_angle_constraints):
             # Set 1-3 contraints for ligating atoms -> Cosine rule
@@ -284,132 +300,135 @@ def get_bounds_matrix(allcoords, molgraph, natoms, catoms, shape, ml_dists, vdwr
                 for j in range(i+1, len(catoms)):
                     angle = shape[i,j]
                     theta = np.pi*angle/180
-                    lig_distance = np.sqrt(ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
-                    UB[catoms[i],catoms[j]] = lig_distance * (1 + ca_angle_tol)
-                    UB[catoms[j],catoms[i]] = lig_distance * (1 + ca_angle_tol)
-                    LB[catoms[i],catoms[j]] = lig_distance * (1 - ca_angle_tol)
-                    LB[catoms[j],catoms[i]] = lig_distance * (1 - ca_angle_tol)
+                    lig_distance = np.sqrt(
+                        ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
+                    UB[catoms[i], catoms[j]] = lig_distance * (1 + ca_angle_tol)
+                    UB[catoms[j], catoms[i]] = lig_distance * (1 + ca_angle_tol)
+                    LB[catoms[i], catoms[j]] = lig_distance * (1 - ca_angle_tol)
+                    LB[catoms[j], catoms[i]] = lig_distance * (1 - ca_angle_tol)
         elif (len(catoms) > 1): # Set to broad range
             for i in range(len(catoms[:-1])):
                 for j in range(i+1, len(catoms)):
-                    angle = shape[i,j]
+                    angle = shape[i, j]
                     theta = np.pi*angle/180
-                    lig_distance = np.sqrt(ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
-                    UB[catoms[i],catoms[j]] = vdwradii[-1] * 3
-                    UB[catoms[j],catoms[i]] = vdwradii[-1] * 3
-                    LB[catoms[i],catoms[j]] = vdw_summat[catoms[i],catoms[j]] * 0.7
-                    LB[catoms[j],catoms[i]] = vdw_summat[catoms[i],catoms[j]] * 0.7
+                    lig_distance = np.sqrt(
+                        ml_dists[i]**2+ml_dists[j]**2-2*ml_dists[i]*ml_dists[j]*np.cos(theta))
+                    UB[catoms[i], catoms[j]] = vdwradii[-1] * 3
+                    UB[catoms[j], catoms[i]] = vdwradii[-1] * 3
+                    LB[catoms[i], catoms[j]] = vdw_summat[catoms[i], catoms[j]]*0.7
+                    LB[catoms[j], catoms[i]] = vdw_summat[catoms[i], catoms[j]]*0.7
 
         # Adding depth (graph distance) from the metal constraints!
         m_depth = depth[-1]
 
-        for i in range(natoms-1): # Iterate through and assign M-atom bounds
+        for i in range(natoms-1):  # Iterate through and assign M-atom bounds
             j = dummy_idx
-            if (i in cpneighs): # Don't force nearest neighbors quite so far away for cp ligands
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
-                UB[i,j] = 10
-                UB[j,i] = 10
-            elif (i in next_neighs) and (anums[i] != 1): # Make next nearest neighbors longer than vdwrad sum.
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-                UB[i,j] = 20
-                UB[j,i] = 20
-            elif (i in next_neighs) and (anums[i] == 1): # Make next nearest hydrogen neighbors a little closer
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                UB[i,j] = 20
-                UB[j,i] = 20
+            if (i in cpneighs):  # Don't force nearest neighbors quite so far away for cp ligands
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*0.9*metal_center_lb_multiplier
+                UB[i, j] = 10
+                UB[j, i] = 10
+            elif (i in next_neighs) and (anums[i] != 1):  # Make next nearest neighbors longer than vdwrad sum.
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                UB[i, j] = 20
+                UB[j, i] = 20
+            elif (i in next_neighs) and (anums[i] == 1):  # Make next nearest hydrogen neighbors a little closer
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i, j] = 20
+                UB[j, i] = 20
             elif (m_depth[i] < 3):
                 continue
-            elif (m_depth[i] < 4) and (anums[i] != 1): # Encourage further away conformers.
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-                UB[i,j] = 50
-                UB[j,i] = 50
-            elif (m_depth[i] < 4) and (anums[i] == 1): # Encourage further away conformers.
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                UB[i,j] = 50
-                UB[j,i] = 50
+            elif (m_depth[i] < 4) and (anums[i] != 1):  # Encourage further away conformers.
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                UB[i, j] = 50
+                UB[j, i] = 50
+            elif (m_depth[i] < 4) and (anums[i] == 1):  # Encourage further away conformers.
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i, j] = 50
+                UB[j, i] = 50
             # Allow closer atoms for huge lanthanides
             elif (m_depth[i] >= 4) and (anums[j] > 56):
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-                UB[i,j] = 100
-                UB[j,i] = 100 # Set upper bound very high
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                UB[i, j] = 100
+                UB[j, i] = 100  # Set upper bound very high
             # Force non-hydrogens further away at greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] != 1):
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
-                UB[i,j] = 100
-                UB[j,i] = 100 # Set upper bound very high
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                UB[i, j] = 100
+                UB[j, i] = 100  # Set upper bound very high
             # Force hydrogens not so far away for greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] == 1):
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-                UB[i,j] = 100
-                UB[j,i] = 100 # Set upper bound very high
-    else: #edge_ligands
-        for i,catom in enumerate(catoms):
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                UB[i, j] = 100
+                UB[j, i] = 100  # Set upper bound very high
+    else:  # edge_ligands
+        for i, catom in enumerate(catoms):
             # Set 1-2 constraints
-            UB[catom,dummy_idx] = ml_dists[i] * (1 + ca_angle_tol)
-            UB[dummy_idx,catom] = ml_dists[i] * (1 + ca_angle_tol)
-            LB[catom,dummy_idx] = ml_dists[i] * (1 - ca_bond_tol)
-            LB[dummy_idx,catom] = ml_dists[i] * (1 - ca_bond_tol)
+            UB[catom, dummy_idx] = ml_dists[i] * (1 + ca_angle_tol)
+            UB[dummy_idx, catom] = ml_dists[i] * (1 + ca_angle_tol)
+            LB[catom, dummy_idx] = ml_dists[i] * (1 - ca_bond_tol)
+            LB[dummy_idx, catom] = ml_dists[i] * (1 - ca_bond_tol)
         # 1-3 contraints for ligating atoms already set -> same as input structure for "edge" bound ligands
-         # Adding depth (graph distance) from the metal constraints!
+        # Adding depth (graph distance) from the metal constraints!
         m_depth = depth[-1]
 
-        for i in range(natoms-1): # Iterate through and assign M-atom bounds
+        for i in range(natoms-1):  # Iterate through and assign M-atom bounds
             j = dummy_idx
             if (i in next_neighs) and (anums[i] != 1): # Make next nearest neighbors longer than vdwrad sum.
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
-                UB[i,j] = 20
-                UB[j,i] = 20
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                UB[i, j] = 20
+                UB[j, i] = 20
             elif (i in next_neighs) and (anums[i] == 1): # Make next nearest hydrogen neighbors a little closer
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
-                UB[i,j] = 20
-                UB[j,i] = 20
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.0*metal_center_lb_multiplier
+                UB[i, j] = 20
+                UB[j, i] = 20
             elif (m_depth[i] < 3):
                 continue
             elif (m_depth[i] < 4) and (anums[i] != 1): # Encourage further away conformers.
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                UB[i,j] = 50
-                UB[j,i] = 50
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i, j] = 50
+                UB[j, i] = 50
             elif (m_depth[i] < 4) and (anums[i] == 1): # Encourage further away conformers.
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
-                UB[i,j] = 50
-                UB[j,i] = 50
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.1*metal_center_lb_multiplier
+                UB[i, j] = 50
+                UB[j, i] = 50
             # Allow closer atoms for huge lanthanides
             elif (m_depth[i] >= 4) and (anums[j] > 56):
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
-                UB[i,j] = 100
-                UB[j,i] = 100 # Set upper bound very high
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.2*metal_center_lb_multiplier
+                UB[i, j] = 100
+                UB[j, i] = 100  # Set upper bound very high
             # Force non-hydrogens further away at greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] != 1):
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
-                UB[i,j] = 100
-                UB[j,i] = 100 # Set upper bound very high
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.5*metal_center_lb_multiplier
+                UB[i, j] = 100
+                UB[j, i] = 100  # Set upper bound very high
             # Force hydrogens not so far away for greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] == 1):
-                LB[i,j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-                LB[j,i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
-                UB[i,j] = 100
-                UB[j,i] = 100 # Set upper bound very high
+                LB[i, j] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                LB[j, i] = (vdwradii[i] + vdwradii[j])*1.3*metal_center_lb_multiplier
+                UB[i, j] = 100
+                UB[j, i] = 100  # Set upper bound very high
     return LB, UB
 
-@conditional_decorator(jit(nopython=True),has_numba)
+
+@conditional_decorator(jit(nopython=True), has_numba)
 def triangle(LB, UB, natoms):
     """triangle
     Triangle inequality bounds smoothing. From ref [2], pp. 252-253.
-    Scales poorly - using jit compilation for faster evalulation. 
+    Scales poorly - using jit compilation for faster evalulation.
 
     Parameters
     ----------
@@ -419,7 +438,7 @@ def triangle(LB, UB, natoms):
             Upper bounds matrix.
         natoms : int
             Number of atoms in the molecule.
-        
+
     Returns
     -------
         LL : np.array
@@ -431,25 +450,26 @@ def triangle(LB, UB, natoms):
     UL = UB
     for k in range(natoms):
         for i in range(natoms-1):
-            for j in range(i+1,natoms):
-                if UL[i,j] > UL[i,k] + UL[k,j]:
-                    UL[i,j] = UL[i,k] + UL[k,j]
-                    UL[j,i] = UL[i,k] + UL[k,j]
-                if LL[i,j] < LL[i,k] - UL[k,j]:
-                    LL[i,j] = LL[i,k] - UL[k,j]
-                    LL[j,i] = LL[i,k] - UL[k,j]
+            for j in range(i+1, natoms):
+                if UL[i, j] > UL[i, k] + UL[k, j]:
+                    UL[i, j] = UL[i, k] + UL[k, j]
+                    UL[j, i] = UL[i, k] + UL[k, j]
+                if LL[i, j] < LL[i, k] - UL[k, j]:
+                    LL[i, j] = LL[i, k] - UL[k, j]
+                    LL[j, i] = LL[i, k] - UL[k, j]
                 else:
-                    if LL[i,j] < LL[j,k] - UL[k,i]:
-                        LL[i,j] = LL[j,k] - UL[k,i]
-                        LL[j,i] = LL[j,k] - UL[k,i]
-                    if LL[i,j] > UL[i,j]:
+                    if LL[i, j] < LL[j, k] - UL[k, i]:
+                        LL[i, j] = LL[j, k] - UL[k, i]
+                        LL[j, i] = LL[j, k] - UL[k, i]
+                    if LL[i, j] > UL[i, j]:
                         raise ValueError('Bounds Incorrect.')
     return LL, UL
+
 
 def metrize(LB, UB, natoms, non_triangle=False, debug=False):
     """metrize
     Metrization selects random in-range distances. Copied from ref [2], pp. 253-254.
-    Scales O(N^3). 
+    Scales O(N^3).
 
     Parameters
     ----------
@@ -459,7 +479,7 @@ def metrize(LB, UB, natoms, non_triangle=False, debug=False):
             Upper bounds matrix.
         natoms : int
             Number of atoms in the molecule.
-        
+
     Returns
     -------
         D : np.array
@@ -469,27 +489,29 @@ def metrize(LB, UB, natoms, non_triangle=False, debug=False):
     LB, UB = triangle(LB, UB, natoms)
     for i in range(natoms-1):
         for j in range(i+1, natoms):
-            if UB[i,j] < LB[i,j]:  # ensure that the upper bound is larger than the lower bound
-                UB[i,j] = LB[i,j]
-            # LB,UB = triangle(LB,UB,natoms) # Uncomment for full metrization 
-            D[i,j] = np.random.uniform(LB[i,j], UB[i,j])
-            D[j,i] = D[i,j]
-            LB[i,j] = D[i,j]
-            UB[i,j] = D[i,j]
-            LB[j,i] = D[i,j]
-            UB[j,i] = D[i,j]
+            if UB[i, j] < LB[i, j]:  
+                # ensure that the upper bound is larger than the lower bound
+                UB[i, j] = LB[i, j]
+            # LB,UB = triangle(LB,UB,natoms) # Uncomment for full metrization
+            D[i, j] = np.random.uniform(LB[i, j], UB[i, j])
+            D[j, i] = D[i, j]
+            LB[i, j] = D[i, j]
+            UB[i, j] = D[i, j]
+            LB[j, i] = D[i, j]
+            UB[j, i] = D[i, j]
     
     if non_triangle:
-        #For pairs involving the metal, set the distance to 100 Angstroms regardless of the triangle rule
-        #This encourages the algorithm to select conformations that don't crowd the metal
+        # For pairs involving the metal, set the distance to 100 Angstroms regardless of the triangle rule
+        # This encourages the algorithm to select conformations that don't crowd the metal
         for j in range(natoms):
-            if UB[natoms-1,j] < LB[natoms-1,j]:  # ensure that the upper bound is larger than the lower bound
-                UB[natoms-1,j] = LB[natoms-1,j]
+            if UB[natoms-1, j] < LB[natoms-1, j]:  # ensure that the upper bound is larger than the lower bound
+                UB[natoms-1, j] = LB[natoms-1, j]
             D[natoms-1][j] = 100
             D[j][natoms-1] = D[natoms-1][j]
     return D
 
-@conditional_decorator(jit(nopython=True),has_numba)
+
+@conditional_decorator(jit(nopython=True), has_numba)
 def get_cm_dists(D, natoms):
     """get_cm_dists
     Get distances of each atom to center of mass given the distance matrix. 
@@ -501,7 +523,7 @@ def get_cm_dists(D, natoms):
             Distance matrix.
         natoms : int
             Number of atoms in the molecule.
-        
+
     Returns
     -------
         D0 : np.array
@@ -512,14 +534,16 @@ def get_cm_dists(D, natoms):
     D0 = np.zeros(natoms)
     for i in range(natoms):
         for j in range(natoms):
-            D0[i] += D[i,j]**2/natoms
+            D0[i] += D[i, j]**2/natoms
         for j in range(natoms):
             for k in range(j, natoms):
-                D0[i] -= (D[j,k])**2/natoms**2
+                D0[i] -= (D[j, k])**2/natoms**2
         D0[i] = np.sqrt(D0[i])
     return D0
 
-@conditional_decorator(jit(nopython=True),has_numba)
+
+@conditional_decorator(jit(nopython=True),
+                       has_numba)
 def get_metric_matrix(D, D0, natoms):
     """get_metric_matrix
     Get metric matrix from distance matrix and cm distances 
@@ -533,7 +557,7 @@ def get_metric_matrix(D, D0, natoms):
             Vector of distances from center of mass.
         natoms : int
             Number of atoms in the molecule.
-        
+
     Returns
     -------
         G : np.ndarray
@@ -542,20 +566,21 @@ def get_metric_matrix(D, D0, natoms):
     G = np.zeros((natoms, natoms))
     for i in range(natoms):
         for j in range(natoms):
-            G[i,j] = (D0[i]**2 + D0[j]**2 - D[i,j]**2)/2
+            G[i, j] = (D0[i]**2 + D0[j]**2 - D[i, j]**2)/2
     return G
+
 
 def get_3_eigs(G, natoms):
     """get_3_eigs
     Gets 3 largest eigenvalues and corresponding eigenvectors of metric matrix
-        
+
     Parameters
     ----------
         G : np.ndarray
             Metric matrix.
         natoms : int
             Number of atoms in the molecule.
-        
+
     Returns
     -------
         L : np.ndarray
@@ -567,23 +592,24 @@ def get_3_eigs(G, natoms):
     V = np.zeros((natoms, 3))
     l, v = np.linalg.eigh(G)
     for i in [0, 1, 2]:
-        L[i,i] = np.sqrt(np.max(l[natoms-1-i], 0))
+        L[i, i] = np.sqrt(np.max(l[natoms-1-i], 0))
         V[:, i] = v[:, natoms-1-i]
     return L, V
 
-@conditional_decorator(jit(nopython=True),has_numba)
+
+@conditional_decorator(jit(nopython=True), has_numba)
 def distance_error(x, *args):
     """distance_error
-    Computes distance error function for scipy optimization. 
+    Computes distance error function for scipy optimization.
     Copied from E3 in pp. 311 of ref. [1]
-        
+
     Parameters
     ----------
         x : np.ndarray
             1D array of coordinates to be optimized.
         *args : dict
             Other parameters for optimization (needed for scipy.optimize)
-        
+
     Returns
     -------
         E : np.ndarray
@@ -602,19 +628,20 @@ def distance_error(x, *args):
             E += (2*lij**2/(lij**2 + dij**2) - 1)**2
     return E
 
-@conditional_decorator(jit(nopython=True),has_numba)
+
+@conditional_decorator(jit(nopython=True), has_numba)
 def dist_error_gradient(x, *args):
     """dist_error_gradient
     Computes gradient of distance error function for scipy optimization.
     Copied from E3 in pp. 311 of ref. [1]
-        
+
     Parameters
     ----------
         x : np.array
             1D array of coordinates to be optimized.
         *args : dict
             Other parameters (refer to scipy.optimize docs)
-        
+
     Returns
     -------
         g : np.array
@@ -632,14 +659,16 @@ def dist_error_gradient(x, *args):
             uij = UB[i][j]
             lij = LB[i][j]
             g[3*i] += (4*((dij/uij)**2-1)/(uij**2) - (8/lij**2)*(2*(lij**2 /
-                                (lij**2+dij**2))-1)/((1+(dij/lij)**2)**2))*(x[3*i]-x[3*j])  # xi
+                      (lij**2+dij**2))-1)/((1+(dij/lij)**2)**2))*(x[3*i]-x[3*j])  # xi
             g[3*i+1] += (4*((dij/uij)**2-1)/(uij**2) - (8/lij**2)*(2*(lij**2 /
-                                (lij**2+dij**2))-1)/((1+(dij/lij)**2)**2))*(x[3*i+1]-x[3*j+1])  # yi
+                        (lij**2+dij**2))-1)/((1+(dij/lij)**2)**2))*(x[3*i+1]-x[3*j+1])  # yi
             g[3*i+2] += (4*((dij/uij)**2-1)/(uij**2) - (8/lij**2)*(2*(lij**2 /
-                                (lij**2+dij**2))-1)/((1+(dij/lij)**2)**2))*(x[3*i+2]-x[3*j+2])  # zi
+                        (lij**2+dij**2))-1)/((1+(dij/lij)**2)**2))*(x[3*i+2]-x[3*j+2])  # zi
     return g
 
-def get_ideal_angles(ligating_coords, metal_coords=np.array((0,0,0))):
+
+def get_ideal_angles(ligating_coords,
+                     metal_coords=np.array((0, 0, 0))):
     """get_ideal_angles
     Determines the relative angular positioning of ligating atoms
 
@@ -659,12 +688,15 @@ def get_ideal_angles(ligating_coords, metal_coords=np.array((0,0,0))):
     angles_out = np.zeros((len(ligating_coords), len(ligating_coords)))
     if len(ligating_coords) > 1:
         inds = list(range(len(ligating_coords)))
-        for (i,j) in itertools.combinations(inds,2):
-            val = calc_angle(ligating_coords[i],metal_coords, ligating_coords[j])
-            angles_out[i,j] = val
-            angles_out[j,i] = val
-    angles_out[0,0] = 0
+        for (i, j) in itertools.combinations(inds, 2):
+            val = calc_angle(ligating_coords[i],
+                             metal_coords,
+                             ligating_coords[j])
+            angles_out[i, j] = val
+            angles_out[j, i] = val
+    angles_out[0, 0] = 0
     return angles_out
+
 
 def detect_cps(OBMol, ligcoordList):
     """detect_cps 
@@ -687,20 +719,22 @@ def detect_cps(OBMol, ligcoordList):
         list of lists of the corecoordList indices shared by each ring
     """
     # Are there sets of coordinating atoms that are given in inputs? - based on if list passed
-    multiflag_lig_con_sets = np.array([','.join([str(y) for y in sorted(x[1])]) for x in ligcoordList if isinstance(x[1],(list,np.ndarray))])
+    multiflag_lig_con_sets = np.array([','.join([str(y) for y in sorted(
+        x[1])]) for x in ligcoordList if isinstance(x[1], (list, np.ndarray))])
     isCp = False
     cp_rings = []
     shared_coords = []
     if len(multiflag_lig_con_sets) > 0:
         isCp = True
         shared_coord_indices = np.unique(multiflag_lig_con_sets)
-        multiflag_lig_coords = np.array([x[0] for x in ligcoordList if isinstance(x[1],list)])
+        multiflag_lig_coords = np.array([x[0] for x in ligcoordList if isinstance(x[1], list)])
         cp_rings = []
-        if len(shared_coord_indices) > 1: # This is for multiple-CP bound ligands: see UTUGUN CSD refcode for example
+        if len(shared_coord_indices) > 1:
+            # This is for multiple-CP bound ligands: see UTUGUN CSD refcode for example
             # Pull out the coordination indices that are mapped together in rings
             for shared in shared_coord_indices:
                 tcord_list = []
-                for i,x in enumerate(multiflag_lig_con_sets):
+                for i, x in enumerate(multiflag_lig_con_sets):
                     if x == shared:
                         tcord_list.append(int(multiflag_lig_coords[i]))
                 rings = OBMol.GetSSSR()
@@ -712,10 +746,13 @@ def detect_cps(OBMol, ligcoordList):
             # Flag sets of coordination indices
             rings = OBMol.GetSSSR()
             for ring in rings:
-                if all([ring.IsInRing(int(x)+1) for x in multiflag_lig_coords]):
+                if all(
+                   [ring.IsInRing(int(x)+1) for x in multiflag_lig_coords]):
                     cp_rings.append(multiflag_lig_coords)
-                    shared_coords.append([int(x) for x in shared_coord_indices[0].split(',')])
+                    shared_coords.append([int(
+                        x) for x in shared_coord_indices[0].split(',')])
     return isCp, cp_rings, shared_coords
+
 
 def find_best_plane_n_points(points):
     """find_best_plane_n_points 
@@ -734,11 +771,12 @@ def find_best_plane_n_points(points):
         normal vector to the plane of best fit.
     """
     centroid = points.mean(axis=0)
-    xyzR = points - centroid                      
-    _, _, v= np.linalg.svd(xyzR)
-    normal= v[2]                                 
-    normal= normal / np.linalg.norm(normal)
-    return centroid,normal
+    xyzR = points - centroid
+    _, _, v = np.linalg.svd(xyzR)
+    normal = v[2]
+    normal = normal / np.linalg.norm(normal)
+    return centroid, normal
+
 
 def manage_cps(OBmol, cp_rings, shared_coords, ligcoordList, corecoordList,
                metal, covrad_metal=None):
@@ -776,52 +814,65 @@ def manage_cps(OBmol, cp_rings, shared_coords, ligcoordList, corecoordList,
     """
     allcoords, anums, _ = io_obabel.get_OBMol_coords_anums_graph(OBmol)
     metal_elem_ind = io_ptable.elements.index(metal)
-    if isinstance(covrad_metal,float):
+    if isinstance(covrad_metal, float):
         met_rcov1 = covrad_metal
     else:
         met_rcov1 = io_ptable.rcov1[metal_elem_ind]
     anums = np.array(anums)
-    core_coords = list(range(len(corecoordList))) # List for keeping track of which (if any) original core
+    core_coords = list(range(len(corecoordList)))  # List for keeping track of which (if any) original core
     # Coordination vectors maintined after aligning cp ligand -> preserve info
     outcorecoordList = []
-    n_ind = 0 # keep track of how many points assigned
+    n_ind = 0  # keep track of how many points assigned
     outligcoordList = []
 
-    for i,shared in enumerate(shared_coords):
-        cp_ring_inds = np.array(cp_rings[i]) # Get indices of ring atoms
+    for i, shared in enumerate(shared_coords):
+        cp_ring_inds = np.array(cp_rings[i])  # Get indices of ring atoms
 
-        elems_cp_bound = anums[cp_ring_inds] # Pull out the element identities of the cp-bound ring
-        unique,counts = np.unique(elems_cp_bound,return_counts=True)
+        elems_cp_bound = anums[cp_ring_inds]
+        # Pull out the element identities of the cp-bound ring
+        unique, counts = np.unique(elems_cp_bound, return_counts=True)
         most_common_elem_covrad = io_ptable.rcov1[unique[np.argmax(counts)]]
-        scaledist = 1*(most_common_elem_covrad + met_rcov1) # Rescale default distance
+        scaledist = 1*(most_common_elem_covrad + met_rcov1)
+        # Rescale default distance
 
-        newbasis_vect = np.array((0.0,0.0,0.0))
+        newbasis_vect = np.array((0.0, 0.0, 0.0))
         # Generate centroid
         for s in shared:
             newbasis_vect += np.array(corecoordList[s])
-            if s in core_coords: # Remove indice as "used" for cp ligand
+            if s in core_coords:  # Remove indice as "used" for cp ligand
                 core_coords.remove(s)
-        newbasis_vect = newbasis_vect/np.linalg.norm(newbasis_vect)*scaledist # Push back out
+        newbasis_vect = newbasis_vect/np.linalg.norm(newbasis_vect)*scaledist  # Push back out
         cp_ring_coords = allcoords[cp_ring_inds]
-        centroid, normal = find_best_plane_n_points(cp_ring_coords) # Rotate to X axis
+        centroid, normal = find_best_plane_n_points(cp_ring_coords)  # Rotate to X axis
         cp_ring_coords = cp_ring_coords - centroid
-        r = Rot.align_vectors(np.array((1.,0.,0.)).reshape(1,-1), normal.reshape(1,-1))
+        r = Rot.align_vectors(np.array((1.,
+                                        0.,
+                                        0.)).reshape(1,
+                                                     -1), normal.reshape(1,
+                                                                         -1))
         rot_cp_ring_coords = r[0].apply(cp_ring_coords) # Rotate to x axis
-        rot_cp_ring_coords[:,0] = rot_cp_ring_coords[:,0] + scaledist # Shift out to new distance
+        rot_cp_ring_coords[:, 0] = rot_cp_ring_coords[:, 0] + scaledist # Shift out to new distance
 
         # Rotate centroid to the new basis position
-        r1 = Rot.align_vectors(newbasis_vect.reshape(1,-1),np.array((scaledist,0.,0.)).reshape(1,-1)) 
-        new_core_coords = r1[0].apply(rot_cp_ring_coords) # Rotate all coordinates to area around new basis position
-        for j,coord in enumerate(new_core_coords): # Set the cp ring coords to correct inds
+        r1 = Rot.align_vectors(newbasis_vect.reshape(1, -1),
+                               np.array((scaledist,
+                                         0.,
+                                         0.)).reshape(1, -1))
+        # Rotate all coordinates to area around new basis position
+        new_core_coords = r1[0].apply(rot_cp_ring_coords)
+        # Set the cp ring coords to correct inds
+        for j, coord in enumerate(new_core_coords):
             outcorecoordList.append(coord.tolist())
-            outligcoordList.append([int(cp_ring_inds[j]),n_ind])
+            outligcoordList.append([int(cp_ring_inds[j]), n_ind])
             n_ind += 1
 
     cp_catoms = [x[0] for x in outligcoordList]
     catoms = [x[0] for x in outligcoordList]
 
-    for core_coord in core_coords: # Map remaining coord sites to correct positions
-        if any([True for x in ligcoordList if (x[1] == core_coord)]): # Check if true first
+    # Map remaining coord sites to correct positions
+    for core_coord in core_coords:
+        # Check if true first
+        if any([True for x in ligcoordList if (x[1] == core_coord)]):
             outcorecoordList.append(corecoordList[core_coord])
             tligref = [x for x in ligcoordList if (x[1] == core_coord)][0]
             tligref[1] = n_ind
@@ -829,6 +880,7 @@ def manage_cps(OBmol, cp_rings, shared_coords, ligcoordList, corecoordList,
             n_ind += 1
             catoms += [tligref[1]]
     return outligcoordList, outcorecoordList, cp_catoms, catoms
+
 
 def reorder_ligcoordList(coords, catoms, shape, ligcoordList, isCp=False):
     """reorder_ligcoordList attempts to reorder the ligcoordList/catom
@@ -856,31 +908,40 @@ def reorder_ligcoordList(coords, catoms, shape, ligcoordList, isCp=False):
     new_catoms : list
         new coordinating atoms
     """
-    if (len(catoms) > 2) and (not isCp): # Only do for multidentates where ordering may be wrong.
-        actmat = get_ideal_angles(coords[catoms],metal_coords=coords[-1])
-        out = quadratic_assignment(shape,actmat,options={'maximize':True})
+    # Only do for multidentates where ordering may be wrong.
+    if (len(catoms) > 2) and (not isCp):
+        actmat = get_ideal_angles(coords[catoms],
+                                  metal_coords=coords[-1])
+        out = quadratic_assignment(shape,
+                                   actmat,
+                                   options={'maximize': True})
         outorder = out['col_ind']
         new_catoms = np.array(catoms)[outorder]
         new_catoms = new_catoms.tolist()
         new_ligcoordList = []
-        for i,val in enumerate(ligcoordList):
-            new_ligcoordList.append([new_catoms[i],val[1]])
+        for i, val in enumerate(ligcoordList):
+            new_ligcoordList.append([new_catoms[i], val[1]])
     else:
         new_ligcoordList = ligcoordList.copy()
         new_catoms = catoms
         pass
     return new_ligcoordList, new_catoms
 
-def clean_conformation_ff(X, OBMol, catoms, shape, graph, 
-                          atomic_numbers, ligcoordList, original_metal='Fe',
-                          add_angle_constraints=True, ca_metal_dist_constraints=None,
-                          isCp=False, cp_catoms=[], skip_mff=False,add_hydrogens=True,
+
+def clean_conformation_ff(X, OBMol, catoms, shape, graph,
+                          atomic_numbers, ligcoordList,
+                          original_metal='Fe',
+                          add_angle_constraints=True,
+                          ca_metal_dist_constraints=None,
+                          isCp=False, cp_catoms=[],
+                          skip_mff=False,
+                          add_hydrogens=True,
                           edge_ligand=False,
                           debug=False
                           ):
     """clean_conformation_ff
     Further cleans up with OB FF and saves to a new ase object.
-        
+
     Parameters
     ----------
     X : np.array
@@ -912,7 +973,7 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
         Whether this is an "edge" bound ligand.
     debug : bool, optional
         Whether to print debug messages.
-        
+
     Returns
     -------
     ase_atoms : ase.Atoms
@@ -928,14 +989,19 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
     last_atom_index = OBMol.NumAtoms()
     fail = False
     # Set metal to zero
-    metal_coords = (X[last_atom_index-1,0],X[last_atom_index-1,1],X[last_atom_index-1,2])
+    metal_coords = (X[last_atom_index-1, 0],
+                    X[last_atom_index-1, 1],
+                    X[last_atom_index-1, 2])
     # Check if oxo
     if (len(catoms) == 1) and (len(atomic_numbers) == 2) and \
-        (atomic_numbers[0] == 8) and (OBMol.GetTotalCharge() == -2):
+       (atomic_numbers[0] == 8) and (OBMol.GetTotalCharge() == -2):
         msym = original_metal
         refdict = get_oxo_refdict()
-        bondls = float(refdict.get(msym,refdict.get('Others',None)))
-        bondls = bondls * (io_ptable.rcov1[io_ptable.elements.index(msym)] + io_ptable.rcov1[8])
+        bondls = float(refdict.get(msym,
+                                   refdict.get('Others',
+                                               None)))
+        bondls = bondls * (
+            io_ptable.rcov1[io_ptable.elements.index(msym)] + io_ptable.rcov1[8])
         oxo = True
     else:
         oxo = False
@@ -944,38 +1010,46 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
         has_dist_constraints = True
     # set coordinates using OBMol to keep bonding info
     for i, atom in enumerate(openbabel.OBMolAtomIter(OBMol)):
-        atom.SetVector(X[i, 0]-metal_coords[0], X[i, 1]-metal_coords[1], X[i, 2]-metal_coords[2])
-    if (not isCp): # Don't use UFF on cp ligands -> really does not work!
-        #First stage of cleaning takes place with the metal still present
+        atom.SetVector(X[i, 0]-metal_coords[0],
+                       X[i, 1]-metal_coords[1],
+                       X[i, 2]-metal_coords[2])
+    if (not isCp):  # Don't use UFF on cp ligands -> really does not work!
+        # First stage of cleaning takes place with the metal still present
         constr = openbabel.OBFFConstraints()
         ff = openbabel.OBForceField.FindForceField('UFF')
         constr.AddAtomConstraint(int(last_atom_index))
         # Oxo set distance based on CSD
         if oxo and (not has_dist_constraints):
             if debug:
-                print('Adding oxo constraints to ligand generation!',bondls)
-            constr.AddDistanceConstraint(1,2,bondls)
+                print('Adding oxo constraints to ligand generation!',
+                      bondls)
+            constr.AddDistanceConstraint(1,
+                                         2,
+                                         bondls)
         if has_dist_constraints:
             if debug:
-                print('Adding m-ligand distance constraints:',ca_metal_dist_constraints)
-            for key,val in ca_metal_dist_constraints.items():
-                constr.AddDistanceConstraint(int(key)+1,last_atom_index,float(val))
+                print('Adding m-ligand distance constraints:',
+                      ca_metal_dist_constraints)
+            for key, val in ca_metal_dist_constraints.items():
+                constr.AddDistanceConstraint(int(key)+1,
+                                             last_atom_index,
+                                             float(val))
         if edge_ligand:
             if debug:
                 print('Edge-ligand, freezing Coordinating Atoms from DG!')
             for ca in catoms:
                 constr.AddAtomConstraint(int(ca+1)) # Freeze coordinating atoms
-        s = ff.Setup(OBMol,constr)
+        s = ff.Setup(OBMol, constr)
         if not s:
             if debug:
                 print('UFF setup failed')
-            fail=True
+            fail = True
         try:
             for i in range(200):
                 ff.SteepestDescent(10)
                 ff.ConjugateGradients(10)
             ff.GetCoordinates(OBMol)
-            if add_hydrogens: # Add hydrogens back only after initial optimization
+            if add_hydrogens:  # Add hydrogens back only after initial optimization
                 OBMol.AddHydrogens()
                 constr = openbabel.OBFFConstraints()
                 ff = openbabel.OBForceField.FindForceField('UFF')
@@ -983,26 +1057,32 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
                 # Oxo set distance based on CSD
                 if oxo and (not has_dist_constraints):
                     if debug:
-                        print('Adding oxo constraints to ligand generation!',bondls)
-                    constr.AddDistanceConstraint(1,2,bondls)
+                        print('Adding oxo constraints to ligand generation!',
+                              bondls)
+                    constr.AddDistanceConstraint(1, 2, bondls)
                 if has_dist_constraints:
                     if debug:
-                        print('Adding m-ligand distance constraints:',ca_metal_dist_constraints)
-                    for key,val in ca_metal_dist_constraints.items():
-                        constr.AddDistanceConstraint(int(key)+1,last_atom_index,float(val))
+                        print('Adding m-ligand distance constraints:',
+                              ca_metal_dist_constraints)
+                    for key, val in ca_metal_dist_constraints.items():
+                        constr.AddDistanceConstraint(int(key)+1, last_atom_index, float(val))
                 if edge_ligand:
                     for ca in catoms:
-                        constr.AddAtomConstraint(int(ca+1)) # Freeze coordinating atoms
-                s = ff.Setup(OBMol,constr)
+                        constr.AddAtomConstraint(int(ca+1))  # Freeze coordinating atoms
+                s = ff.Setup(OBMol, constr)
                 for i in range(100):
                     ff.SteepestDescent(10)
                     ff.ConjugateGradients(10)
                 ff.GetCoordinates(OBMol)
-            coords, _, _ = io_obabel.get_OBMol_coords_anums_graph(OBMol, return_coords=True)
+            coords, _, _ = io_obabel.get_OBMol_coords_anums_graph(OBMol,
+                                                                  return_coords=True)
             # Reorder the coordinating atom assignment to more closely match unconstrained
             # UFF relaxation to the desired geometry.
-            tligcoordList, catoms = reorder_ligcoordList(coords, catoms, shape, ligcoordList, isCp=isCp)
-            if (add_angle_constraints) and (len(atomic_numbers) > 2) and (not edge_ligand) and (len(catoms) > 1):
+            tligcoordList, catoms = reorder_ligcoordList(coords, catoms, shape,
+                                                         ligcoordList, 
+                                                         isCp=isCp)
+            if (add_angle_constraints) and (len(atomic_numbers) > 2) and \
+               (not edge_ligand) and (len(catoms) > 1):
                 if debug:
                     print('Finished initial UFF relaxation without angle constraints.')
                 ff = openbabel.OBForceField.FindForceField('UFF')
@@ -1011,9 +1091,12 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
                 # Add Ca-M-Ca angle constraints to coordinating atoms 
                 # Helps encourage desired geometry
                 for i in range(shape.shape[0]-1):
-                    for j in range(i+1,shape.shape[0]):
-                        constr.AddAngleConstraint(int(catoms[i]+1),int(last_atom_index),int(catoms[j]+1),float(shape[i,j]))
-                s = ff.Setup(OBMol,constr)
+                    for j in range(i+1, shape.shape[0]):
+                        constr.AddAngleConstraint(int(catoms[i]+1),
+                                                  int(last_atom_index),
+                                                  int(catoms[j]+1),
+                                                  float(shape[i, j]))
+                s = ff.Setup(OBMol, constr)
                 for i in range(200):
                     ff.SteepestDescent(10)
                     ff.ConjugateGradients(10)
@@ -1027,19 +1110,20 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
                 print('Never Finished UFF relaxation.')
     else:
         tligcoordList = ligcoordList.copy()
-        if add_hydrogens: # Re-add hydrogens after generation and UFF relaxation.
+        if add_hydrogens:  # Re-add hydrogens after generation and UFF relaxation.
             OBMol.AddHydrogens()
     ########## Second stage of cleaning removes the metal - MMFF94 ################# 
     #### Uses constraints on the bonding atoms to ensure the binding conformation is maintained
     #### If not Cp ligand - otherwise - fully relaxing!
-
-    #Delete the dummy metal atom that we added earlier for MMFF94
+    # Delete the dummy metal atom that we added earlier for MMFF94
     metal_atom = OBMol.GetAtom(last_atom_index)
     OBMol.DeleteAtom(metal_atom)
 
-    _, atomic_numbers, graph = io_obabel.get_OBMol_coords_anums_graph(OBMol, return_coords=False)
+    _, atomic_numbers, graph = io_obabel.get_OBMol_coords_anums_graph(OBMol,
+                                                return_coords=False)
 
-    mmff94_ok = io_obabel.check_mmff_okay(OBMol) # Check for match between chemistry and MMFF94
+    mmff94_ok = io_obabel.check_mmff_okay(OBMol)  
+    # Check for match between chemistry and MMFF94
 
     # Set up force field
     if mmff94_ok:
@@ -1050,24 +1134,24 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
     if (not isCp):
         constr = openbabel.OBFFConstraints()
         for ca in catoms:
-            constr.AddAtomConstraint(int(ca+1)) # Freeze coordinating atoms
+            constr.AddAtomConstraint(int(ca+1))  # Freeze coordinating atoms
             neighs = np.nonzero(graph[ca])[0]
             for n in neighs:
                 # Freeze Hs on coordinating atoms (w/o metal will go into metal position)
                 if atomic_numbers[n] == 1:
                     constr.AddAtomConstraint(int(n+1)) 
-        s = ff.Setup(OBMol,constr)
+        s = ff.Setup(OBMol, constr)
     else:
         # Fixing tail/non-coordinating positions with MMFF -> attempt to fix hydrogen positions
         constr = openbabel.OBFFConstraints()
         for ca in catoms:
-            constr.AddAtomConstraint(int(ca+1)) # Freeze coordinating atoms
-        s = ff.Setup(OBMol,constr)
+            constr.AddAtomConstraint(int(ca+1))  # Freeze coordinating atoms
+        s = ff.Setup(OBMol, constr)
 
     if not s:
         if debug:
             print('MMFF setup failed')
-        fail=True
+        fail = True
 
     if not skip_mff:
         for i in range(200):
@@ -1079,14 +1163,15 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
     ase_atoms_tmp = io_obabel.convert_obmol_ase(OBMol)
     final_relax = True
 
-    #### Third stage of cleaning for only Cp - geometries ####
-    if isCp: # GFN-FF needed for capturing Cp geometries
+    # Third stage of cleaning for only Cp - geometries #
+    if isCp:  # GFN-FF needed for capturing Cp geometries
         constraintList = []
-        mat = Atom(atomic_numbers[-1],(0,0,0))
-        ase_atoms_tmp.append(mat) # Fix metal atom only for single cp ring
+        mat = Atom(atomic_numbers[-1],(0, 0, 0))
+        ase_atoms_tmp.append(mat)  # Fix metal atom only for single cp ring
         fixCore = ase_con.FixAtoms(indices=[last_atom_index-1])
 
-        if (len(cp_catoms) == 4) or (len(cp_catoms) == 3): #For small rings encourage staying in the same place!
+        if (len(cp_catoms) == 4) or (len(cp_catoms) == 3): 
+            # For small rings encourage staying in the same place!
             fixCon = ase_con.FixAtoms(indices=cp_catoms)
             constraintList.append(fixCon)
             final_relax = False
@@ -1102,17 +1187,19 @@ def clean_conformation_ff(X, OBMol, catoms, shape, graph,
             if debug:
                 print(e)
             fail = True
-        ase_atoms_tmp.set_constraint() # Clear constraints
-        ase_atoms_tmp.calc = None # Remove calculator
-        ase_atoms_tmp.pop() # re-remove metal atom
+        ase_atoms_tmp.set_constraint()  # Clear constraints
+        ase_atoms_tmp.calc = None  # Remove calculator
+        ase_atoms_tmp.pop()  # re-remove metal atom
 
     return ase_atoms_tmp, fail, final_relax, tligcoordList
 
 
 def nonclean_conformation_ff(X, OBMol, catoms, shape, graph, 
-                          atomic_numbers, ligcoordList, add_angle_constraints=True,
-                          isCp=False, cp_catoms=[], skip_mff=False, add_hydrogens=False
-                          ):
+                             atomic_numbers, ligcoordList, 
+                             add_angle_constraints=True,
+                             isCp=False, cp_catoms=[], 
+                             skip_mff=False, add_hydrogens=False
+                             ):
     """nonclean_conformation_ff -> Mostly used for debug/DG optimization
     Skips all OB FF and saves to a new ase object.
 

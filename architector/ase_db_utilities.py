@@ -24,18 +24,18 @@ def serialize_json_dict(indict):
     ss = '{'
     count = 1
     ids = []
-    for key,val in tqdm(indict.items(),total=len(indict)):
+    for key, val in tqdm(indict.items(),total=len(indict)):
         if count % 500 == 0:
             print(count)
-        tlines = '"{}"'.format(count) + ': '+ '{\n'
-        for skey,sval in val.items():
-            if isinstance(sval,str):
+        tlines = '"{}"'.format(count) + ': ' + '{\n'
+        for skey, sval in val.items():
+            if isinstance(sval, str):
                 sval = '"{}"'.format(sval)
             tlines += '"{}"'.format(skey)+': '+str(sval)+',\n'
         tlines = tlines.strip().strip(',') + '},\n'
-        tlines = re.sub("'",'"',tlines)
-        tlines = re.sub('True','true',tlines)
-        tlines = re.sub('False','false',tlines)
+        tlines = re.sub("'", '"', tlines)
+        tlines = re.sub('True', 'true', tlines)
+        tlines = re.sub('False', 'false', tlines)
         if 'nan' in tlines:
             print('nan error')
         else:
@@ -47,7 +47,7 @@ def serialize_json_dict(indict):
     return ss
 
 
-def merge_JsonFiles(filenamelist,outfname='compiled.json'):
+def merge_JsonFiles(filenamelist, outfname='compiled.json'):
     """jsons = [str(x) for x in p.glob('architector*json')]
     compiled_json_name = 'compiled.json'
     merge_JsonFiles(jsons,compiled_json_name)"""
@@ -74,7 +74,8 @@ def merge_JsonFiles(filenamelist,outfname='compiled.json'):
 
 
 def convert_arrays_to_npz(dbname, prefix, mindist_cutoff=0.5,
-    return_symbols=False, max_force=300, return_df=False):
+                          return_symbols=False, max_force=300,
+                          return_df=False):
     """load arrays load ase database into hippynn database arrays
     example : convert_arrays_to_npz('compiled.json','xtbdataset')
 
@@ -116,20 +117,23 @@ def convert_arrays_to_npz(dbname, prefix, mindist_cutoff=0.5,
         try:
             syms,counts=np.unique(row.symbols,return_counts=True)
             result_dict = {
-                'atoms':row.numbers,
+                'atoms': row.numbers,
                 'xyz': row.positions,
                 'cell': row.cell,
-                'is_pbc':is_pbc,
+                'is_pbc': is_pbc,
                 'force': row.forces,
                 'energy': row.energy,
-                'atomization_energy':row.energy -  np.sum([io_ptable.xtb_single_atom_ref_es[sym]*counts[i] for i,sym in enumerate(syms)]),
+                'atomization_energy': row.energy -
+                np.sum(
+                    [io_ptable.xtb_single_atom_ref_es[sym]*counts[i] for i, sym in enumerate(syms)]),
                 'uid': row.unique_id,
                 'relaxed': row.relaxed,
                 'geo_step': row.geo_step
             }
             distmat = row.toatoms().get_all_distances() + np.eye(len(row.numbers))* mindist_cutoff*2
-            maxforce = np.max(np.linalg.norm(row.forces,axis=1))
-            if (distmat.min() > mindist_cutoff) and (maxforce < max_force): # Hard distance cutoff, forces cutoff
+            maxforce = np.max(np.linalg.norm(row.forces, axis=1))
+            # Hard distance cutoff, forces cutoff
+            if (distmat.min() > mindist_cutoff) and (maxforce < max_force):
                 record_list.append(result_dict)
                 if row.natoms > max_n_atom:
                     max_n_atom = row.natoms
@@ -159,8 +163,8 @@ def convert_arrays_to_npz(dbname, prefix, mindist_cutoff=0.5,
         atom_z_array[i,:natom] = record['atoms']
         if pbc:
             cell_array[i, :, :] = record['cell']
-    np.save("data-" + prefix + 'atomization_energy.npy', atomization_array) 
-    np.save("data-" + prefix + 'energy.npy', energy_array)        
+    np.save("data-" + prefix + 'atomization_energy.npy', atomization_array)
+    np.save("data-" + prefix + 'energy.npy', energy_array)
     np.save("data-" + prefix + 'R.npy', xyz_array)
     np.save("data-" + prefix + 'force.npy', force_array)
     np.save("data-" + prefix + 'Z.npy', atom_z_array.astype('int'))

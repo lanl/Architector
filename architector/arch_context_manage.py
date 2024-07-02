@@ -3,6 +3,7 @@ import shutil
 import contextlib
 import os
 
+
 @contextlib.contextmanager
 def make_temp_directory(prefix=None):
     """make_temp_directory function to make a temporary directory and change there.
@@ -26,4 +27,3 @@ def make_temp_directory(prefix=None):
     finally:
         os.chdir(mycwd)
         shutil.rmtree(temp_dir)
-        

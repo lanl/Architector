@@ -1,10 +1,9 @@
 """
-Namely the class to handle ase calculations or obmol calculations of metal complexes.
+Namely the class to handle ase calculations or
+obmol calculations of metal complexes.
 
 Developed by Michael Taylor
 """
-
-
 import numpy as np
 import time
 import copy
@@ -19,80 +18,86 @@ import ase
 from ase.io import Trajectory
 from ase.optimize import LBFGSLineSearch
 from ase.constraints import (FixAtoms, FixBondLengths, FixInternals)
+
+# Add any other ASE calculator here.
+# To extend to other methods.
+from xtb.ase.calculator import XTB
+from tblite.ase import TBLite
+# No GFN-FF nor solvent support yet in TBLite
+
 has_sella = True
 try:
     from sella import Internals
 except:
     has_sella = False
 
-### Add any other ASE calculator here.
-# To extend to other methods.
-from xtb.ase.calculator import XTB
-from tblite.ase import TBLite  #-> No GFN-FF nor solvent support yet
 
-params={
-"save_trajectories": False, # Only on XTB methods
-"save_first_n":1, # Number of trajectory steps to save to json database.
-"dump_ase_atoms": False,
-"ase_atoms_db_name":'architector_ase_db.json',
-"temp_prefix":"/tmp/",
-"ase_db_tmp_name":"/tmp/architector_ase_db.json",
-"architector_run_label":'arch_run_0',
-# Cutoff parameters
-"assemble_sanity_checks":True, # Turn on/off assembly sanity checks.
-"assemble_graph_sanity_cutoff":1.8,
-# Graph Sanity cutoff for imposed molecular graph represents the maximum elongation of bonds
-# rcov1*full_graph_sanity_cutoff is the maximum value for the bond lengths.
-"assemble_smallest_dist_cutoff":0.3,
-# Smallest dist cutoff screens if any bonds are less than smallest_dist_cutoff*sum of cov radii
-# Will not be evaluated by XTB if they are lower.
-"assemble_min_dist_cutoff":4,
-# Smallest min dist cutoff screens if any atoms are at minimum min_dist_cutoff*sum of cov radii
-# away from ANY other atom (indicating blown-up structure) 
-# - will not be evaluated by XTB if they are lower.
-"full_sanity_checks":True, # Turn on/off final sanity checks.
-"full_graph_sanity_cutoff":1.7,
-# full_graph_sanity_cutoff can be tightened to weed out distorted geometries (e.g. 1.5 for non-group1-metals) 
-"full_smallest_dist_cutoff":0.55,
-"full_min_dist_cutoff":3.5,
-# Electronic parameters
-"metal_ox": None, # Oxidation State
-"metal_spin": None, # Spin State
-"xtb_solvent": 'none', # Add any named XTB solvent!
-"calculator_kwargs":dict(), # ASE calculator kwargs.
-"ase_opt_kwargs":dict(), # ASE optimizer kwargs.
-"xtb_accuracy":1.0, # Numerical Accuracy for XTB calculations
-"xtb_electronic_temperature":300, # In K -> fermi smearing - increase for convergence on harder systems
-"xtb_max_iterations":250, # Max iterations for xtb SCF.
-"full_spin": None, # Assign spin to the full complex (overrides metal_spin)
-"full_charge": None, # Assign charge to the complex (overrides ligand charges and metal_ox)!
-"full_method":"GFN2-xTB", # Which xtb method to use for final cleaning/evaulating conformers.
-"assemble_method":"GFN2-xTB",
-"ff_preopt":False,
-"override_oxo_opt":False,
-"fmax":0.1,
-"maxsteps":1000,
-"vdwrad_metal":None,
-"covrad_metal":None,
-"scaled_radii_factor":None,
-"force_generation":False,
-"species_run":False,
-"debug":False,
-"ase_opt_kwargs":{},
-"calculator_kwargs":{}
+params = {
+    "save_trajectories": False,  # Only on XTB methods
+    "save_first_n": 1,  # Number of trajectory steps to save to json database.
+    "dump_ase_atoms": False,
+    "ase_atoms_db_name": 'architector_ase_db.json',
+    "temp_prefix": "/tmp/",
+    "ase_db_tmp_name": "/tmp/architector_ase_db.json",
+    "architector_run_label": 'arch_run_0',
+    # Cutoff parameters
+    "assemble_sanity_checks": True, # Turn on/off assembly sanity checks.
+    "assemble_graph_sanity_cutoff": 1.8,
+    # Graph Sanity cutoff for imposed molecular graph represents the maximum elongation of bonds
+    # rcov1*full_graph_sanity_cutoff is the maximum value for the bond lengths.
+    "assemble_smallest_dist_cutoff": 0.3,
+    # Smallest dist cutoff screens if any bonds are less than smallest_dist_cutoff*sum of cov radii
+    # Will not be evaluated by XTB if they are lower.
+    "assemble_min_dist_cutoff": 4,
+    # Smallest min dist cutoff screens if any atoms are at minimum min_dist_cutoff*sum of cov radii
+    # away from ANY other atom (indicating blown-up structure) 
+    # - will not be evaluated by XTB if they are lower.
+    "full_sanity_checks": True,  # Turn on/off final sanity checks.
+    "full_graph_sanity_cutoff": 1.7,
+    # full_graph_sanity_cutoff can be tightened to weed out distorted geometries (e.g. 1.5 for non-group1-metals) 
+    "full_smallest_dist_cutoff": 0.55,
+    "full_min_dist_cutoff": 3.5,
+    # Electronic parameters
+    "metal_ox": None,  # Oxidation State
+    "metal_spin": None,  # Spin State
+    "xtb_solvent": 'none',  # Add any named XTB solvent!
+    "calculator_kwargs": dict(),  # ASE calculator kwargs.
+    "ase_opt_kwargs": dict(),  # ASE optimizer kwargs.
+    "xtb_accuracy": 1.0,  # Numerical Accuracy for XTB calculations
+    "xtb_electronic_temperature": 300,  # In K -> fermi smearing - increase for convergence on harder systems
+    "xtb_max_iterations": 250,  # Max iterations for xtb SCF.
+    "full_spin": None,  # Assign spin to the full complex (overrides metal_spin)
+    "full_charge": None,  # Assign charge to the complex (overrides ligand charges and metal_ox)!
+    "full_method": "GFN2-xTB",  # Which xtb method to use for final cleaning/evaulating conformers.
+    "assemble_method": "GFN2-xTB",
+    "ff_preopt": False,
+    "override_oxo_opt": False,
+    "fmax": 0.1,
+    "maxsteps": 1000,
+    "vdwrad_metal": None,
+    "covrad_metal": None,
+    "scaled_radii_factor": None,
+    "force_generation": False,
+    "species_run": False,
+    "debug": False,
 }
+
 
 class CalcExecutor:
     def __init__(self, structure, parameters={}, init_sanity_check=False,
-                final_sanity_check=False, relax=False, assembly=False,
-                method='GFN2-xTB', xtb_solvent='none', xtb_accuracy=1.0,
-                xtb_electronic_temperature=300, xtb_max_iterations=250,
-                fmax=0.1, maxsteps=1000, ff_preopt_run=False,
-                detect_spin_charge=False, fix_m_neighbors=False, fix_indices=None,
-                default_params=params, ase_opt_method=None, ase_opt_kwargs={}, species_run=False,
-                intermediate=False, skip_spin_assign=False, save_trajectories=False,
-                store_results=False, use_constraints=False, trans_oxo_triples=[],
-                calculator=None, debug=False):
+                 final_sanity_check=False, relax=False, assembly=False,
+                 method='GFN2-xTB', xtb_solvent='none', xtb_accuracy=1.0,
+                 xtb_electronic_temperature=300, xtb_max_iterations=250,
+                 fmax=0.1, maxsteps=1000, ff_preopt_run=False,
+                 detect_spin_charge=False, fix_m_neighbors=False,
+                 fix_indices=None,
+                 default_params=params, ase_opt_method=None, ase_opt_kwargs={},
+                 species_run=False,
+                 intermediate=False, skip_spin_assign=False,
+                 save_trajectories=False,
+                 store_results=False, use_constraints=False,
+                 trans_oxo_triples=[],
+                 calculator=None, debug=False):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
         Parameters
@@ -174,7 +179,7 @@ class CalcExecutor:
         default_params.update(parameters)
         self.parameters = default_params
         if len(self.parameters) > 0:
-            for key,val in self.parameters.items():
+            for key, val in self.parameters.items():
                 setattr(self, key, val)
         self.init_sanity_check = init_sanity_check
         self.final_sanity_check = final_sanity_check
@@ -209,7 +214,7 @@ class CalcExecutor:
             self.relax = False
             self.method = self.assemble_method
         elif species_run:
-            if isinstance(intermediate,str):
+            if isinstance(intermediate, str):
                 if intermediate == 'rotation':
                     self.method = self.species_intermediate_method
                     self.relax = False
@@ -223,19 +228,19 @@ class CalcExecutor:
         elif len(parameters) > 0:
             if self.ff_preopt_run:
                 self.method = 'UFF'
-                self.relax=True
+                self.relax = True
             else:
                 self.method = self.full_method
         else:
             if self.ff_preopt_run:
                 self.method = 'UFF'
-                self.relax=True
-        if self.ase_opt_method is None: # Default to LBFGSLineSearch
+                self.relax = True
+        if self.ase_opt_method is None:  # Default to LBFGSLineSearch
             self.opt_method = LBFGSLineSearch
         else:
             self.opt_method = self.ase_opt_method
         # Temporary logfile or not for ase optimizer
-        if self.parameters['debug']: # Set logfile to suppress stdout output.
+        if self.parameters['debug']:  # Set logfile to suppress stdout output.
             self.logfile = None
         else:
             self.logfile = 'tmp.log'
@@ -245,8 +250,10 @@ class CalcExecutor:
 
         self.calc_instantiated = False
 
-        if (self.calculator is not None) and ('custom' in self.method): # Check if input calculator is XTB.
-            if hasattr(self.calculator,'name'): # Check if instantiated already
+        if (self.calculator is not None) and ('custom' in self.method):  
+            # Check if input calculator is XTB.
+            if hasattr(self.calculator, 'name'):
+                # Check if instantiated already
                 self.calc_instantiated = True
                 if 'xtb' in self.calculator.name:
                     self.mol.swap_actinide(debug=self.parameters['debug'])
@@ -264,9 +271,12 @@ class CalcExecutor:
         self.calculate()
 
     def calculate(self):
-        if self.init_sanity_check and self.parameters.get('assemble_sanity_checks',True):
-            self.mol.dist_sanity_checks(params=self.parameters,assembly=self.assembly)
-            self.mol.graph_sanity_checks(params=self.parameters,assembly=self.assembly)
+        if self.init_sanity_check and self.parameters.get(
+           'assemble_sanity_checks', True):
+            self.mol.dist_sanity_checks(params=self.parameters,
+                                        assembly=self.assembly)
+            self.mol.graph_sanity_checks(params=self.parameters,
+                                         assembly=self.assembly)
         if self.mol.dists_sane:
             if (not self.species_run) and (not self.skip_spin_assign):
                 self.mol.calc_suggested_spin(params=self.parameters)
@@ -293,17 +303,18 @@ class CalcExecutor:
             elif 'gfn' in self.method.lower():
                 # Temporary workaround to use TBLite by default if applicable.
                 if (self.xtb_solvent == 'none') and (self.method != 'GFN-FF'):
-                    calc = TBLite(method=self.method, max_iterations=self.xtb_max_iterations,
+                    calc = TBLite(method=self.method,
+                                  max_iterations=self.xtb_max_iterations,
                                   electronic_temperature=self.xtb_electronic_temperature,
-                                #   spin_polarization=1.0, # Have spin polarization on if desired.
+                                  # spin_polarization=1.0, # Have spin polarization on if desired.
                                   verbosity=self.parameters['debug'])
                 # Use XTB for other cases.
                 else:
                     calc = XTB(method=self.method, solvent=self.xtb_solvent,
-                            max_iterations=self.xtb_max_iterations,
-                            electronic_temperature=self.xtb_electronic_temperature,
-                            accuracy=self.xtb_accuracy)
-                        #    verbosity=0)
+                               max_iterations=self.xtb_max_iterations,
+                               electronic_temperature=self.xtb_electronic_temperature,
+                               accuracy=self.xtb_accuracy)
+                        # verbosity=0)
                 # Difference of more than 1. Still perform a ff_preoptimization if requested.
                 if (np.abs(self.mol.xtb_charge - self.mol.charge) > 1):
                     if len(self.trans_oxo_triples) > 0:
@@ -352,7 +363,7 @@ class CalcExecutor:
                                 tlist = self.fix_indices
                             if (triple[0] not in tlist) or (triple[1] not in tlist):
                                 bonds.append([self.mol.ase_atoms.get_distance(triple[0],triple[1]),
-                                        [triple[0],triple[1]]])
+                                              [triple[0],triple[1]]])
                                 bonds.append([self.mol.ase_atoms.get_distance(triple[2],triple[1]),
                                         [triple[2],triple[1]]])
                                 angles_degs.append([180.0,list(triple)])

@@ -946,6 +946,7 @@ class Molecule:
                  smallest_dist_cutoff=0.55,
                  min_dist_cutoff=3,
                  params={},
+                 pair_cutoffs=None,
                  assembly=False,
                  covrad_metal=None,
                  debug=False):
@@ -958,6 +959,8 @@ class Molecule:
             atoms to check for sanity.
         params : dict, optional
             parameters for dictionary, default {}.
+        pair_cutoffs : dict, optional
+            pair distance cutoffs definition e.g. {('O','H'):0.8}, default None
         smallest_dist_cutoff : float
             distance cutoff-make sure sum of cov radii larger than dist*smallest_dist_cutoff
         min_dist_cutoff : int/float
@@ -970,42 +973,63 @@ class Molecule:
             print if debug requested.
         """
         run_check = True
-        if (len(params) > 0)  and (not assembly):
-            run_check = params.get('full_sanity_checks',run_check)
-            smallest_dist_cutoff = params.get('full_smallest_dist_cutoff',smallest_dist_cutoff)
-            min_dist_cutoff = params.get('full_min_dist_cutoff',min_dist_cutoff)
-        elif (len(params) > 0) :
-            run_check = params.get('assemble_sanity_checks',run_check)
-            smallest_dist_cutoff = params.get('assemble_smallest_dist_cutoff',smallest_dist_cutoff)
-            min_dist_cutoff = params.get('assemble_min_dist_cutoff',min_dist_cutoff)
+        if (len(params) > 0) and (not assembly):
+            run_check = params.get('full_sanity_checks', run_check)
+            smallest_dist_cutoff = params.get('full_smallest_dist_cutoff',
+                                              smallest_dist_cutoff)
+            min_dist_cutoff = params.get('full_min_dist_cutoff',
+                                         min_dist_cutoff)
+        elif (len(params) > 0):
+            run_check = params.get('assemble_sanity_checks', run_check)
+            smallest_dist_cutoff = params.get('assemble_smallest_dist_cutoff',
+                                              smallest_dist_cutoff)
+            min_dist_cutoff = params.get('assemble_min_dist_cutoff',
+                                         min_dist_cutoff)
         if debug:
-            params.update({'debug':debug})
+            params.update({'debug': debug})
+        if isinstance(pair_cutoffs, dict):
+            new_pair_dict = dict()
+            for key, val in pair_cutoffs.items():
+                newkey = tuple(sorted(key))
+                if newkey in new_pair_dict:
+                    if params.get('debug', False):
+                        print("Warning: multiple distance cutoffs passed for the same set of atom pairs")
+                        print('Using the first one only!')
+                # 'dist' or 'scale_covrad'
+                elif key == 'type': 
+                    new_pair_dict[key] = val
+                else:
+                    new_pair_dict[newkey] = val
+            # Default to scale factors to the sum of covalent radii
+            if 'type' not in new_pair_dict:
+                new_pair_dict['type'] = 'scale_covrad'
         sane = self.dists_sane
         min_dist_dict = {}
         smallest_dist_dict = {}
+        symbols = self.ase_atoms.get_chemical_symbols()
         if run_check:
             atoms = self.ase_atoms.copy()
-            if len(atoms) > 1: # Don't test distances for single atom
+            if len(atoms) > 1:  # Don't test distances for single atom
                 posits = atoms.get_positions()
-                m_inds = [i for i,x in enumerate(atoms.get_chemical_symbols()) if x in io_ptable.all_metals]
-                m_ind=None
+                m_inds = [i for i, x in enumerate(atoms.get_chemical_symbols()) if x in io_ptable.all_metals]
+                m_ind = None
                 if len(m_inds) > 1:
                     if params.get('debug',False):
                         print('Warning - Sanity check with custom covrad only for mononuclear so far. Setting Defaults for all metals.')
-                        multi=True
+                        multi = True
                 elif len(m_inds) == 1:
                     m_ind = m_inds[0]
-                    multi=False
+                    multi = False
                 else:
-                    multi=False
+                    multi = False
                 mrad = None
-                if isinstance(covrad_metal,float):
+                if isinstance(covrad_metal, float):
                     mrad = covrad_metal
-                elif isinstance(params,dict):
+                elif isinstance(params, dict):
                     if isinstance(params.get('covrad_metal',False),float):
                         mrad = params['covrad_metal']
                 if np.any(np.isnan(posits)): # Any nan in positions
-                    if params.get('debug',False):
+                    if params.get('debug', False):
                         print('Nan in positions.')
                     sane = False
                 else:
@@ -1013,26 +1037,47 @@ class Molecule:
                     cov_radii = np.array([io_ptable.rcov1[x] for x in atoms.get_atomic_numbers()])
                     if (not (m_ind is None)) and (not (mrad is None)) and (not multi):
                         cov_radii[m_ind] = mrad
-                    for i in range(0,len(atoms)):
-                        j_list = list(range(0,len(atoms)))
+                    for i in range(0, len(atoms)):
+                        j_list = list(range(0, len(atoms)))
                         j_list.remove(i)
                         i_dists = []
                         for j in j_list:
-                            i_dists.append(all_dists[i,j])
-                            if all_dists[i,j] < smallest_dist_cutoff*(cov_radii[i] + cov_radii[j]): # Check for extra crowded metals
+                            i_dists.append(all_dists[i, j])
+                            # Use pair_cutoffs for sanity check.
+                            if isinstance(pair_cutoffs, dict):
+                                if new_pair_dict['type'] == 'scale_covrad':
+                                    cutoff = new_pair_dict.get(tuple(sorted(
+                                        (symbols[i], symbols[j]))),
+                                        smallest_dist_cutoff)*(cov_radii[i] + cov_radii[j])
+                                elif new_pair_dict['type'] == 'dist':
+                                    cutoff = new_pair_dict.get(tuple(sorted(
+                                        (symbols[i], symbols[j]))),
+                                        smallest_dist_cutoff*(cov_radii[i] + cov_radii[j]))
+                                else:
+                                    if params.get('debug', False):
+                                        print('Warning: pair distance cutoffs for "{}" not implemented'.format(
+                                            new_pair_dict.get('type', 'None')
+                                        ))
+                                        print('Acceptable types: "dist" or "scale_covrad!')
+                            else:
+                                cutoff = smallest_dist_cutoff*(cov_radii[i] + cov_radii[j])
+                            if all_dists[i, j] < cutoff:  # Check for extra-crowded metals
                                 sane = False
-                                smallest_dist_dict.update({'Cutoff':smallest_dist_cutoff})
-                                smallest_dist_dict.update({(i,j):all_dists[i,j]/(cov_radii[i] + cov_radii[j])})
-                                if params.get('debug',False):
-                                    print('Dist short: ', all_dists[i,j])
-                        if min(i_dists) > min_dist_cutoff: # Catch cases where atom shot off metal center or blown up structure
+                                smallest_dist_dict.update({'Cutoff': cutoff})
+                                smallest_dist_dict.update({(i, j): all_dists[i, j] / (
+                                    cov_radii[i] + cov_radii[j])})
+                                if params.get('debug', False):
+                                    print('Dist short: ', all_dists[i, j])
+                        if min(i_dists) > min_dist_cutoff:  # Catch cases where atom
+                            # shot off metal center or blown up structure
                             sane = False
-                            min_dist_dict.update({'Cutoff':min_dist_cutoff})
-                            min_dist_dict.update({i:min(i_dists)})
-                            if params.get('debug',False):
+                            min_dist_dict.update({'Cutoff': min_dist_cutoff})
+                            min_dist_dict.update({i: min(i_dists)})
+                            if params.get('debug', False):
                                 print('Mindist long: ', min(i_dists))
         self.dists_sane = sane
-        self.sanity_check_dict.update({'Smallest_Dist_Checks':smallest_dist_dict, 'Min_Dist_Checks':min_dist_dict})
+        self.sanity_check_dict.update({'Smallest_Dist_Checks': smallest_dist_dict,
+                                       'Min_Dist_Checks': min_dist_dict})
 
     def get_can_label(self):
         """ Get molecular graph determinant - serves as unique identifier. 
