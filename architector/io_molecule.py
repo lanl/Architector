@@ -181,9 +181,44 @@ def convert_xyz_ase(structure_str):
 
 
 class Molecule:
+    """Molecule
 
-    def __init__(self, in_ase=False, BO_dict={}, atom_types=[], cell=[], charge=None,
-                uhf=None, xtb_uhf=None, xtb_charge=None, actinides=None):
+    Class containing all the relevant information about the molecules.
+    Key attributes:
+
+    self.ase_atoms : full ASE atoms object including positions, energy, forces, symbols...
+    self.graph : molecular graph as Num_AtomsxNum_atoms numpy array of 0/1.
+    self.BO_graph : dictionary representation of molecular graph with bond orders
+    self.uhf : unpaired electrons (spin-multiplicity!) 
+    self.charge : molecular charge 
+    """
+
+    def __init__(self, in_ase=False, BO_dict={}, atom_types=[], cell=[],
+                 charge=None, uhf=None, xtb_uhf=None, xtb_charge=None,
+                 actinides=None):
+        """Molecule class
+
+        Parameters
+        ----------
+        in_ase : bool, optional
+            Ase atoms added, by default False
+        BO_dict : dict, optional
+            Bond orders dictionary, by default {}
+        atom_types : list, optional
+            Atom types - SYBYL, by default []
+        cell : list, optional
+            Unit cell, by default []
+        charge : int, optional
+            molecular charge, by default None
+        uhf : int, optional
+            number unpaired electrons, by default None
+        xtb_uhf : int, optional
+            number of unpaired electrons for XTB, by default None
+        xtb_charge : int, optional
+            charge on molecule for XTB, by default None
+        actinides : None | list, optional
+            indices of the actinides, by default None
+        """
         self.dists_sane = True
         self.sanity_check_dict = {}
         self.ase_constraints = {} ### Add distance constraints here.
