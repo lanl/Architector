@@ -79,6 +79,7 @@ def add_bonds(view_ats,
               labelsize=12,
               distvisradius=0.3,
               distatompairs=None,
+              distatomtype_pairs=None,
               distcolor='black',
               distskin=0.3,
               distopacity=0.85,
@@ -107,6 +108,9 @@ def add_bonds(view_ats,
     distatompairs : list, 
         Atom pairs to view distances. 
         e.g. [[0,1],[1,2]] will show only distances between a0 and a1, and a1 and a2, by default None
+    distatomtype_pairs: list,
+        Atom type pairs to view distances.
+        Give multiple sets of atom types to give distnaces [['Fe','O]] should give all fe-o distances...
     distcolor : str,
         color of drawn distance vectors, by default 'black'
     distopacity: float,
@@ -125,7 +129,8 @@ def add_bonds(view_ats,
                                 skin=distskin,
                                 ref_ind=vis_distances,
                                 radius=distradius,
-                                atom_pairs=distatompairs)
+                                atom_pairs=distatompairs,
+                                atom_type_pairs=distatomtype_pairs)
         visited = list()
         count = 0
         for i,row in bondsdf.iterrows():
@@ -166,12 +171,19 @@ def add_bonds(view_ats,
                         'fontColor':"white",'inFront':'true'},viewer=viewer)
 
 
-            
-def view_structures(structures, w=200, h=200, columns=4, representation='ball_stick', labelsize=12,
-                 labels=False, labelinds=None, labelatoms=False, vector=None, sphere_scale=0.3, stick_scale=0.25,
-                 metal_scale=0.75, modes=None, trajectory=False, interval=200, vis_distances=None,
-                 distvisradius=0.3, distcolor='black', distopacity=0.85, distskin=0.3, distradius=None,
-                 distlabelposit=1.0, distatompairs=None, stack=False, stack_align=True, hydrogens=True):
+def view_structures(structures,
+                    w=200, h=200,
+                    columns=4, representation='ball_stick', labelsize=12,
+                    labels=False, labelinds=None,
+                    labelatoms=False, vector=None,
+                    sphere_scale=0.3, stick_scale=0.25,
+                    metal_scale=0.75, modes=None, trajectory=False,
+                    interval=200, vis_distances=None,
+                    distvisradius=0.3, distcolor='black',
+                    distopacity=0.85, distskin=0.3, distradius=None,
+                    distlabelposit=1.0, distatompairs=None,
+                    distatomtype_pairs=None,
+                    stack=False, stack_align=True, hydrogens=True):
     """view_structures
     Jupyter-notebook-based visualization of molecular structures.
 
@@ -252,6 +264,9 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
     distatompairs : list, 
         Atom pairs to view distances. 
         e.g. [[0,1],[1,2]] will show only distances between a0 and a1, and a1 and a2, by default None
+    distatomtype_pairs : list, 
+        Atom type pairs to view distances. 
+        e.g. [['Fe','O'],['Fe','N']] will give distances between all Fe-O and all Fe-N distances, by default None
     stack : bool,
         Stack all the images in a single viewer, default False.
     stack_align : bool,
@@ -357,6 +372,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                   distradius=distradius,
                   distlabelposit=distlabelposit,
                   distatompairs=distatompairs,
+                  distatomtype_pairs=distatomtype_pairs,
                   vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.show()
@@ -491,6 +507,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                       distradius=distradius,
                       distlabelposit=distlabelposit,
                       distatompairs=distatompairs,
+                      distatomtype_pairs=distatomtype_pairs,
                       labelsize=labelsize, vis_distances=vis_distances, viewer=(x,y))
             view_ats.zoomTo(viewer=(x,y))
             if y+1 < columns: # Fill in columns
@@ -533,6 +550,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                   distradius=distradius,
                   distlabelposit=distlabelposit,
                   distatompairs=distatompairs,
+                  distatomtype_pairs=distatomtype_pairs,
                   labelsize=labelsize, vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.animate({'interval':interval,'loop':'forward'}) # Infinite repetition
@@ -576,6 +594,7 @@ def view_structures(structures, w=200, h=200, columns=4, representation='ball_st
                   distradius=distradius,
                   distlabelposit=distlabelposit,
                   distatompairs=distatompairs,
+                  distatomtype_pairs=distatomtype_pairs,
                   labelsize=labelsize, vis_distances=vis_distances)
         view_ats.zoomTo()
         view_ats.show()

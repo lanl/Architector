@@ -215,19 +215,23 @@ class Complex:
         best_val = np.inf
         bestConformer = conformerList[0]
         assembled = False
-        for i,conformer in enumerate(conformerList):# Try and use XTB
+        for i,conformer in enumerate(conformerList): # Try and use XTB
             tmp_molecule = io_molecule.convert_io_molecule(self.initMol)
-            tmp_molecule.append_ligand({'ase_atoms':conformer,'bo_dict':ligand.BO_dict, 
-                            'atom_types':ligand.atom_types,
-                            'ca_metal_dist_constraints':ligand.ca_metal_dist_constraints})
+            tmp_molecule.append_ligand({'ase_atoms': conformer,
+                                        'bo_dict': ligand.BO_dict,
+                                        'atom_types': ligand.atom_types,
+                                        'ca_metal_dist_constraints':
+                                        ligand.ca_metal_dist_constraints})
             if self.parameters['debug']:
-                print(tmp_molecule.write_mol2('cool{}.mol2'.format(i),writestring=True))
-            out_eval = CalcExecutor(tmp_molecule,assembly=True, 
+                print(tmp_molecule.write_mol2('cool{}.mol2'.format(i), 
+                                              writestring=True))
+            out_eval = CalcExecutor(tmp_molecule, assembly=True,
                                     parameters=self.parameters,
                                     init_sanity_check=True)
             if out_eval.successful:
-                Eval = out_eval.energy*(1/rot_vals[i]) # Bias to lower rotational loss values
-                if Eval < best_val and out_eval.successful: 
+                # Bias to lower rotational loss values
+                Eval = out_eval.energy*(1/rot_vals[i])
+                if Eval < best_val and out_eval.successful:
                     assembled = True
                     bestConformer = conformer
                     best_val = Eval
@@ -473,7 +477,7 @@ def complex_driver(inputDict1):
                         newligDict[key] = oldligclass
                 ligandDict = newligDict
             else: # Generate from scratch
-                ligandDict = {} # 
+                ligandDict = {} #
             
             coreCoordList = core_geo_class.geometry_dict[coreType]
 
@@ -484,9 +488,9 @@ def complex_driver(inputDict1):
                                                             )
             if inputDict['parameters']['debug']:
                 print('Assigned LigCons ->')
-                print('LigLists:', all_liglists) 
+                print('LigLists:', all_liglists)
                 print('coreCoordList:', coreCoordList)
-                print('Unique Symmetries:',total_unique_symmetries)
+                print('Unique Symmetries:', total_unique_symmetries)
 
             fin_time1 = time.time()
             symmetry_preprocess_time = fin_time1 - int_time1
@@ -624,7 +628,7 @@ def build_complex_driver(inputDict1):
         # Iterate through all structures and check/remove duplicate structures.
         # Remove extra classes that we don't need to persist
         del inputDict['core_geo_class']
-        del inputDict['parameters']['ase_db'] 
+        del inputDict['parameters']['ase_db']
         for ind, i in enumerate(order):
             iscopy = False
             if (ind > 0) and (not inputDict['parameters'][
