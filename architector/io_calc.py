@@ -208,7 +208,7 @@ class CalcExecutor:
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
             for key,val in parameters.items():
-                setattr(self,key,val)
+                setattr(self, key, val)
         if assembly:
             self.init_sanity_check = True
             self.relax = False

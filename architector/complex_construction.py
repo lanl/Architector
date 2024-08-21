@@ -26,8 +26,10 @@ from architector.io_calc import CalcExecutor
 class Ligand:
     """Class to contain all information about a ligand including conformers."""
 
-    def __init__(self, smiles, ligcoordList, corecoordList, core, ligGeo, ligcharge, ca_metal_dist_constraints,
-                covrad_metal=None, vdwrad_metal=None, debug=False):
+    def __init__(self, smiles, ligcoordList, corecoordList, core,
+                 ligGeo, ligcharge, ca_metal_dist_constraints,
+                 covrad_metal=None, vdwrad_metal=None, enforce_symmetry=False,
+                 debug=False):
         """Set up initial variables for ligand and run conformer generation routines.
 
         Parameters
@@ -50,6 +52,8 @@ class Ligand:
             Covalent radii of the metal, default values from io_ptable.rcov1
         vdwrad_metal : float, optional
             VDW radii of the metal, default values from io_ptable.rvdw
+        enforce_symmetry : bool, optional
+            Enforce the ligand symmetry elements during conformer generation?
         debug: bool, optional
             debug turns on/off output text/comments.
         """
@@ -59,32 +63,35 @@ class Ligand:
         self.corecoordList = corecoordList
         self.metal = core
         self.ca_metal_dist_constraints = ca_metal_dist_constraints
-        self.geo = ligGeo 
+        self.geo = ligGeo
         self.BO_dict = None
         self.atom_types = None
         self.out_ligcoordLists = None
         self.charge = ligcharge
+        self.enforce_symmetry = enforce_symmetry
         self.liggen_start_time = time.time()
         # Generate conformations
         if debug:
             print("GENERATING CONFORMATIONS for {}".format(smiles))
-        conformers, rotscores, tligcoordList, relax, bo_dict, atypes, rotlist = io_lig.find_conformers(self.smiles, 
-                                                        self.ligcoordList, 
-                                                        self.corecoordList, 
-                                                        metal=self.metal,
-                                                        ligtype=self.geo,
-                                                        ca_metal_dist_constraints=self.ca_metal_dist_constraints,
-                                                        covrad_metal=covrad_metal,
-                                                        vdwrad_metal=vdwrad_metal,
-                                                        debug=debug
-                                                        )
+        conformers, rotscores, tligcoordList, relax, bo_dict, atypes, rotlist = io_lig.find_conformers(
+            self.smiles, 
+            self.ligcoordList,
+            self.corecoordList,
+            metal=self.metal,
+            ligtype=self.geo,
+            ca_metal_dist_constraints=self.ca_metal_dist_constraints,
+            covrad_metal=covrad_metal,
+            vdwrad_metal=vdwrad_metal,
+            enforce_symmetry=self.enforce_symmetry,
+            debug=debug
+        )
         if len(conformers) > 0:
             self.conformerList = conformers
             self.conformerRotScore = rotscores
             self.rotList = rotlist
             self.out_ligcoordLists = tligcoordList
             self.selectedConformer = self.conformerList[0]
-            self.exists = True 
+            self.exists = True
             self.relax = relax
             self.BO_dict = bo_dict
             self.atom_types = atypes
@@ -238,10 +245,10 @@ class Complex:
             elif (not out_eval.successful) and (self.parameters['debug']):
                 print('Ligand {} failed xtb/uff or overlapped.'.format(i))
         return bestConformer, assembled
-            
+
     def final_eval(self, single_point=False):
         """final_eval perform final evaulation of full complex conformer with XTB.
-        
+
         Involves either a relaxation or not for each "sane" conformer.
 
         Parameters
@@ -366,7 +373,9 @@ def gen_aligned_complex(newLigInputDicts,
                 lig_ca_metal_dist_constraints,
                 covrad_metal=inputDict['parameters']['covrad_metal'],
                 vdwrad_metal=inputDict['parameters']['vdwrad_metal'],
-                debug=inputDict['parameters']['debug']
+                enforce_symmetry=inputDict['parameters'].get(
+                    'enforce_ligand_internal_symmetry', False),
+                debug=inputDict['parameters']['debug'],
                                 )
             # Store results
             ligandDict[ligid] = ligandClass

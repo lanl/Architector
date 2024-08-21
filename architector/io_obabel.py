@@ -6,6 +6,7 @@ Developed by Dan Burril and Michael Taylor
 
 # Imports
 import ase
+import itertools
 from ase.io import read
 from ase import units
 import numpy as np
@@ -1002,7 +1003,7 @@ def obmol_lig_split(mol2string,
                     calc_coord_atoms=True,
                     allow_radicals=False,
                     calc_all=False):
-    """obmol_lig_split 
+    """obmol_lig_split
     Take in a mol2string and use openbabel to split into ligands,
     convert to smiles, and calculate metal-ligand coordinating atoms
     implicit in the mol2string.
@@ -1249,6 +1250,86 @@ def obmol_lig_split(mol2string,
         return ligand_smiles, coord_atom_lists, info_dict
 
 
+def obmol_lig_compare(mol2string,
+                      smiles):
+    """obmol_lig_compare
+    Take in a mol2string and smiles string - use openbabel to 
+    calculate metal-ligand coordinating atoms
+    implicit in the mol2string as related to the smiles string.
+
+    Parameters
+    ----------
+    mol2string : str
+        mol2string of ligand-metal complex
+    smiles : str
+        smiles string of the ligand
+
+    Returns
+    -------
+    coord_atom_list : list(int)
+        list of coordinating atom indices for the smiles str
+    """
+    if 'un' in mol2string:
+        mol2string = mol2string.replace('un', '0')
+        obmol = convert_mol2_obmol(mol2string)
+        obmol.ConvertZeroBonds()
+    else:
+        obmol = convert_mol2_obmol(mol2string)
+    _, anums, graph = get_OBMol_coords_anums_graph(obmol)
+    bo_dict, _ = get_OBMol_bo_dict_atom_types(obmol, metal_passed=False)
+    met_inds = [i for i, x in enumerate(anums) if (
+        io_ptable.elements[x] in io_ptable.all_metals)]
+    shape = graph.shape
+    only_mets_graph = np.zeros(shape)
+    init_graph = graph.copy()
+    # Create 2 graphs - one with metals removed, one with only the metals graphs
+    for ind in sorted(met_inds):
+        only_mets_graph[:, ind] = graph[ind]
+        only_mets_graph[ind, :] = graph[ind]
+        # Zero out the deleted inds
+        init_graph[ind, :] = np.zeros(shape[0])
+        init_graph[:, ind] = np.zeros(shape[0])
+    csg = csgraph.csgraph_from_dense(init_graph)
+    # Break apart zeroed graph into connected components
+    disjoint_components = csgraph.connected_components(csg)[1]
+    ligs_inds = []
+    for ind in sorted(list(set(disjoint_components))):  # sort for reproducability
+        subgraph = np.where(disjoint_components == ind)[0]
+        sg = np.array([x for x in subgraph if x not in met_inds])  # Check not deleted atoms
+        sg.sort()
+        if len(sg) > 0:
+            ligs_inds.append(sg)
+    lig = ligs_inds[0].tolist()
+    ligobmol = ob.OBMol()
+    coord_atom_list = []
+    for i, atom_ind in enumerate(lig):
+        atom_ind += 1
+        for j, atom in enumerate(ob.OBMolAtomIter(obmol)):
+            if (j+1 == atom_ind):
+                ligobmol.AddAtom(atom)
+        for k in bo_dict.keys():
+            if (atom_ind in k):
+                other_ind = [x for x in k if x != atom_ind][0] - 1
+                if other_ind in met_inds:
+                    coord_atom_list.append(i)
+        for k in bo_dict.keys():
+            if (k[0]-1 in lig) and (k[1]-1 in lig):
+                start_ind = lig.index(k[0]-1) + 1
+                end_ind = lig.index(k[1]-1) + 1
+                ligobmol.AddBond(start_ind, end_ind, bo_dict[k])
+    tmp1 = get_obmol_smiles(smiles, build=False)
+    if tmp1.NumAtoms() == ligobmol.NumAtoms():
+        can1 = get_canonical_label(tmp1)
+        can2 = get_canonical_label(ligobmol)  # Know indices
+        smicat = []
+        for atom in coord_atom_list:  # Match canonicalized graph indices
+            a_ind = can2.index(atom)
+            smicat.append(can1[a_ind])
+    else:
+        smicat = None
+    return smicat
+
+
 def get_canonical_label(obmol):
     """Create a canonical label for the molecule using pynauty.
     Warning - can fail/hang on particularly gnarly graphs.
@@ -1286,11 +1367,11 @@ def map_coord_ats_smiles(lig_smiles, lig_obmol, coord_atoms, return_all=False):
     to the pynauty canonicalized form of the molecular graphs (colored by atom type)
     to map the 3d structure graph to the smiles graph.
     """
-    tmp1 = get_obmol_smiles(lig_smiles)
-    can1 = get_canonical_label(tmp1) 
-    can2 = get_canonical_label(lig_obmol) # Know indices
+    tmp1 = get_obmol_smiles(lig_smiles, build=False)
+    can1 = get_canonical_label(tmp1)
+    can2 = get_canonical_label(lig_obmol)  # Know indices
     smicat = []
-    for atom in coord_atoms: # Match canonicalized graph indices
+    for atom in coord_atoms:  # Match canonicalized graph indices
         a_ind = can2.index(atom)
         smicat.append(can1[a_ind])
     if return_all:
@@ -1322,6 +1403,102 @@ def get_fingerprint(obmol, fp='FP2'):
     pybelmol = pybel.Molecule(obmol)
     fp = pybelmol.calcfp(fp)
     return fp
+
+
+def min_circular(intuple):
+    """take in a tuple and re-order such that the lowest 
+    value in the tuple is first (preserving circular relative ordering)
+
+    Parameters
+    ----------
+    intuple : tuple
+        tuple with any number of values
+
+    Returns
+    -------
+    out : tuple
+        tuple re-ordered with lowest element first (preserving circular ordering)
+    """
+    tlist = list(intuple)
+    minind = tlist.index(min(intuple))
+    repeated = tlist + tlist
+    out = repeated[minind:minind + len(tlist)]
+    return tuple(out)
+
+
+def get_stereo_label(obmol, tetrahedral=True, ct=False):
+    """get_stereo_label
+    gives a unique label for the stereochemistry for a given molecule
+
+    Openbabel only handles tetrahedral or cis/trans stereochemistry,
+    So higher order stereochemistries aren't necessarily preserved!
+
+    Parameters
+    ----------
+    obmol : ob.OBmol
+        Molecule in openbabel representation
+
+    Returns
+    -------
+    out : str
+       Unique label containing the stereochemistry as assigned/detected by openbabel.
+    """
+    if not obmol.HasChiralityPerceived():
+        ob.PerceiveStereo(obmol)
+    facade = ob.OBStereoFacade(obmol)
+    out = ''
+    if tetrahedral:
+        for atom in ob.OBMolAtomIter(obmol):
+            mid = atom.GetId()
+            if facade.HasTetrahedralStereo(mid):
+                tetra = facade.GetTetrahedralStereo(mid)
+                config = tetra.GetConfig()
+                if tetra.IsSpecified():
+                    out += 'tet:' + str(mid) + \
+                        str(config.from_or_towards) + \
+                        str(min_circular(config.refs))
+    if ct:
+        for bond in ob.OBMolBondIter(obmol):
+            mid = bond.GetId()
+            if facade.HasCisTransStereo(mid):
+                cistrans = facade.GetCisTransStereo(mid)
+                config = cistrans.GetConfig()
+                if config.specified:
+                    out += 'ct:' + str(mid) + \
+                        str(sorted([config.begin, config.end])) + \
+                        str(min_circular(config.refs))
+    return out
+
+def get_stereo_fix_bond_dihedrals(obmol):
+    """get_stereo_fix_bond_dihedrals
+    gives a unique label for the stereochemistry for a given molecule
+
+    Openbabel only handles tetrahedral or cis/trans stereochemistry,
+    So higher order stereochemistries aren't necessarily preserved!
+
+    Parameters
+    ----------
+    obmol : ob.OBmol
+        Molecule in openbabel representation
+
+    Returns
+    -------
+    out : str
+       Unique label containing the stereochemistry as assigned/detected by openbabel.
+    """
+    if not obmol.HasChiralityPerceived():
+        ob.PerceiveStereo(obmol)
+    facade = ob.OBStereoFacade(obmol)
+    bond_fixes = dict()
+    for bond in ob.OBMolBondIter(obmol):
+        mid = bond.GetId()
+        if facade.HasCisTransStereo(mid):
+            cistrans = facade.GetCisTransStereo(mid)
+            config = cistrans.GetConfig()
+            if config.specified:
+                bond_fixes[(config.begin, config.end)] = config.refs
+    return bond_fixes
+
 
 # Main
 if (__name__ == '__main__'):

@@ -105,8 +105,13 @@ def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
                                               tolerance=20)
         lig_denticity = len(ligcoords)
         possible_Ligtypes = tcore_geo_class.cn_ligType_dict[lig_denticity]
-        exitloop=False
+        exitloop = False
+        maxcount = 20
+        count = 0
         while not exitloop:
+            if count == maxcount:
+                raise ValueError('No Possible ligand type for this ligand.')
+            count += 1
             rot_vals = []
             possible_saves = []
             conformers = []
@@ -919,6 +924,7 @@ def inparse(inputDict):
             "force_trans_oxos": True, # Force trans configurations for oxos (Useful for actinyls)
             "override_oxo_opt": False, # Override no relaxation of oxo groups (not generally suggested)
             "lig_assignment": 'default', # or "similarity" How to automatically assign ligand types.
+            'enforce_ligand_internal_symmetry': False, # Whether to enforce the ligand's internal symmetry during generation.
 
             # Cutoff parameters
             "assemble_sanity_checks":True, # Turn on/off assembly sanity checks.
@@ -943,7 +949,7 @@ def inparse(inputDict):
             "metal_spin": None, # Spin State
             "test_alternate_metal_spin": False, # Test a second spin state for the metal?
             "alternate_metal_spin": None, # Secondary spin state to check. 
-                
+
             # Method parameters.
             "calculator":None, # ASE calculator class input for usage during construction or for optimization.
             "calculator_kwargs":dict(), # ASE calculator kwargs.
@@ -970,7 +976,7 @@ def inparse(inputDict):
             # For very large speedup - use GFN-FF, though this is much less stable (especially for Lanthanides)
             # Or UFF
             "skip_duplicate_tests":False, # Skip the duplicate tests (return all generated/relaxed configurations)
-            
+
             # Covalent radii and vdw radii of the metal if deviations requested.
             "vdwrad_metal":vdwrad_metal,
             "covrad_metal":covrad_metal,

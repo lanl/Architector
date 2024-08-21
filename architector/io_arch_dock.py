@@ -30,7 +30,7 @@ defaults = {
     # e.g. Reduce to allow for closer molecule-species distances
     'species_location_method': 'default',  # Default attempts a basic colomb repulsion placement, targeted
     # Only other option is 'random' at the moment.
-    'species_add_copies': 1,  # Number of species addition orientations to build 
+    'species_add_copies': 1,  # Number of species addition orientations to build
     'species_method': 'GFN2-xTB',  # Method to use on full species - right now only GFN2-xTB really works
     'species_relax': True,  # Whether or not to relax the generated secondary solvation structures.
     'species_intermediate_method': 'GFN-FF',  # Method to use for intermediate species screening - Suggested GFN-FF
