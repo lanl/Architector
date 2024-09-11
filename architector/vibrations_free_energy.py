@@ -96,21 +96,25 @@ def vibration_analysis(atoms,
                     np.dot(centered[i], X[0])*X[j, 1]-np.dot(
                         centered[i], X[1])*X[j, 0])
 
-        ### To implement, qr factorization to normal modes.
-
+    # To implement, qr factorization to normal modes.
     eig_values, eig_vectors = np.linalg.eigh(mweight_H)
-    
-    unit_conversion = ase.units._hbar * ase.units.m / np.sqrt(ase.units._e * ase.units._amu) 
-    
-    energies = unit_conversion * eig_values.astype(complex)**0.5 # Unit sqrt(eV/Angstroms^2/MW) gives 1/s, convert to eV via frequency
 
-    frequencies = energies / ase.units.invcm # Convert to frequency from energy.
+    unit_conversion = ase.units._hbar * ase.units.m / np.sqrt(ase.units._e * ase.units._amu) 
+
+    # Unit sqrt(eV/Angstroms^2/MW) gives 1/s, convert to eV via frequency
+    energies = unit_conversion * eig_values.astype(complex)**0.5
+
+    # Convert to frequency from energy.
+    frequencies = energies / ase.units.invcm
 
     # Modes in columns
-    mw_normalized = eig_vectors.T # Unitless
-    md_unnormalized = mw_normalized * mass_weights # Units are 1/sqrt(MW)
-    norm_factors = 1 / np.linalg.norm(md_unnormalized, axis=0)  #units are sqrt(MW)
-    md_normalized = md_unnormalized * norm_factors # Unitless
+    mw_normalized = eig_vectors.T  # Unitless
+    # Units are 1/sqrt(MW)
+    md_unnormalized = mw_normalized * mass_weights
+    # Units are sqrt(MW)
+    norm_factors = 1 / np.linalg.norm(md_unnormalized, axis=0)
+    # Unitless
+    md_normalized = md_unnormalized * norm_factors
 
     # Reshape modes.
     mw_normalized = mw_normalized.reshape(n_atoms * 3, n_atoms, 3)
@@ -119,26 +123,28 @@ def vibration_analysis(atoms,
 
     rmasses = norm_factors**2  # units are MW
 
-    fconstants = eig_values.astype(complex) * rmasses  # units are eV/(Angstroms)^2 to define an R
-    # kB*T in ase units in units of eV. So plugging into normal mode sampling gives Angstrom.
+    # Units are eV/(Angstroms)^2 to define an R
+    fconstants = eig_values.astype(complex) * rmasses
+    # kB*T in ase units in units of eV.
+    # So plugging into normal mode sampling gives Angstrom.
 
     modes = None
-    if mode_type == 'direct_eigen_vectors': # Unitless
+    if mode_type == 'direct_eigen_vectors':  # Unitless
         modes = mw_normalized
-    elif mode_type == 'mass_weighted_unnormalized': # Mass weighted has units of 1/sqrt(MW)
+    elif mode_type == 'mass_weighted_unnormalized':  # Mass weighted has units of 1/sqrt(MW)
         modes =  md_unnormalized
-    elif mode_type == 'mass_weighted_normalized': # Unitless
+    elif mode_type == 'mass_weighted_normalized':  # Unitless
         modes = md_normalized
     else:
         raise ValueError('Mode Type requested unknown.')
-    
     return energies, modes, fconstants, rmasses, frequencies
-    
+
 
 def calc_free_energy(relaxed_atoms,
                      temp=298.15,
                      pressure=101325,
-                     geometry='nonlinear'):
+                     geometry='nonlinear',
+                     ignore_imag_modes=True):
     """calc_free_energy utility function to calculate free energy of 
     relaxed structures with
     ASE calculators added.
@@ -155,6 +161,8 @@ def calc_free_energy(relaxed_atoms,
         pressure in pascal, by default 101325 Pa
     geometry : str, optional
         'linear','nonlinear' , by default 'nonlinear'
+    ignore_imag_modes : bool, optional
+        default True
 
     Returns
     -------
@@ -174,6 +182,8 @@ def calc_free_energy(relaxed_atoms,
                                 potentialenergy=potentialenergy,
                                 atoms=relaxed_atoms,
                                 geometry=geometry,
-                                symmetrynumber=2, spin=nunpaired/2)
+                                symmetrynumber=2,
+                                spin=nunpaired/2,
+                                ignore_imag_modes=ignore_imag_modes)
         G = thermo.get_gibbs_energy(temperature=temp, pressure=pressure)
     return G, thermo

@@ -103,7 +103,7 @@ inputDict = {
     "metal_spin": None, # Spin State
     "full_spin": None, # Assign spin to the full complex (overrides metal_spin)
     "full_charge": None, # Assign charge to the complex (overrides ligand charges and metal_ox)!
-        
+
     # Method parameters.
     "calculator":None, # ASE calculator class input for usage during construction or for optimization.
     "calculator_kwargs":dict(), # ASE calculator kwargs.

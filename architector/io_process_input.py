@@ -467,6 +467,7 @@ def inparse(inputDict):
     newinpDict = inputDict.copy()
     u_id = str(uuid.uuid4())
     min_n_conformers = 1
+    tdebug = newinpDict.get('parameters',{}).get('debug',False)
     # Adding logging
     # logging.config.fileConfig('/path/to/logging.conf')
     if (('core' in inputDict) and (('ligands' in inputDict) or ('ligandList' in inputDict))) or ('mol2string' in inputDict):
@@ -584,7 +585,6 @@ def inparse(inputDict):
                 raise ValueError('Need a inputDict["ligands"] list passed')
             newliglist = []
 
-            tdebug = newinpDict.get('parameters',{}).get('debug',False)
             if tdebug:
                 print('Starting Ligand Assignment')
 
