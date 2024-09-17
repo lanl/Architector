@@ -292,8 +292,10 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
         molecule to compare to (reference molecule)
     rmsd_type : str, optional
         which type of rmsd to calculate , by default 'simple', possible 'edge'
-    coresize : int, optional
-        number of graph hops from the metal to consider when aligning molecules, by default 3 
+    coresize : int/None, optional
+        number of graph hops from the metal to consider when aligning molecules, by default 3
+        If coresize is set to None, alignment will be performed based on centroid only.
+        Use when non-single-metal center used.
     maxiter : int, optional
         number of iterations per time on permutation/alignment routine, by default 1
     sample : int, optional
@@ -347,6 +349,57 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
         rmsd_loss_core = 1000
         rmsd_loss_full = 1000
         coreinds = None
+    elif coresize is None: # Perform alignment based on centroid instead.
+        # Pull out center of molecule up to depth coresize graph hops for matching to reference.
+        genMol_subset_component_inds = np.arange(len(genMol.ase_atoms))
+        compareMol_subset_component_inds = np.arange(len(genMol.ase_atoms))
+        tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy() 
+        tmp_ref_comp = compareMol.ase_atoms[compareMol_subset_component_inds].copy() 
+        coreinds = compareMol_subset_component_inds
+        # Center on centroid.
+        tmp_self_comp.set_positions(tmp_self_comp.positions - tmp_self_comp.positions.mean(axis=0))
+        tmp_ref_comp.set_positions(tmp_ref_comp.positions - tmp_ref_comp.positions.mean(axis=0))
+        genMol.ase_atoms.set_positions(genMol.ase_atoms.positions - genMol.ase_atoms.positions.mean(axis=0))
+        compareMol.ase_atoms.set_positions(compareMol.ase_atoms.positions - compareMol.ase_atoms.positions.mean(axis=0))
+
+        # Sample random rotations to find best starting assignment point.
+        best = np.inf
+        for _ in range(sample):
+            q = Rot.random()
+            calc_test_comp = copy.deepcopy(tmp_self_comp)
+            calc_test_comp.set_positions(q.apply(calc_test_comp.positions))
+            rmsd_core, _, _ = permute_align(tmp_ref_comp, calc_test_comp, maxiter=maxiter)
+            rmsd_mirror, _, _ = mirror_align(tmp_ref_comp, calc_test_comp, maxiter=maxiter)
+            if rmsd_mirror < rmsd_core:
+                rmsd_core = rmsd_mirror
+            if rmsd_core < best:
+                saveq = q
+                best = rmsd_core
+
+        tmp_self_comp.set_positions(saveq.apply(tmp_self_comp.positions))
+        genMol.ase_atoms.set_positions(saveq.apply(genMol.ase_atoms.positions))
+
+        rmsd_core, r, outcore = permute_align(tmp_ref_comp, tmp_self_comp, maxiter=maxiter)
+        rmsd_mirror, r_mirror, moutcore = mirror_align(tmp_ref_comp, tmp_self_comp, maxiter=maxiter)
+
+        if rmsd_mirror < rmsd_core:  # Pick the better one!
+            rmsd_core = rmsd_mirror
+            outcore = moutcore
+            r = r_mirror
+            newposits = genMol.ase_atoms.positions
+            newposits[:, 0] = -newposits[:, 0] # Mirror across x axis to replicate mirror in permute
+            genMol.ase_atoms.set_positions(newposits)
+
+        rmsd_loss_core = rmsd_core
+        tmp_posits = genMol.ase_atoms.positions
+        tmp_posits = r.apply(tmp_posits)
+        genMol.ase_atoms.set_positions(tmp_posits)
+        # Do permutation mapping to estimate full loss given the rotation to match the core.
+        rmsd_loss_full, _, _ = permute_align(copy.deepcopy(compareMol.ase_atoms),
+                                                copy.deepcopy(genMol.ase_atoms),
+                                                maxiter=1, tol=1e-6,
+                                                in_place=True)
+        flag_struct = False
     else:
         # Set ordering to be identical based on canonical labels.
         genMol_metalind = genMol.find_metal(debug=debug)
