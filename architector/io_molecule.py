@@ -1833,8 +1833,12 @@ class Molecule:
                 self.ase_atoms.set_positions(mol_coords)
 
                 # rotate functional group to +z 
-                r = Rot.align_vectors(np.array([[0.,0.,1.]]*len(funct_coords)), funct_coords)#.reshape(1,-1))
-                funct_coords = r[0].apply(funct_coords) + np.array((0.,0.,2.)) # Move to 2
+                if len(funct_coords) > 1:
+                    r = Rot.align_vectors(np.array([[0.,0.,1.]]*len(funct_coords)), funct_coords)#.reshape(1,-1))
+                    funct_coords = r[0].apply(funct_coords) + np.array((0.,0.,2.)) # Move to 2
+                else:
+                    funct_coords = np.array((0.,0.,2.)).reshape(1, -1) # Move to 2
+                
 
                 funct_mol.ase_atoms.set_positions(funct_coords)
 
@@ -1945,8 +1949,11 @@ class Molecule:
                 self.ase_atoms.set_positions(mol_coords)
 
                 # rotate functional group to +z 
-                r = Rot.align_vectors(np.array([[0.,0.,1.]]*len(funct_coords)), funct_coords)
-                funct_coords = r[0].apply(funct_coords) + np.array((0.,0.,2.)) # Move to 2
+                if len(funct_coords) > 1:
+                    r = Rot.align_vectors(np.array([[0.,0.,1.]]*len(funct_coords)), funct_coords)#.reshape(1,-1))
+                    funct_coords = r[0].apply(funct_coords) + np.array((0.,0.,2.)) # Move to 2
+                else:
+                    funct_coords = np.array((0.,0.,2.)).reshape(1,-1) # Move to 2
 
                 funct_mol.ase_atoms.set_positions(funct_coords)
 
