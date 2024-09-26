@@ -326,9 +326,10 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
     total_out = 0
     max_attempts = max_attempts + n
     count = 0
-    max_dist = max_rmsd*0.9
     with tqdm(total=n) as pbar:
         while (total_out < n) and (count < max_attempts):
+            # Randomize magnitude of displacement
+            max_dist = max_rmsd*np.random.random()
             count += 1
             out_atoms = relaxed_atoms.copy()
             # Generate random displacements
