@@ -332,23 +332,34 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
             count += 1
             out_atoms = relaxed_atoms.copy()
             # Generate random displacements
-            newcoords = out_atoms.positions + np.random.uniform(low=-max_dist,
-                                                        high=max_dist,
-                                                        size=(na, 3))
+            newcoords = out_atoms.positions + np.random.uniform(
+                low=-max_dist,
+                high=max_dist,
+                size=(na, 3))
             out_atoms.set_positions(newcoords)
             tmpmol = convert_io_molecule(mol2)
             tmpmol.dists_sane = True
-            s_rmsd = simple_rmsd(relaxed_atoms,out_atoms)
-            _,align_rmsd = reorder_align_rmsd(relaxed_atoms,out_atoms,return_rmsd=True)
+            s_rmsd = simple_rmsd(relaxed_atoms, out_atoms)
+            _, align_rmsd = reorder_align_rmsd(relaxed_atoms,
+                                               out_atoms,
+                                               return_rmsd=True)
             tmpmol.ase_atoms = out_atoms
-            tmpmol.dist_sanity_checks(min_dist_cutoff=min_dist_cutoff,smallest_dist_cutoff=smallest_dist_cutoff,debug=debug)
-            if (tmpmol.dists_sane) and (s_rmsd > min_rmsd) and (s_rmsd < max_rmsd) and (return_energies):
-                out = CalcExecutor(out_atoms,method='custom',calculator=calc,relax=False,debug=debug)
+            tmpmol.dist_sanity_checks(
+                min_dist_cutoff=min_dist_cutoff,
+                smallest_dist_cutoff=smallest_dist_cutoff,
+                debug=debug)
+            if (tmpmol.dists_sane) and (s_rmsd > min_rmsd) and (
+             s_rmsd < max_rmsd) and (return_energies):
+                out = CalcExecutor(out_atoms,
+                                   method='custom',
+                                   calculator=calc,
+                                   relax=False,
+                                   debug=debug)
                 if out.successful:
                     simple_rmsds.append(s_rmsd)
                     aligned_rmsds.append(align_rmsd)
                     energies.append(out.energy)
-                    full_results.append(out.ase_atoms.calc.results)
+                    full_results.append(out.mol.ase_atoms.calc.results)
                     displaced_structures.append(tmpmol)
                     total_out += 1
                     pbar.update(1)
@@ -372,10 +383,10 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
         return []
 
 
-def normal_mode_sampler(relaxed_mol, 
+def normal_mode_sampler(relaxed_mol,
                         hess=None,
-                        temp=298.15, 
-                        n=10, 
+                        temp=298.15,
+                        n=10,
                         seed=42,
                         distance_factor=1.0,
                         freq_cutoff=150,
@@ -385,7 +396,7 @@ def normal_mode_sampler(relaxed_mol,
                         per_mode_temp=False,
                         min_dist_cutoff=3,
                         smallest_dist_cutoff=0.55,
-                        return_energies=False, 
+                        return_energies=False,
                         debug=False):
     """normal_mode_sampler
     https://www.nature.com/articles/sdata2017193#Sec12
