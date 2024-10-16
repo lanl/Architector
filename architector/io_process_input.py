@@ -16,8 +16,16 @@ import uuid
 import copy
 import os
 import mendeleev
+import multiprocessing
+import concurrent.futures
 from ase.db import connect
 from ase import Atoms
+try:
+    from executorlib import Executor
+except:
+    from concurrent.futures import ProcessPoolExecutor as Executor
+
+ncpu = multiprocessing.cpu_count()
 
 def isnotebook():
     """isnotebook
@@ -147,7 +155,7 @@ def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
                 possible_Ligtypes) if (i in save_inds)]
             if len(tpossible_Ligtypes) > 0:
                 possible_Ligtypes = tpossible_Ligtypes
-                exitloop=True
+                exitloop = True
         out_types = []
         confidences = []
         min_losses = []
@@ -526,7 +534,9 @@ def inparse(inputDict):
                 elif (coreDict['coreType'] is None) or isinstance(coreDict['coreType'],bool):
                     skip = False
                 else:
-                    raise ValueError('Unrecognized type passed to inputDict["core"]["coreType"] - need list/str/None/bool.')
+                    raise ValueError(
+                        'Unrecognized type passed to inputDict["core"]["coreType"] - need list/str/None/bool.'
+                        )
             if ('coreCN' in coreDict) and (not skip):
                 if isinstance(coreDict['coreCN'],list):
                     core_geo_class = io_core.Geometries()
@@ -901,6 +911,7 @@ def inparse(inputDict):
             "debug": False, # Print out additional info for debugging purposes.
             "save_init_geos": False, # Save initial geometries before relaxations with xTB.
             "seed":None, # If a seed is passed (int/float) use it to initialize np.random.seed for reproducability.
+            "nproc": ncpu, # Number of processors.
             # If you want to replicate whole workflows - set np.random.seed() at the beginning of your workflow.
             ### OPENBABEL STILL HAS RANDOMNESS
             "save_trajectories": False, # Save full relaxation trajectories from xTB to the ase db.

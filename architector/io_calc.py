@@ -268,6 +268,14 @@ class CalcExecutor:
         self.rmsd = None
         self.calc_time = time.time()
         self.done = False
+        # Set processsing to be single-thread.
+        if parameters.get('nproc', 1) > 1:
+            import os
+            os.environ["OMP_NUM_THREADS"] = "1"
+            os.environ["OPENBLAS_NUM_THREADS"] = "1"
+            os.environ["MKL_NUM_THREADS"] = "1"
+            os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+            os.environ["NUMEXPR_NUM_THREADS"] = "1"
         self.calculate()
 
     def calculate(self):
