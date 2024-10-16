@@ -24,7 +24,8 @@ def serialize_json_dict(indict):
     ss = '{'
     count = 1
     ids = []
-    for key, val in tqdm(indict.items(),total=len(indict)):
+    for key, val in tqdm(indict.items(),
+                         total=len(indict)):
         if count % 500 == 0:
             print(count)
         tlines = '"{}"'.format(count) + ': ' + '{\n'
@@ -47,20 +48,28 @@ def serialize_json_dict(indict):
     return ss
 
 
-def merge_JsonFiles(filenamelist, outfname='compiled.json'):
+def merge_JsonFiles(filenamelist, outfname='compiled.json',
+                    maxforce=300):
     """jsons = [str(x) for x in p.glob('architector*json')]
     compiled_json_name = 'compiled.json'
     merge_JsonFiles(jsons,compiled_json_name)"""
     result = dict()
     ids = []
     count = 1
-    for i,f1 in tqdm(enumerate(filenamelist),total=len(filenamelist)):
+    for i, f1 in tqdm(enumerate(filenamelist),
+                      total=len(filenamelist)):
         newdata = dict()
         try:
             with open(f1, 'r') as infile:
                 data = json.load(infile)
             for key,val in data.items():
-                if (key != 'ids') and (key != 'nextid'):
+                try:
+                    maxf = np.linalg.norm(np.array(
+                        val['forces']['__ndarray__'][2]).reshape(
+                        val['forces']['__ndarray__'][0]), axis=1).max()
+                except Exception as e:
+                    maxf = np.inf
+                if (key != 'ids') and (key != 'nextid') and (maxf < maxforce):
                     newdata[str(count)] = val
                     ids.append(count)
                     count +=1
@@ -115,7 +124,8 @@ def convert_arrays_to_npz(dbname, prefix, mindist_cutoff=0.5,
             is_pbc = True
             any_pbc = True
         try:
-            syms,counts=np.unique(row.symbols,return_counts=True)
+            syms, counts = np.unique(row.symbols,
+                                     return_counts=True)
             result_dict = {
                 'atoms': row.numbers,
                 'xyz': row.positions,
@@ -130,7 +140,8 @@ def convert_arrays_to_npz(dbname, prefix, mindist_cutoff=0.5,
                 'relaxed': row.relaxed,
                 'geo_step': row.geo_step
             }
-            distmat = row.toatoms().get_all_distances() + np.eye(len(row.numbers))* mindist_cutoff*2
+            distmat = row.toatoms().get_all_distances() + np.eye(
+                len(row.numbers)) * mindist_cutoff*2
             maxforce = np.max(np.linalg.norm(row.forces, axis=1))
             # Hard distance cutoff, forces cutoff
             if (distmat.min() > mindist_cutoff) and (maxforce < max_force):
@@ -160,7 +171,7 @@ def convert_arrays_to_npz(dbname, prefix, mindist_cutoff=0.5,
         natom = len(record['atoms'])
         xyz_array[i, :natom, :] = record['xyz']
         force_array[i, :natom, :] = record['force']
-        atom_z_array[i,:natom] = record['atoms']
+        atom_z_array[i,: natom] = record['atoms']
         if pbc:
             cell_array[i, :, :] = record['cell']
     np.save("data-" + prefix + 'atomization_energy.npy', atomization_array)
