@@ -9,3 +9,5 @@
 *__pycache__*
 **/.vscode/
 meta_production_sample.pkl
+development/**/*.csv
+development/**/*.mol2

@@ -1,0 +1,2 @@
+$write
+   gbsa=true

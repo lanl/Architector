@@ -487,7 +487,7 @@ def complex_driver(inputDict1):
                 ligandDict = newligDict
             else: # Generate from scratch
                 ligandDict = {} #
-            
+
             coreCoordList = core_geo_class.geometry_dict[coreType]
 
             # Assign con atoms based on all ligands
@@ -540,7 +540,7 @@ def complex_driver(inputDict1):
                             out_energies.append(complexClass.calculator.energy)
                             if inputDict['parameters']['return_only_1']:
                                 break
-                if not isinstance(complexClass, bool): # Catch cases where no conformation generated.
+                if not isinstance(complexClass, bool):  # Catch cases where no conformation generated.
                     order = np.argsort(out_energies)
                     for ind, j in enumerate(order[0:inputDict[
                        'parameters']['n_conformers']]):
@@ -585,7 +585,7 @@ def complex_driver(inputDict1):
         return conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1
     else:
         return {},inputDict,0,0,0
-    
+
 def build_complex_driver(inputDict1): 
     """build_complex_driver overall driver building of the complex
 
@@ -787,12 +787,13 @@ def build_complex(inputDict):
             keys.append(key)
             vals.append(val)
         order = np.argsort(xtb_energies)
-        for j,i in enumerate(order):
+        for j, i in enumerate(order):
             if tmp_inputDict['parameters']['add_secondary_shell_species'] and \
                   (j < tmp_inputDict['parameters'][
                       'secondary_shell_n_conformers']):
                 if tmp_inputDict['parameters']['debug']:
-                    print('Starting secondary shell addition on {} of {}!'.format(j+1,len(order)))
+                    print('Starting secondary shell addition on {} of {}!'.format(j+1,
+                                                                                  len(order)))
                     print('Normally adds a chunk of time to generation.')
                 # Use the docking function to add species specified in inputDict/parameters
                 mol_plus_species, species_list = \
