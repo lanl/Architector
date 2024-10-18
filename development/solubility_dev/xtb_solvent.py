@@ -6,6 +6,18 @@ import numpy as np
 
 
 def read_solv_params(file):
+    """XTB output parser for solvent parameters
+
+    Parameters
+    ----------
+    file : str
+        file to load
+
+    Returns
+    -------
+    outdict : dict
+       dictionary of output
+    """
     with open(file, "r") as file1:
         lines = file1.readlines()
     solvent_area_start_key = "generalized Born model for continuum solvation"
@@ -93,7 +105,8 @@ def xtb_solv_params(structure, solvent="water"):
             xtbPath, int(mol_charge), int(uhf), solvent
         )
 
-        sub.run(execStr, shell=True, check=True)
+        sub.run(execStr, shell=True, check=True,
+                stderr=sub.DEVNULL, stdout=sub.DEVNULL)
 
         # Read conformers from file
         result_dict = read_solv_params("output.xtb")

@@ -6,7 +6,6 @@ Developed by Dan Burril and Michael Taylor
 
 # Imports
 import ase
-import itertools
 from ase.io import read
 from ase import units
 import numpy as np
@@ -20,8 +19,8 @@ from scipy.sparse import csgraph
 from pynauty import Graph as pnGraph
 from pynauty import canon_label
 
-# ob.obErrorLog.SetOutputLevel(0) # Set warnings to only critical.
 ob.obErrorLog.StopLogging()  # Turn off ALL openbabel logging.
+# ob.obErrorLog.SetOutputLevel(0)  # Set warnings to only critical.
 
 warnings.filterwarnings('ignore')  # Supress warnings.
 
@@ -442,8 +441,8 @@ def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000,
     _, anums, graph = get_OBMol_coords_anums_graph(obmol, return_coords=False,
                                                    get_types=False)
     syms = [io_ptable.elements[x] for x in anums]
-    act_inds = [i for i,x in enumerate(syms) if x in io_ptable.actinides]
-    swapped=False
+    act_inds = [i for i, x in enumerate(syms) if x in io_ptable.actinides]
+    swapped = False
     if len(act_inds) > 0:
         an_symbols = [syms[x] for x in act_inds]
         ln_symbols = [io_ptable.lanthanides[io_ptable.actinides.index(x)] for x in an_symbols]
@@ -451,18 +450,18 @@ def generate_obmol_conformers(structure, rmsd_cutoff=0.4, conf_cutoff=3000,
         for i, atom in enumerate(ob.OBMolAtomIter(obmol)):
             if i in act_inds:
                 atom.SetAtomicNum(io_ptable.elements.index(ln_symbols[j]))
-                j+=1
-        swapped=True
+                j += 1
+        swapped = True
     mmff94_ok = check_mmff_okay(obmol)
     if mmff94_ok:
         FF = ob.OBForceField.FindForceField("MMFF94")
-        FF.Setup(obmol) # Make sure setup works OK
+        FF.Setup(obmol)  # Make sure setup works OK
     else:
         FF = ob.OBForceField.FindForceField("UFF")
-        FF.Setup(obmol) # Make sure setup works OK
+        FF.Setup(obmol)  # Make sure setup works OK
     if fix_m_neighbors:
-        mets = [i for i,x in enumerate(syms) if x in io_ptable.all_metals]
-        if len(mets) == 1: # Freeze metal and neighbor positions - relax ligands
+        mets = [i for i, x in enumerate(syms) if x in io_ptable.all_metals]
+        if len(mets) == 1:  # Freeze metal and neighbor positions - relax ligands
             frozen_atoms = [mets[0]+1] + (np.nonzero(np.ravel(graph[mets[0]]))[0] + 1).tolist()
             constr = ob.OBFFConstraints()
             for j in frozen_atoms:
