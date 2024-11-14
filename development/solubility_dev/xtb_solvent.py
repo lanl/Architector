@@ -3,6 +3,7 @@ import architector.io_molecule as io_molecule
 import shutil
 import subprocess as sub
 import numpy as np
+from ase import units
 
 
 def read_solv_params(file):
@@ -37,7 +38,20 @@ def read_solv_params(file):
                 born_radii.append(float(sline[3]))
         else:
             pass
-    outdict = {"sas": np.array(sas), "born_radii": np.array(born_radii)}
+    gsolv = None
+    for line in lines:
+        if 'Gsolv' in line:
+            gsolv = float(line.split()[3]) * units.Ha
+            break
+    hl_gap = None
+    for line in lines:
+        if 'HOMO-LUMO gap' in line:
+            hl_gap = float(line.split()[3])
+            break
+    outdict = {"sas": np.array(sas),
+               "born_radii": np.array(born_radii),
+               "gsolv_eV": gsolv,
+               "hl_gap_eV": hl_gap}
     return outdict
 
 

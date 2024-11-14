@@ -141,6 +141,8 @@ def full_conf_xtb_workflow(insmiles):
                         {
                             "sas": None,
                             "born_radii": None,
+                            "gsolv_eV": None,
+                            "hl_gap_eV": None,
                             "error": "XTB Sovlent Eval Error",
                         }
                     )
@@ -163,6 +165,8 @@ def full_conf_xtb_workflow(insmiles):
                 results["n_atoms"] = None
                 results["xtb_solvent"] = solvent
                 results["sas"] = None
+                results['gsolv_eV'] = None
+                results['hl_gap_eV'] = None
                 results["born_radii"] = None
                 results["error"] = "XTB-Python Relaxation Failed"
                 results_list.append(results)
@@ -183,6 +187,8 @@ def full_conf_xtb_workflow(insmiles):
             results["n_atoms"] = None
             results["xtb_solvent"] = solvent
             results["sas"] = None
+            results['gsolv_eV'] = None
+            results['hl_gap_eV'] = None
             results["born_radii"] = None
             results["error"] = "python/XTB error"
             results_list.append(results)

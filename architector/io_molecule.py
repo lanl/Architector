@@ -2083,3 +2083,22 @@ class Molecule:
         info_dict['lig_smiles'] = ligsmiles
         info_dict['lig_metal_coordatoms'] = catoms
         return info_dict
+    
+    def get_rad_gyration(self):
+        """Calcaulate the radius of gyration of the molecule
+        Around the center of mass.
+
+        Returns
+        -------
+        gyration_radii : float
+           Gyration radius in Angstroms.
+        """
+        posits = self.ase_atoms.get_positions()
+        masses = self.ase_atoms.get_masses()
+        com = self.ase_atoms.get_center_of_mass()
+        gyration_radii = np.sqrt(np.sum(np.linalg.norm(
+            (posits - com),
+            axis=1)**2*masses) /
+            np.sum(masses))
+        return gyration_radii
+
