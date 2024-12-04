@@ -1706,18 +1706,20 @@ class Molecule:
         trans_oxo_triples = []
         if isinstance(info_dict['metal_ind'],(int,float)):
             info_dict['metal_ind'] = [info_dict['metal_ind']]
-        for m_ind in info_dict['metal_ind']:
-            toxinds = []
-            for oxind in oxo_inds:
-                if m_ind in info_dict['bound_metal_inds'][oxind]:
-                    toxinds.append(oxind)
-            if len(toxinds) > 1:
-                for pair in itertools.combinations(toxinds,2):
-                    ind0 = info_dict['original_lig_inds'][pair[0]][0]
-                    ind1 = info_dict['original_lig_inds'][pair[1]][0]
-                    angle = self.ase_atoms.get_angle(ind0,m_ind,ind1)
-                    if angle > 179:
-                        trans_oxo_triples.append((ind0,m_ind,ind1))
+        if info_dict.get('metal_ind',None) is not None:
+            if len(info_dict.get('metal_ind',[])) > 0:
+                for m_ind in info_dict['metal_ind']:
+                    toxinds = []
+                    for oxind in oxo_inds:
+                        if m_ind in info_dict['bound_metal_inds'][oxind]:
+                            toxinds.append(oxind)
+                    if len(toxinds) > 1:
+                        for pair in itertools.combinations(toxinds,2):
+                            ind0 = info_dict['original_lig_inds'][pair[0]][0]
+                            ind1 = info_dict['original_lig_inds'][pair[1]][0]
+                            angle = self.ase_atoms.get_angle(ind0,m_ind,ind1)
+                            if angle > 179:
+                                trans_oxo_triples.append((ind0,m_ind,ind1))
         return trans_oxo_triples
 
     def functionalize_3D(self,
