@@ -28,7 +28,7 @@ try:
 except ImportError:
     pass
 
-from arch_xtb_text_ase_calc import XTB_Calculator
+from architector.arch_xtb_text_ase_calc import XTB_Calculator
 from tblite.ase import TBLite
 # No GFN-FF nor solvent support yet in TBLite
 
