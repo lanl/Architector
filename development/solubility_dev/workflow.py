@@ -147,7 +147,8 @@ def full_conf_xtb_workflow(insmiles):
             except:
                 results = dict()
                 results["uff_energy"] = float(
-                    conf.split("\n")[1].split("=")[1].split()[0])
+                    conf.split("\n")[1].split("=")[1].split()[0]
+                )
                 results["uff_mol2"] = conf
                 results["smiles"] = insmiles
                 results["xtb_solvent"] = solvent
@@ -161,18 +162,19 @@ def full_conf_xtb_workflow(insmiles):
 
     # Log output to file from subprocess
     out_df = pd.DataFrame(results_list)
-    out_df.to_pickle(savedir_p / ("Smiles_{}.pkl".format(encode_smi(insmiles)))
-                     )
+    out_df.to_pickle(savedir_p / ("Smiles_{}.pkl".format(encode_smi(insmiles))))
     return results_list
 
 
 with flux.job.FluxExecutor() as flux_exe:
     with Executor(
         max_workers=max_workers,  # total number of cores available to the Executor
-        cores_per_worker=1,
-        threads_per_core=1,
-        cwd=cwd,
-        openmpi_oversubscribe=False,  # not available with flux
+        resource_dict={
+            "cores": 1,
+            "threads_per_core": 1,
+            "cwd": cwd,
+            "openmpi_oversubscribe": False,
+        },
         flux_executor=flux_exe,
         block_allocation=True,  # reuse existing processes with fixed resources
     ) as exe:
