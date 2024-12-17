@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python
-  - xtb-python
+  - xtb
   - ase
   - numpy
   - openbabel

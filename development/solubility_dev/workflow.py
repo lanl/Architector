@@ -65,11 +65,11 @@ def full_conf_xtb_workflow(insmiles):
     from architector.io_calc import CalcExecutor
     from architector import convert_io_molecule
     from architector.io_obabel import generate_obmol_conformers
-    from xtb_solvent import xtb_solv_params
     import pandas as pd
     import pathlib
 
-    solvent = "water"
+    solvents = ["THF", "Acetone", "water"]
+    # Epsilons: 7.58, 20.7, 78.7
     totaln = 50
     savedir = "completed_pickles"
     savedir_p = pathlib.Path(savedir)
@@ -103,95 +103,56 @@ def full_conf_xtb_workflow(insmiles):
     # Generate conformers
     confs = gen_confs(insmiles)
     results_list = []
-    for conf in confs:
-        try:  # Catch errors
-            out = CalcExecutor(
-                conf,
-                method="GFN2-xTB",
-                # Store the energy/forces/charges of the minima
-                store_results=True,
-                relax=True,
-                fmax=0.05,  # Tighter force maximum
-                xtb_solvent=solvent,
-            )
-            if out.successful:
-                # Store results
-                results = out.results
-                results["xtb_mol2"] = out.mol.write_mol2(
-                    "GFn2-XTB_relax", writestring=True
+    # Iterate over solvents
+    for solvent in solvents:
+        for conf in confs:
+            try:  # Catch errors
+                out = CalcExecutor(
+                    conf,
+                    method="GFN2-xTB",
+                    # Store the energy/forces/charges of the minima
+                    store_results=True,
+                    relax=True,
+                    fmax=0.05,  # Tighter force maximum
+                    xtb_solvent=solvent,
                 )
-                results["uff_energy"] = float(
-                    conf.split("\n")[1].split("=")[1].split()[0]
-                )
-                results["uff_mol2"] = conf
-                results["smiles"] = insmiles
-                results["total_charge"] = out.mol.charge
-                results["total_unpaired_electrons"] = out.mol.uhf
-                results["n_atoms"] = len(out.mol.ase_atoms)
-                results["xtb_solvent"] = solvent
-                # THIS call has a subprocess call of XTB
-                xtb_sa_eval_dict = xtb_solv_params(results["xtb_mol2"],
-                                                   solvent=solvent)
-                if isinstance(xtb_sa_eval_dict, dict):
-                    results.update(xtb_sa_eval_dict)
-                    results["error"] = ""
+                if out.successful:
+                    # Store results
+                    results = out.results
+                    results["xtb_mol2"] = out.mol.write_mol2(
+                        "GFn2-XTB_relax", writestring=True
+                    )
+                    results["uff_energy"] = float(
+                        conf.split("\n")[1].split("=")[1].split()[0]
+                    )
+                    results["uff_mol2"] = conf
+                    results["smiles"] = insmiles
+                    results["total_charge"] = out.mol.charge
+                    results["total_unpaired_electrons"] = out.mol.uhf
+                    results["n_atoms"] = len(out.mol.ase_atoms)
+                    results["xtb_solvent"] = solvent
+                    results["rad_gyration"] = out.mol.get_rad_gyration()
+                    # THIS call has a subprocess call of XTB
                     results_list.append(results)
                 else:
-                    results.update(
-                        {
-                            "sas": None,
-                            "born_radii": None,
-                            "gsolv_eV": None,
-                            "hl_gap_eV": None,
-                            "error": "XTB Sovlent Eval Error",
-                        }
+                    results = dict()
+                    results["uff_energy"] = float(
+                        conf.split("\n")[1].split("=")[1].split()[0]
                     )
+                    results["uff_mol2"] = conf
+                    results["smiles"] = insmiles
+                    results["xtb_solvent"] = solvent
+                    results["error"] = "XTB-Python Relaxation Failed"
                     results_list.append(results)
-            else:
+            except:
                 results = dict()
-                results["energy"] = None
-                results["free_energy"] = None
-                results["forces"] = None
-                results["dipole"] = None
-                results["charges"] = None
-                results["xtb_mol2"] = None
                 results["uff_energy"] = float(
-                    conf.split("\n")[1].split("=")[1].split()[0]
-                )
+                    conf.split("\n")[1].split("=")[1].split()[0])
                 results["uff_mol2"] = conf
                 results["smiles"] = insmiles
-                results["total_charge"] = None
-                results["total_unpaired_electrons"] = None
-                results["n_atoms"] = None
                 results["xtb_solvent"] = solvent
-                results["sas"] = None
-                results['gsolv_eV'] = None
-                results['hl_gap_eV'] = None
-                results["born_radii"] = None
-                results["error"] = "XTB-Python Relaxation Failed"
+                results["error"] = "python/XTB error"
                 results_list.append(results)
-        except:
-            results = dict()
-            results["energy"] = None
-            results["free_energy"] = None
-            results["forces"] = None
-            results["dipole"] = None
-            results["charges"] = None
-            results["xtb_mol2"] = None
-            results["uff_energy"] = float(
-                conf.split("\n")[1].split("=")[1].split()[0])
-            results["uff_mol2"] = conf
-            results["smiles"] = insmiles
-            results["total_charge"] = None
-            results["total_unpaired_electrons"] = None
-            results["n_atoms"] = None
-            results["xtb_solvent"] = solvent
-            results["sas"] = None
-            results['gsolv_eV'] = None
-            results['hl_gap_eV'] = None
-            results["born_radii"] = None
-            results["error"] = "python/XTB error"
-            results_list.append(results)
 
     # encode smiles
     def encode_smi(insmi):
@@ -225,7 +186,3 @@ with flux.job.FluxExecutor() as flux_exe:
                 lst = done.result()
                 pbar.update(1)  # Update pbar
                 print("Smiles Done: {}".format(lst[0]["smiles"]))
-
-# Don't need if logging/restart enabled - works well for smaller production runs.
-# combined_df = pd.concat([pd.DataFrame(x) for x in out_results])
-# combined_df.to_pickle('all_dataframes.pkl')

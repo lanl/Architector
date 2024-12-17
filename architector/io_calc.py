@@ -21,7 +21,14 @@ from ase.constraints import (FixAtoms, FixBondLengths, FixInternals)
 
 # Add any other ASE calculator here.
 # To extend to other methods.
-from xtb.ase.calculator import XTB
+has_xtb_python = False
+try:
+    from xtb.ase.calculator import XTB
+    has_xtb_python  = True
+except ImportError:
+    pass
+
+from arch_xtb_text_ase_calc import XTB_Calculator
 from tblite.ase import TBLite
 # No GFN-FF nor solvent support yet in TBLite
 
@@ -41,7 +48,7 @@ params = {
     "ase_db_tmp_name": "/tmp/architector_ase_db.json",
     "architector_run_label": 'arch_run_0',
     # Cutoff parameters
-    "assemble_sanity_checks": True, # Turn on/off assembly sanity checks.
+    "assemble_sanity_checks": True,  # Turn on/off assembly sanity checks.
     "assemble_graph_sanity_cutoff": 1.8,
     # Graph Sanity cutoff for imposed molecular graph represents the maximum elongation of bonds
     # rcov1*full_graph_sanity_cutoff is the maximum value for the bond lengths.
@@ -207,7 +214,7 @@ class CalcExecutor:
         self.results = None
         self.detect_spin_charge = detect_spin_charge
         if len(parameters) > 0:
-            for key,val in parameters.items():
+            for key, val in parameters.items():
                 setattr(self, key, val)
         if assembly:
             self.init_sanity_check = True
@@ -281,7 +288,8 @@ class CalcExecutor:
             if (not self.species_run) and (not self.skip_spin_assign):
                 self.mol.calc_suggested_spin(params=self.parameters)
             obabel_ff_requested = False
-            if (self.calculator is not None) and ('custom' in self.method): # If ASE calculator passed use that by default
+            if (self.calculator is not None) and ('custom' in self.method):
+                # If ASE calculator passed use that by default
                 if not self.calc_instantiated:
                     calc = self.calculator(**self.calculator_kwargs)
                 else:
@@ -308,20 +316,37 @@ class CalcExecutor:
                                   electronic_temperature=self.xtb_electronic_temperature,
                                   # spin_polarization=1.0, # Have spin polarization on if desired.
                                   verbosity=self.parameters['debug'])
-                # Use XTB for other cases.
+                # No xtb-python
+                elif (not has_xtb_python) and (self.method != 'GFN-FF'):
+                    print('Warning: Defaulting to TBLite with no solvent since xtb-python is not installed.')
+                    calc = TBLite(method=self.method,
+                                  max_iterations=self.xtb_max_iterations,
+                                  electronic_temperature=self.xtb_electronic_temperature,
+                                  # spin_polarization=1.0, # Have spin polarization on if desired.
+                                  verbosity=self.parameters['debug'])
+                elif (not has_xtb_python):
+                    calc = XTB_Calculator(
+                        xtb_method=self.method,
+                        xtb_accuracy=self.xtb_accuracy,
+                        xtb_max_iterations=self.xtb_max_iterations,
+                        xtb_electronic_temperature=self.xtb_electronic_temperature,
+                        xtb_solvent=self.xtb_solvent)
                 else:
-                    calc = XTB(method=self.method, solvent=self.xtb_solvent,
+                    calc = XTB(method=self.method,
+                               solvent=self.xtb_solvent,
                                max_iterations=self.xtb_max_iterations,
                                electronic_temperature=self.xtb_electronic_temperature,
                                accuracy=self.xtb_accuracy)
-                        # verbosity=0)
+                    # verbosity=0)
                 # Difference of more than 1. Still perform a ff_preoptimization if requested.
                 if (np.abs(self.mol.xtb_charge - self.mol.charge) > 1):
                     if len(self.trans_oxo_triples) > 0:
                         pass
                     elif ((not self.override_oxo_opt) or (self.assembly)) and (not self.force_oxo_relax):
-                        self.relax = False # E.g - don't relax if way off in oxidation states (III) vs (V or VI)
-                    elif self.assembly: # FF more stable for highly charged assembly complexes.
+                        self.relax = False
+                        # E.g - don't relax if way off in oxidation states (III) vs (V or VI)
+                    elif self.assembly:
+                        # FF more stable for highly charged assembly complexes.
                         self.method = 'GFN-FF'
                 uhf_vect = np.zeros(len(self.mol.ase_atoms))
                 if self.method != 'GFN-FF':
@@ -362,11 +387,17 @@ class CalcExecutor:
                             else:
                                 tlist = self.fix_indices
                             if (triple[0] not in tlist) or (triple[1] not in tlist):
-                                bonds.append([self.mol.ase_atoms.get_distance(triple[0],triple[1]),
-                                              [triple[0],triple[1]]])
-                                bonds.append([self.mol.ase_atoms.get_distance(triple[2],triple[1]),
-                                        [triple[2],triple[1]]])
-                                angles_degs.append([180.0,list(triple)])
+                                bonds.append(
+                                    [self.mol.ase_atoms.get_distance(
+                                        triple[0], triple[1]),
+                                     [triple[0], triple[1]]])
+                                bonds.append([self.mol.ase_atoms.get_distance(
+                                    triple[2],
+                                    triple[1]),
+                                    [triple[2],
+                                     triple[1]]])
+                                angles_degs.append([180.0,
+                                                    list(triple)])
                         c = FixInternals(bonds=bonds, angles_deg=angles_degs)
                         cs.append(c)
                     self.mol.ase_atoms.set_constraint(cs)
@@ -418,9 +449,12 @@ class CalcExecutor:
                                 self.read_traj()
                             if self.parameters['debug']:
                                 print('Warning - method did not converge!',e)
-                                print('Mol XTB Charge {} Spin {}\n'.format(self.mol.xtb_charge,self.mol.xtb_uhf))
-                                print('Mol ase Charge {} Spin {}\n'.format(self.mol.ase_atoms.get_initial_charges().sum(),
-                                                                           self.mol.ase_atoms.get_initial_magnetic_moments().sum()))
+                                print('Mol XTB Charge {} Spin {}\n'.format(
+                                    self.mol.xtb_charge,
+                                    self.mol.xtb_uhf))
+                                print('Mol ase Charge {} Spin {}\n'.format(
+                                    self.mol.ase_atoms.get_initial_charges().sum(),
+                                    self.mol.ase_atoms.get_initial_magnetic_moments().sum()))
                             self.energy = 10000
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
@@ -442,9 +476,10 @@ class CalcExecutor:
                         except Exception as e:
                             self.errors.append(e)
                             if self.parameters['debug']:
-                                print('Warning - method did not converge!',e)
-                                print('Mol XTB Charge {} Spin {}\n'.format(self.mol.xtb_charge,
-                                                                           self.mol.xtb_uhf))
+                                print('Warning - method did not converge!', e)
+                                print('Mol XTB Charge {} Spin {}\n'.format(
+                                    self.mol.xtb_charge,
+                                    self.mol.xtb_uhf))
                                 print('Mol ase Charge {} Spin {}\n'.format(
                                     self.mol.ase_atoms.get_initial_charges().sum(),
                                     self.mol.ase_atoms.get_initial_magnetic_moments().sum()))
@@ -455,12 +490,14 @@ class CalcExecutor:
                 if self.relax:
                     try:
                         self.init_energy = io_obabel.obmol_energy(self.mol)
-                        out_atoms, energy = io_obabel.obmol_opt(self.mol, center_metal=True,
-                                fix_m_neighbors=self.fix_m_neighbors,
-                                fix_indices=self.fix_indices,  # Note - fixing metal neighbors in UFF
-                                    # Done to maintain metal center symmetry
-                                trans_oxo_triples=self.trans_oxo_triples,
-                                return_energy=True)
+                        out_atoms, energy = io_obabel.obmol_opt(
+                            self.mol,
+                            center_metal=True,
+                            fix_m_neighbors=self.fix_m_neighbors,
+                            fix_indices=self.fix_indices,  # Note - fixing metal neighbors in UFF
+                                # Done to maintain metal center symmetry
+                            trans_oxo_triples=self.trans_oxo_triples,
+                            return_energy=True)
                         self.successful = True
                         self.energy = energy
                         self.mol.ase_atoms.set_positions(out_atoms.get_positions())
