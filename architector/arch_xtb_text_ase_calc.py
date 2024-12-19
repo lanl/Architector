@@ -87,7 +87,7 @@ class XTB_Calculator(Calculator):
                     file1.write("    gbsa=true\n")
 
                 # Run xtb
-                execStr = "{} structure.xyz {} --chrg {} --uhf {} --alpb {} -P 1 -a {} --etemp {} --iterations {} --grad -I solv_options.txt> output.xtb".format(
+                execStr = "{} structure.xyz {} --chrg {} --uhf {} --alpb {} -P 1 -a {} --etemp {} --iterations {} --grad -I solv_options.txt".format(
                     xtbPath,
                     methods_dict[self.parameters.get("xtb_method", "GFN2-xTB")],
                     int(charge),
@@ -98,7 +98,7 @@ class XTB_Calculator(Calculator):
                     self.parameters["xtb_max_iterations"],
                 )
             else:
-                execStr = "{} structure.xyz {} --chrg {} --uhf {} -P 1 -a {} --etemp {} --iterations {} --grad> output.xtb".format(
+                execStr = "{} structure.xyz {} --chrg {} --uhf {} -P 1 -a {} --etemp {} --iterations {} --grad".format(
                     xtbPath,
                     methods_dict[self.parameters.get("xtb_method", "GFN2-xTB")],
                     int(charge),
@@ -108,9 +108,11 @@ class XTB_Calculator(Calculator):
                     self.parameters["xtb_max_iterations"],
                 )
 
-            sub.run(
-                execStr, shell=True, check=True, stderr=sub.DEVNULL, stdout=sub.DEVNULL
-            )
+            with open('output.xtb', 'w') as file1:
+                sub.run(
+                    execStr.split(), check=True,
+                    stderr=sub.DEVNULL, stdout=file1
+                )
 
             outpath = pathlib.Path(".")
 

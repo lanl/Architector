@@ -37,7 +37,14 @@ from scipy.spatial.transform import Rotation as Rot
 from ase import Atom
 from ase.optimize.bfgslinesearch import BFGSLineSearch
 import ase.constraints as ase_con
-from xtb.ase.calculator import XTB
+has_xtb_python = False
+try:
+    from xtb.ase.calculator import XTB
+    has_xtb_python = True
+except:
+    pass
+
+from architector.arch_xtb_text_ase_calc import XTB_Calculator
 # from tblite.ase import TBLite -> No GFN-FF support yet.
 import warnings
 
@@ -107,7 +114,10 @@ def set_XTB_calc(ase_atoms):
     """
     ase_atoms.set_initial_charges(np.zeros(len(ase_atoms)))
     ase_atoms.set_initial_magnetic_moments(np.zeros(len(ase_atoms)))
-    calc = XTB(method="GFN-FF")
+    if has_xtb_python:
+        calc = XTB(method="GFN-FF")
+    else:
+        calc = XTB_Calculator(xtb_method="GFN-FF")
     # Default to only GFN-FF for ligand conformer relaxation.
     ase_atoms.calc = calc
     return ase_atoms

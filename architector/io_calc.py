@@ -315,15 +315,8 @@ class CalcExecutor:
                                   max_iterations=self.xtb_max_iterations,
                                   electronic_temperature=self.xtb_electronic_temperature,
                                   # spin_polarization=1.0, # Have spin polarization on if desired.
-                                  verbosity=self.parameters['debug'])
-                # No xtb-python
-                elif (not has_xtb_python) and (self.method != 'GFN-FF'):
-                    print('Warning: Defaulting to TBLite with no solvent since xtb-python is not installed.')
-                    calc = TBLite(method=self.method,
-                                  max_iterations=self.xtb_max_iterations,
-                                  electronic_temperature=self.xtb_electronic_temperature,
-                                  # spin_polarization=1.0, # Have spin polarization on if desired.
-                                  verbosity=self.parameters['debug'])
+                                #   verbosity=self.parameters['debug'])
+                                 verbosity=-1)
                 elif (not has_xtb_python):
                     calc = XTB_Calculator(
                         xtb_method=self.method,
