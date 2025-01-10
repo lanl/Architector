@@ -8,3 +8,4 @@ from architector.io_obabel import (get_obmol_smiles,
                                    )
 
 from architector.io_molecule import convert_io_molecule
+from architector.io_calc import CalcExecutor

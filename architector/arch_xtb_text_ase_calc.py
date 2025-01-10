@@ -87,7 +87,10 @@ class XTB_Calculator(Calculator):
                     file1.write("    gbsa=true\n")
 
                 # Run xtb
-                execStr = "{} structure.xyz {} --chrg {} --uhf {} --alpb {} -P 1 -a {} --etemp {} --iterations {} --grad -I solv_options.txt".format(
+                execStr = ("{} structure.xyz {} --chrg {} "
+                           " --uhf {} --alpb {} -a {} "
+                           "--etemp {} --iterations {} "
+                           "--grad -I solv_options.txt").format(
                     xtbPath,
                     methods_dict[self.parameters.get("xtb_method", "GFN2-xTB")],
                     int(charge),
@@ -98,7 +101,9 @@ class XTB_Calculator(Calculator):
                     self.parameters["xtb_max_iterations"],
                 )
             else:
-                execStr = "{} structure.xyz {} --chrg {} --uhf {} -P 1 -a {} --etemp {} --iterations {} --grad".format(
+                execStr = ("{} structure.xyz {} --chrg {}"
+                           " --uhf {} -a {} --etemp {}"
+                           " --iterations {} --grad").format(
                     xtbPath,
                     methods_dict[self.parameters.get("xtb_method", "GFN2-xTB")],
                     int(charge),
@@ -108,11 +113,8 @@ class XTB_Calculator(Calculator):
                     self.parameters["xtb_max_iterations"],
                 )
 
-            with open('output.xtb', 'w') as file1:
-                sub.run(
-                    execStr.split(), check=True,
-                    stderr=sub.DEVNULL, stdout=file1
-                )
+            with open("output.xtb", "w") as file1:
+                sub.run(execStr.split(), check=True, stderr=sub.DEVNULL, stdout=file1)
 
             outpath = pathlib.Path(".")
 
@@ -151,7 +153,7 @@ class XTB_Calculator(Calculator):
                 pass
         gsolv = None
         for line in lines:
-            if ("Gsolv" in line) and ('w/o' not in line):
+            if ("Gsolv" in line) and ("w/o" not in line):
                 gsolv = float(line.split()[3]) * units.Ha
                 break
         hl_gap = None

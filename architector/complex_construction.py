@@ -26,10 +26,20 @@ from architector.io_calc import CalcExecutor
 class Ligand:
     """Class to contain all information about a ligand including conformers."""
 
-    def __init__(self, smiles, ligcoordList, corecoordList, core,
-                 ligGeo, ligcharge, ca_metal_dist_constraints,
-                 covrad_metal=None, vdwrad_metal=None, enforce_symmetry=False,
-                 debug=False):
+    def __init__(
+        self,
+        smiles,
+        ligcoordList,
+        corecoordList,
+        core,
+        ligGeo,
+        ligcharge,
+        ca_metal_dist_constraints,
+        covrad_metal=None,
+        vdwrad_metal=None,
+        enforce_symmetry=False,
+        debug=False,
+    ):
         """Set up initial variables for ligand and run conformer generation routines.
 
         Parameters
@@ -73,17 +83,19 @@ class Ligand:
         # Generate conformations
         if debug:
             print("GENERATING CONFORMATIONS for {}".format(smiles))
-        conformers, rotscores, tligcoordList, relax, bo_dict, atypes, rotlist = io_lig.find_conformers(
-            self.smiles, 
-            self.ligcoordList,
-            self.corecoordList,
-            metal=self.metal,
-            ligtype=self.geo,
-            ca_metal_dist_constraints=self.ca_metal_dist_constraints,
-            covrad_metal=covrad_metal,
-            vdwrad_metal=vdwrad_metal,
-            enforce_symmetry=self.enforce_symmetry,
-            debug=debug
+        conformers, rotscores, tligcoordList, relax, bo_dict, atypes, rotlist = (
+            io_lig.find_conformers(
+                self.smiles,
+                self.ligcoordList,
+                self.corecoordList,
+                metal=self.metal,
+                ligtype=self.geo,
+                ca_metal_dist_constraints=self.ca_metal_dist_constraints,
+                covrad_metal=covrad_metal,
+                vdwrad_metal=vdwrad_metal,
+                enforce_symmetry=self.enforce_symmetry,
+                debug=debug,
+            )
         )
         if len(conformers) > 0:
             self.conformerList = conformers
@@ -100,7 +112,7 @@ class Ligand:
                 print("CONFORMERS GENERATED for {}".format(smiles))
         else:
             if debug:
-                print('No Valid Conformers Generated for {}!'.format(smiles))
+                print("No Valid Conformers Generated for {}!".format(smiles))
             self.exists = False
             self.relax = False
             self.conformerList = []
@@ -127,7 +139,7 @@ class Complex:
             Core vectors definitions (2 D array with denticityX3 shape)
         ligandList : list (Ligand)
             List of generated Ligand classes
-        parameters : dict 
+        parameters : dict
             All input parameters dictionary
         """
         # Set variables
@@ -136,8 +148,10 @@ class Complex:
         self.ligandList = ligandList
         self.parameters = parameters
         self.calculator = None
-        self.save = True # Save corresponds to whether calculations completed or failed.
-        self.index = 0 # Index keeps track of which index conformer this is.
+        self.save = (
+            True  # Save corresponds to whether calculations completed or failed.
+        )
+        self.index = 0  # Index keeps track of which index conformer this is.
         self.initMol = None
         self.initEnergy = None
         self.finalEvalTotalTime = None
@@ -146,14 +160,14 @@ class Complex:
 
         # Initialize Atoms object for complex
         init_atoms = io_obabel.smiles2Atoms(self.coreSmiles, addHydrogens=False)
-        init_atoms.set_initial_charges([parameters['metal_ox']])
-        init_atoms.set_initial_magnetic_moments([parameters['metal_spin']])
+        init_atoms.set_initial_charges([parameters["metal_ox"]])
+        init_atoms.set_initial_magnetic_moments([parameters["metal_spin"]])
 
         self.complexMol = io_molecule.convert_io_molecule(init_atoms)
         self.assembleMol = None
 
         # Assemble complex
-        if self.parameters['debug']:
+        if self.parameters["debug"]:
             print("ASSEMBLING COMPLEX")
         self.assemble_start_time = time.time()
         self.assemble_complex()
@@ -170,37 +184,53 @@ class Complex:
 
         self.initMol = io_molecule.convert_io_molecule(self.complexMol)
 
-        for i,ligand in enumerate(self.ligandList):
-            if self.parameters['debug']:
+        for i, ligand in enumerate(self.ligandList):
+            if self.parameters["debug"]:
                 print("LIGAND: {}".format(ligand.smiles))
                 # Find correct conformer to use
                 print("FINDING CORRECT CONFORMER")
             conformerList = ligand.conformerList
             rot_vals = ligand.conformerRotScore
             # Compute conformer efficacy by XTB-energy and fit to binding sites.
-            bestConformer, assembled = self.compute_conformer_efficacy(conformerList,
-                                                                rot_vals,
-                                                                ligand)
+            bestConformer, assembled = self.compute_conformer_efficacy(
+                conformerList, rot_vals, ligand
+            )
             if assembled:
-                self.complexMol.append_ligand({'ase_atoms':bestConformer,'bo_dict':ligand.BO_dict, 
-                                            'atom_types':ligand.atom_types,
-                                            'ca_metal_dist_constraints':ligand.ca_metal_dist_constraints})
-                self.initMol.append_ligand({'ase_atoms':bestConformer,'bo_dict':ligand.BO_dict, 
-                                            'atom_types':ligand.atom_types,
-                                            'ca_metal_dist_constraints':ligand.ca_metal_dist_constraints})
-            else: # Check for failures - do not evaluate.
+                self.complexMol.append_ligand(
+                    {
+                        "ase_atoms": bestConformer,
+                        "bo_dict": ligand.BO_dict,
+                        "atom_types": ligand.atom_types,
+                        "ca_metal_dist_constraints": ligand.ca_metal_dist_constraints,
+                    }
+                )
+                self.initMol.append_ligand(
+                    {
+                        "ase_atoms": bestConformer,
+                        "bo_dict": ligand.BO_dict,
+                        "atom_types": ligand.atom_types,
+                        "ca_metal_dist_constraints": ligand.ca_metal_dist_constraints,
+                    }
+                )
+            else:  # Check for failures - do not evaluate.
                 self.allLigandsGood = False
-                if self.parameters['debug']:
-                    print('Ligand {} was not able to be generated!'.format(self.ligandList[i-1].smiles))
-                break                
-        if self.parameters['debug']:
-            print('Initial ligand geometry sanity: ', self.allLigandsGood)
-        if self.allLigandsGood: # Only perform total energy if all ligands sane and no overlaps
+                if self.parameters["debug"]:
+                    print(
+                        "Ligand {} was not able to be generated!".format(
+                            self.ligandList[i - 1].smiles
+                        )
+                    )
+                break
+        if self.parameters["debug"]:
+            print("Initial ligand geometry sanity: ", self.allLigandsGood)
+        if (
+            self.allLigandsGood
+        ):  # Only perform total energy if all ligands sane and no overlaps
             self.assembled = True
 
-    def compute_conformer_efficacy(self,conformerList,rot_vals,ligand):
+    def compute_conformer_efficacy(self, conformerList, rot_vals, ligand):
         """Conformer efficiency currently calculated by GFN-FF in XTB for acceleration
-        
+
         Now possible to specify method for comparing ligands.
 
         Parameters
@@ -222,28 +252,35 @@ class Complex:
         best_val = np.inf
         bestConformer = conformerList[0]
         assembled = False
-        for i,conformer in enumerate(conformerList): # Try and use XTB
+        for i, conformer in enumerate(conformerList):  # Try and use XTB
             tmp_molecule = io_molecule.convert_io_molecule(self.initMol)
-            tmp_molecule.append_ligand({'ase_atoms': conformer,
-                                        'bo_dict': ligand.BO_dict,
-                                        'atom_types': ligand.atom_types,
-                                        'ca_metal_dist_constraints':
-                                        ligand.ca_metal_dist_constraints})
-            if self.parameters['debug']:
-                print(tmp_molecule.write_mol2('cool{}.mol2'.format(i), 
-                                              writestring=True))
-            out_eval = CalcExecutor(tmp_molecule, assembly=True,
-                                    parameters=self.parameters,
-                                    init_sanity_check=True)
+            tmp_molecule.append_ligand(
+                {
+                    "ase_atoms": conformer,
+                    "bo_dict": ligand.BO_dict,
+                    "atom_types": ligand.atom_types,
+                    "ca_metal_dist_constraints": ligand.ca_metal_dist_constraints,
+                }
+            )
+            if self.parameters["debug"]:
+                print(
+                    tmp_molecule.write_mol2("cool{}.mol2".format(i), writestring=True)
+                )
+            out_eval = CalcExecutor(
+                tmp_molecule,
+                assembly=True,
+                parameters=self.parameters,
+                init_sanity_check=True,
+            )
             if out_eval.successful:
                 # Bias to lower rotational loss values
-                Eval = out_eval.energy*(1/rot_vals[i])
+                Eval = out_eval.energy * (1 / rot_vals[i])
                 if Eval < best_val and out_eval.successful:
                     assembled = True
                     bestConformer = conformer
                     best_val = Eval
-            elif (not out_eval.successful) and (self.parameters['debug']):
-                print('Ligand {} failed xtb/uff or overlapped.'.format(i))
+            elif (not out_eval.successful) and (self.parameters["debug"]):
+                print("Ligand {} failed xtb/uff or overlapped.".format(i))
         return bestConformer, assembled
 
     def final_eval(self, single_point=False):
@@ -257,75 +294,79 @@ class Complex:
             Perform only a singlepoint calculation?, by default False
         """
         self.final_start_time = time.time()
-        self.initMol.dist_sanity_checks(params=self.parameters,
-                                        assembly=single_point)
-        self.initMol.graph_sanity_checks(params=self.parameters,
-                                         assembly=single_point)
+        self.initMol.dist_sanity_checks(params=self.parameters, assembly=single_point)
+        self.initMol.graph_sanity_checks(params=self.parameters, assembly=single_point)
         if self.assembled:
-            if self.parameters['ff_preopt']:
-                if self.parameters['debug']:
-                    print('Doing UFF - pre-optimization before final evaluation.')
+            if self.parameters["ff_preopt"]:
+                if self.parameters["debug"]:
+                    print("Doing UFF - pre-optimization before final evaluation.")
                 calculator = CalcExecutor(
                     self.complexMol,
                     parameters=self.parameters,
                     final_sanity_check=False,
-                    relax=True, assembly=False,
-                    ff_preopt_run=self.parameters['ff_preopt'],
-                    fix_m_neighbors=True)
+                    relax=True,
+                    assembly=False,
+                    ff_preopt_run=self.parameters["ff_preopt"],
+                    fix_m_neighbors=True,
+                )
                 if calculator:
                     self.complexMol.ase_atoms.set_positions(
-                        calculator.mol.ase_atoms.get_positions())
-                elif self.parameters['debug']:
-                    print('Pre-opt failed!')
-            if self.parameters['debug']:
-                print("Final Evaluation - Opt Molecule/Single point, Single Point? {}".format(single_point))
+                        calculator.mol.ase_atoms.get_positions()
+                    )
+                elif self.parameters["debug"]:
+                    print("Pre-opt failed!")
+            if self.parameters["debug"]:
+                print(
+                    "Final Evaluation - Opt Molecule/Single point, Single Point? {}".format(
+                        single_point
+                    )
+                )
             self.calculator = CalcExecutor(
                 self.complexMol,
                 parameters=self.parameters,
-                final_sanity_check=self.parameters['full_sanity_checks'],
+                final_sanity_check=self.parameters["full_sanity_checks"],
                 relax=(not single_point),
-                assembly=False)
-            if (self.parameters['debug']) and (self.calculator):
-                print('Finished method: {} {}.'.format(
-                    self.calculator.method,
-                    self.calculator.relax))
-            if self.parameters['debug'] and (not self.calculator.successful):
-                print('Failed final relaxation. - Retrying with UFF/XTB')
-                print(self.initMol.write_mol2('cool.mol2', writestring=True))
+                assembly=False,
+            )
+            if (self.parameters["debug"]) and (self.calculator):
+                print(
+                    "Finished method: {} {}.".format(
+                        self.calculator.method, self.calculator.relax
+                    )
+                )
+            if self.parameters["debug"] and (not self.calculator.successful):
+                print("Failed final relaxation. - Retrying with UFF/XTB")
+                print(self.initMol.write_mol2("cool.mol2", writestring=True))
             # Retry with 2 step optimization -> first do UFF -> then do the requested method.
-            if (not self.calculator.successful):
-                tmp_relax = CalcExecutor(self.complexMol, method='UFF',
-                                         relax=True,
-                                         assembly=False,
-                                         fix_m_neighbors=True,
-                                         ff_preopt_run=True
-                                         )
+            if not self.calculator.successful:
+                tmp_relax = CalcExecutor(
+                    self.complexMol,
+                    method="UFF",
+                    relax=True,
+                    assembly=False,
+                    fix_m_neighbors=True,
+                    ff_preopt_run=True,
+                )
                 self.calculator = CalcExecutor(
                     tmp_relax.mol,
                     parameters=self.parameters,
-                    final_sanity_check=self.parameters['full_sanity_checks'],
-                    relax=(not single_point)
-                                               )
+                    final_sanity_check=self.parameters["full_sanity_checks"],
+                    relax=(not single_point),
+                )
         else:  # Ensure calculation object at least exists
             self.calculator = CalcExecutor(
-                self.complexMol,
-                method='UFF',
-                fix_m_neighbors=False,
-                relax=False)
+                self.complexMol, method="UFF", fix_m_neighbors=False, relax=False
+            )
             self.calculator.successful = False
         self.final_end_time = time.time()
-        self.final_eval_total_time = self.final_end_time - \
-            self.final_start_time
+        self.final_eval_total_time = self.final_end_time - self.final_start_time
         if self.calculator:
             self.complexMol = self.calculator.mol
 
 
-def gen_aligned_complex(newLigInputDicts,
-                        ligandDict,
-                        inputDict,
-                        ligLists,
-                        coreCoordList,
-                        coreType):
+def gen_aligned_complex(
+    newLigInputDicts, ligandDict, inputDict, ligLists, coreCoordList, coreType
+):
     """gen_aligned_complex
 
     Parameters
@@ -354,29 +395,30 @@ def gen_aligned_complex(newLigInputDicts,
     for i, ligand in enumerate(newLigInputDicts):
         # Get ligand smiles
         ligandSmiles = ligand["smiles"]
-        ligGeo = ligand['ligType']
-        ligCharge = ligand['ligCharge']
-        lig_ca_metal_dist_constraints = ligand.get('ca_metal_dist_constraints',None)
-        ligcons = '_'.join(sorted([str(x[0]) for x in ligLists[i]]))
+        ligGeo = ligand["ligType"]
+        ligCharge = ligand["ligCharge"]
+        lig_ca_metal_dist_constraints = ligand.get("ca_metal_dist_constraints", None)
+        ligcons = "_".join(sorted([str(x[0]) for x in ligLists[i]]))
         ligid = ligandSmiles + ligcons + str(lig_ca_metal_dist_constraints)
 
         # Generate conformations if not already done
-        if (ligid not in ligandDict):
+        if ligid not in ligandDict:
             # Generate Ligand class
             ligandClass = Ligand(
                 ligandSmiles,
                 ligLists[i],
                 coreCoordList,
-                inputDict["core"]["smiles"].strip('[').strip(']'),
+                inputDict["core"]["smiles"].strip("[").strip("]"),
                 ligGeo,
                 ligCharge,
                 lig_ca_metal_dist_constraints,
-                covrad_metal=inputDict['parameters']['covrad_metal'],
-                vdwrad_metal=inputDict['parameters']['vdwrad_metal'],
-                enforce_symmetry=inputDict['parameters'].get(
-                    'enforce_ligand_internal_symmetry', False),
-                debug=inputDict['parameters']['debug'],
-                                )
+                covrad_metal=inputDict["parameters"]["covrad_metal"],
+                vdwrad_metal=inputDict["parameters"]["vdwrad_metal"],
+                enforce_symmetry=inputDict["parameters"].get(
+                    "enforce_ligand_internal_symmetry", False
+                ),
+                debug=inputDict["parameters"]["debug"],
+            )
             # Store results
             ligandDict[ligid] = ligandClass
             ligandList.append(ligandClass)
@@ -387,56 +429,66 @@ def gen_aligned_complex(newLigInputDicts,
             ligandCopy.corecoordList = coreCoordList  # DO NOT DELETE THIS LINE
             newligconfList = []
             ligconfVals = []
-            for j,lig in enumerate(ligandCopy.conformerList):
+            for j, lig in enumerate(ligandCopy.conformerList):
                 new_ligcoordList = [
-                    [val[0], ligandCopy.ligcoordList[k][1]] for k, val in enumerate(ligandCopy.out_ligcoordLists[j])
-                    ]
+                    [val[0], ligandCopy.ligcoordList[k][1]]
+                    for k, val in enumerate(ligandCopy.out_ligcoordLists[j])
+                ]
                 rot_angle = ligandCopy.rotList[j]
                 if rot_angle != 0:  # Apply same rotations.
                     newconf, rotscore, sane = io_lig.set_position_align(
                         lig,
                         new_ligcoordList,
                         ligandCopy.corecoordList,
-                        debug=inputDict['parameters']['debug'],
+                        debug=inputDict["parameters"]["debug"],
                         rot_coord_vect=True,
-                        rot_angle=rot_angle)
+                        rot_angle=rot_angle,
+                    )
                 else:
                     newconf, rotscore, sane = io_lig.set_position_align(
                         lig,
                         new_ligcoordList,
                         ligandCopy.corecoordList,
-                        debug=inputDict['parameters']['debug'])
+                        debug=inputDict["parameters"]["debug"],
+                    )
                 if sane:
                     ligconfVals.append(rotscore)
                     newligconfList.append(newconf)
                 else:
-                    if inputDict['parameters']['debug']:
-                        print('Conformer sucks!')
+                    if inputDict["parameters"]["debug"]:
+                        print("Conformer sucks!")
             ligandCopy.conformerList = newligconfList
             ligandCopy.conformerRotScore = ligconfVals
             ligandList.append(copy.deepcopy(ligandCopy))
-    if all([x.exists for x in ligandList]): # Check that all ligands were able to generate at least one conformer
+    if all(
+        [x.exists for x in ligandList]
+    ):  # Check that all ligands were able to generate at least one conformer
         coreSmiles = inputDict["core"]["smiles"]
         coreCoordList = coreCoordList
-        complexClass = Complex(coreSmiles,
-                               coreCoordList,
-                               ligandList,
-                               inputDict['parameters'])
+        complexClass = Complex(
+            coreSmiles, coreCoordList, ligandList, inputDict["parameters"]
+        )
         # Key here - have singlepoints during assembly be defined by assembly params.
         complexClass.final_eval(single_point=True)
-        if inputDict['parameters']['debug']:
-            print('Complex class generated: ',
-                  complexClass.calculator.successful)
-        if (not complexClass.assembled) or \
-            (not complexClass.calculator.successful) or \
-                (not complexClass.calculator.mol.dists_sane):
-            if inputDict['parameters']['debug']:
-                print('Generated geometry is not sane or XTB failed for coreType: ', coreType)
+        if inputDict["parameters"]["debug"]:
+            print("Complex class generated: ", complexClass.calculator.successful)
+        if (
+            (not complexClass.assembled)
+            or (not complexClass.calculator.successful)
+            or (not complexClass.calculator.mol.dists_sane)
+        ):
+            if inputDict["parameters"]["debug"]:
+                print(
+                    "Generated geometry is not sane or XTB failed for coreType: ",
+                    coreType,
+                )
             complexClass = None
     else:
         complexClass = None
-        if inputDict['parameters']['debug']:
-            print('At least one ligand was not able to be generated when mapped to this core.')
+        if inputDict["parameters"]["debug"]:
+            print(
+                "At least one ligand was not able to be generated when mapped to this core."
+            )
 
     return complexClass, ligandDict
 
@@ -468,9 +520,9 @@ def complex_driver(inputDict1):
     inputDict = io_process_input.inparse(inputDict1)
     fin_time0 = time.time()
     core_preprocess_time = fin_time0 - start_time0
-    
-    coreTypes = inputDict['coreTypes']
-    core_geo_class = inputDict['core_geo_class']
+
+    coreTypes = inputDict["coreTypes"]
+    core_geo_class = inputDict["core_geo_class"]
 
     ligandDict = {}
     conf_dict = {}
@@ -482,24 +534,28 @@ def complex_driver(inputDict1):
             if len(ligandDict) > 0:
                 newligDict = dict()
                 for key, oldligclass in ligandDict.items():
-                    if oldligclass.geo == 'mono':
+                    if oldligclass.geo == "mono":
                         newligDict[key] = oldligclass
                 ligandDict = newligDict
-            else: # Generate from scratch
-                ligandDict = {} #
+            else:  # Generate from scratch
+                ligandDict = {}  #
 
             coreCoordList = core_geo_class.geometry_dict[coreType]
 
             # Assign con atoms based on all ligands
-            newLigInputDicts, all_liglists, total_unique_symmetries, good = io_symmetry.select_cons(
-                inputDict["ligands"],
-                coreType, core_geo_class, inputDict['parameters']
-                                                            )
-            if inputDict['parameters']['debug']:
-                print('Assigned LigCons ->')
-                print('LigLists:', all_liglists)
-                print('coreCoordList:', coreCoordList)
-                print('Unique Symmetries:', total_unique_symmetries)
+            newLigInputDicts, all_liglists, total_unique_symmetries, good = (
+                io_symmetry.select_cons(
+                    inputDict["ligands"],
+                    coreType,
+                    core_geo_class,
+                    inputDict["parameters"],
+                )
+            )
+            if inputDict["parameters"]["debug"]:
+                print("Assigned LigCons ->")
+                print("LigLists:", all_liglists)
+                print("coreCoordList:", coreCoordList)
+                print("Unique Symmetries:", total_unique_symmetries)
 
             fin_time1 = time.time()
             symmetry_preprocess_time = fin_time1 - int_time1
@@ -508,7 +564,7 @@ def complex_driver(inputDict1):
                 # -> don't generate new conformers/shift ligandDict for different symmetries
                 out_complexlist = []
                 out_energies = []
-                for i, ligLists in enumerate(all_liglists): 
+                for i, ligLists in enumerate(all_liglists):
                     if i == 0:  # Generate and save ligandDict from first conformer
                         complexClass, ligandDict = gen_aligned_complex(
                             newLigInputDicts,
@@ -516,77 +572,140 @@ def complex_driver(inputDict1):
                             inputDict,
                             ligLists,
                             coreCoordList,
-                            coreType)
-                        if (complexClass is None):  # Catch when generated conformer is invalid.
+                            coreType,
+                        )
+                        if (
+                            complexClass is None
+                        ):  # Catch when generated conformer is invalid.
                             complexClass = False
                         else:
                             out_complexlist.append(complexClass)
                             out_complexlist[-1].index = i
                             out_energies.append(complexClass.calculator.energy)
-                            if inputDict['parameters']['return_only_1']:
+                            if inputDict["parameters"]["return_only_1"]:
                                 break
-                    else: # Use the first conformer ligand structures to map to other symmetries
+                    else:  # Use the first conformer ligand structures to map to other symmetries
                         tcomplexClass, _ = gen_aligned_complex(
-                                newLigInputDicts,
-                                ligandDict,
-                                inputDict,
-                                ligLists,
-                                coreCoordList,
-                                coreType)
-                        if (tcomplexClass is not None):
+                            newLigInputDicts,
+                            ligandDict,
+                            inputDict,
+                            ligLists,
+                            coreCoordList,
+                            coreType,
+                        )
+                        if tcomplexClass is not None:
                             complexClass = tcomplexClass
                             out_complexlist.append(complexClass)
                             out_complexlist[-1].index = i
                             out_energies.append(complexClass.calculator.energy)
-                            if inputDict['parameters']['return_only_1']:
+                            if inputDict["parameters"]["return_only_1"]:
                                 break
-                if not isinstance(complexClass, bool):  # Catch cases where no conformation generated.
+                if not isinstance(
+                    complexClass, bool
+                ):  # Catch cases where no conformation generated.
                     order = np.argsort(out_energies)
-                    for ind, j in enumerate(order[0:inputDict[
-                       'parameters']['n_conformers']]):
+                    for ind, j in enumerate(
+                        order[0 : inputDict["parameters"]["n_conformers"]]
+                    ):
                         tmp_conformer = out_complexlist[j]
-                        setattr(tmp_conformer,
-                                'total_possible_n_symmetries',
-                                total_unique_symmetries)
+                        setattr(
+                            tmp_conformer,
+                            "total_possible_n_symmetries",
+                            total_unique_symmetries,
+                        )
                         if any([(not x.relax) for x in tmp_conformer.ligandList]):
-                            if inputDict['parameters']['debug']:
-                                print('Warning This complex is likely strange because of failures of MMFF94 or distance geometry!')
-                                print('Defaulting to single point evaluation.')
-                        else: # Do the final relaxation (if good) on each conformer to save!
+                            if inputDict["parameters"]["debug"]:
+                                print(
+                                    "Warning This complex is likely strange because of failures of MMFF94 or distance geometry!"
+                                )
+                                print("Defaulting to single point evaluation.")
+                        else:  # Do the final relaxation (if good) on each conformer to save!
                             tmp_conformer.final_eval()
-                        if inputDict['parameters']['debug']:
-                            print('Complex Distances Sane: ',
-                                  tmp_conformer.complexMol.dists_sane)
-                        spin_n_unpaired = np.sum(
-                            tmp_conformer.complexMol.xtb_uhf)
-                        tot_charge = np.sum(
-                            tmp_conformer.complexMol.xtb_charge)
+                        if inputDict["parameters"]["debug"]:
+                            print(
+                                "Complex Distances Sane: ",
+                                tmp_conformer.complexMol.dists_sane,
+                            )
+                        spin_n_unpaired = np.sum(tmp_conformer.complexMol.xtb_uhf)
+                        tot_charge = np.sum(tmp_conformer.complexMol.xtb_charge)
                         if tmp_conformer.calculator is not None:
-                            if tmp_conformer.complexMol.dists_sane and tmp_conformer.calculator.successful: # Check sanity after
-                                conf_dict.update({coreType + '_' + str(ind) + '_nunpairedes_' + \
-                                    str(int(spin_n_unpaired))+'_charge_'+str(int(tot_charge)):tmp_conformer})
-                                if inputDict['parameters']['return_only_1']:
-                                        return conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1
-                            elif tmp_conformer.initMol.dists_sane and inputDict['parameters']['save_init_geos']:
-                                tmp_conformer.calculator.energy = 10000 # Set to high energy.
-                                conf_dict.update({coreType + '_' + str(ind) + '_nunpairedes_' + \
-                                    str(int(spin_n_unpaired))+'_charge_'+str(int(tot_charge))+'_init_only':tmp_conformer})
-                                if inputDict['parameters']['return_only_1']:
-                                        return conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1
+                            if (
+                                tmp_conformer.complexMol.dists_sane
+                                and tmp_conformer.calculator.successful
+                            ):  # Check sanity after
+                                conf_dict.update(
+                                    {
+                                        coreType
+                                        + "_"
+                                        + str(ind)
+                                        + "_nunpairedes_"
+                                        + str(int(spin_n_unpaired))
+                                        + "_charge_"
+                                        + str(int(tot_charge)): tmp_conformer
+                                    }
+                                )
+                                if inputDict["parameters"]["return_only_1"]:
+                                    return (
+                                        conf_dict,
+                                        inputDict,
+                                        core_preprocess_time,
+                                        symmetry_preprocess_time,
+                                        int_time1,
+                                    )
+                            elif (
+                                tmp_conformer.initMol.dists_sane
+                                and inputDict["parameters"]["save_init_geos"]
+                            ):
+                                tmp_conformer.calculator.energy = (
+                                    10000  # Set to high energy.
+                                )
+                                conf_dict.update(
+                                    {
+                                        coreType
+                                        + "_"
+                                        + str(ind)
+                                        + "_nunpairedes_"
+                                        + str(int(spin_n_unpaired))
+                                        + "_charge_"
+                                        + str(int(tot_charge))
+                                        + "_init_only": tmp_conformer
+                                    }
+                                )
+                                if inputDict["parameters"]["return_only_1"]:
+                                    return (
+                                        conf_dict,
+                                        inputDict,
+                                        core_preprocess_time,
+                                        symmetry_preprocess_time,
+                                        int_time1,
+                                    )
                         else:
-                            if inputDict['parameters']['debug']:
-                                print('Skipping complex due to no calculator assignment -> not assembled .')
+                            if inputDict["parameters"]["debug"]:
+                                print(
+                                    "Skipping complex due to no calculator assignment -> not assembled ."
+                                )
                 else:
-                    if inputDict['parameters']['debug']:
-                        print('Complex not generated due to lack of ability for ligand to map to core.')
+                    if inputDict["parameters"]["debug"]:
+                        print(
+                            "Complex not generated due to lack of ability for ligand to map to core."
+                        )
             else:
-                if inputDict['parameters']['debug']:
-                    print('No coordination environment avaiable for this ligand combination')
-        return conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1
+                if inputDict["parameters"]["debug"]:
+                    print(
+                        "No coordination environment avaiable for this ligand combination"
+                    )
+        return (
+            conf_dict,
+            inputDict,
+            core_preprocess_time,
+            symmetry_preprocess_time,
+            int_time1,
+        )
     else:
-        return {},inputDict,0,0,0
+        return {}, inputDict, 0, 0, 0
 
-def build_complex_driver(inputDict1): 
+
+def build_complex_driver(inputDict1):
     """build_complex_driver overall driver building of the complex
 
     Parameters
@@ -599,11 +718,14 @@ def build_complex_driver(inputDict1):
     ordered_conf_dict : dict
         Conformer dictionary with stored values if generation successful.
     """
-    conf_dict, inputDict, core_preprocess_time, symmetry_preprocess_time, int_time1 = complex_driver(
-        inputDict1=inputDict1)
+    conf_dict, inputDict, core_preprocess_time, symmetry_preprocess_time, int_time1 = (
+        complex_driver(inputDict1=inputDict1)
+    )
     if len(conf_dict) == 0:
-        if inputDict['parameters']['debug']:
-            print('No possible geometries for the input ligand/coreType(s) combination.')
+        if inputDict["parameters"]["debug"]:
+            print(
+                "No possible geometries for the input ligand/coreType(s) combination."
+            )
         ordered_conf_dict = conf_dict
     else:
         ordered_conf_dict = OrderedDict()
@@ -617,104 +739,128 @@ def build_complex_driver(inputDict1):
             xtb_energies.append(val.calculator.energy)
             keys.append(key)
             structs.append(val)
-            if inputDict['parameters']['save_init_geos']:
-                if (inputDict['parameters'].get('full_spin_nonxtb',None) is not None):
-                    val.initMol.uhf = inputDict['parameters'][
-                        'full_spin_nonxtb']
-                init_mol2strings.append(val.initMol.write_mol2('{}'.format(key),
-                                                               writestring=True)
-                                        )
+            if inputDict["parameters"]["save_init_geos"]:
+                if inputDict["parameters"].get("full_spin_nonxtb", None) is not None:
+                    val.initMol.uhf = inputDict["parameters"]["full_spin_nonxtb"]
+                init_mol2strings.append(
+                    val.initMol.write_mol2("{}".format(key), writestring=True)
+                )
             else:
                 init_mol2strings.append(None)
-            energy_sorted_inds.append(val.index)  # Save energy sorted index for reference.
-            if (inputDict['parameters'].get('full_spin_nonxtb',
-                                            None) is not None):
-                val.complexMol.uhf = inputDict['parameters'][
-                    'full_spin_nonxtb']
-            mol2strings.append(val.complexMol.write_mol2('{}'.format(key),
-                                                         writestring=True))
+            energy_sorted_inds.append(
+                val.index
+            )  # Save energy sorted index for reference.
+            if inputDict["parameters"].get("full_spin_nonxtb", None) is not None:
+                val.complexMol.uhf = inputDict["parameters"]["full_spin_nonxtb"]
+            mol2strings.append(
+                val.complexMol.write_mol2("{}".format(key), writestring=True)
+            )
         order = np.argsort(xtb_energies)
         # Iterate through all structures and check/remove duplicate structures.
         # Remove extra classes that we don't need to persist
-        del inputDict['core_geo_class']
-        del inputDict['parameters']['ase_db']
+        del inputDict["core_geo_class"]
+        del inputDict["parameters"]["ase_db"]
         for ind, i in enumerate(order):
             iscopy = False
-            if (ind > 0) and (not inputDict['parameters'][
-               'skip_duplicate_tests']):  # Check for copies
+            if (ind > 0) and (
+                not inputDict["parameters"]["skip_duplicate_tests"]
+            ):  # Check for copies
                 for key, val in ordered_conf_dict.items():
                     # if ('_init_only' in key) or ('_init_only' in keys[i]): # Do not do duplicate test on init_only structures.
                     #     continue
                     # else:
-                    _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i],
-                                                             val['mol2string'],
-                                                             coresize=10,
-                                                             override=True,
-                                                             debug=inputDict[
-                                                                 'parameters'][
-                                                                     'debug'])
-                    if (rmsd_full < 0.5):
+                    _, rmsd_full, _ = io_align_mol.calc_rmsd(
+                        mol2strings[i],
+                        val["mol2string"],
+                        coresize=10,
+                        override=True,
+                        debug=inputDict["parameters"]["debug"],
+                    )
+                    if rmsd_full < 0.5:
                         iscopy = True
                         break
-                    rmsd_core, _, _ = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
-                                                             override=True,
-                                                             debug=inputDict['parameters']['debug'])
-                    if (rmsd_core < 0.7) and np.isclose(val['energy'],xtb_energies[i],atol=0.1):
+                    rmsd_core, _, _ = io_align_mol.calc_rmsd(
+                        mol2strings[i],
+                        val["mol2string"],
+                        override=True,
+                        debug=inputDict["parameters"]["debug"],
+                    )
+                    if (rmsd_core < 0.7) and np.isclose(
+                        val["energy"], xtb_energies[i], atol=0.1
+                    ):
                         iscopy = True
                         break
-                if (not iscopy):
+                if not iscopy:
                     structs[i].complexMol.classify_metal_geo_type()
                     ordered_conf_dict[keys[i]] = {
-                        'ase_atoms': structs[i].complexMol.ase_atoms,
-                        'total_charge': int(structs[i].complexMol.charge),
-                        'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
-                        'xtb_total_charge': int(structs[i].complexMol.xtb_charge),
-                        'calc_n_unpaired_electrons': structs[i].complexMol.uhf,
-                        'metal_ox': inputDict['parameters']['metal_ox'],
-                        'init_energy': structs[i].calculator.init_energy,
-                        'energy': xtb_energies[i],
-                        'metal_center_symmetry': structs[i].complexMol.metal_center_geos[0]['metal_geo_type'],
-                        'metal_center_confidence': structs[i].complexMol.metal_center_geos[0]['confidence'],
-                        'mol2string': mol2strings[i], 'init_mol2string':init_mol2strings[i],
-                        'energy_sorted_index': energy_sorted_inds[i],
-                        'total_possible_n_symmetries': structs[i].total_possible_n_symmetries,
-                        'inputDict': inputDict
-                        }
+                        "ase_atoms": structs[i].complexMol.ase_atoms,
+                        "total_charge": int(structs[i].complexMol.charge),
+                        "xtb_n_unpaired_electrons": structs[i].complexMol.xtb_uhf,
+                        "xtb_total_charge": int(structs[i].complexMol.xtb_charge),
+                        "calc_n_unpaired_electrons": structs[i].complexMol.uhf,
+                        "metal_ox": inputDict["parameters"]["metal_ox"],
+                        "init_energy": structs[i].calculator.init_energy,
+                        "energy": xtb_energies[i],
+                        "metal_center_symmetry": structs[
+                            i
+                        ].complexMol.metal_center_geos[0]["metal_geo_type"],
+                        "metal_center_confidence": structs[
+                            i
+                        ].complexMol.metal_center_geos[0]["confidence"],
+                        "mol2string": mol2strings[i],
+                        "init_mol2string": init_mol2strings[i],
+                        "energy_sorted_index": energy_sorted_inds[i],
+                        "total_possible_n_symmetries": structs[
+                            i
+                        ].total_possible_n_symmetries,
+                        "inputDict": inputDict,
+                    }
             else:
                 structs[i].complexMol.classify_metal_geo_type()
                 ordered_conf_dict[keys[i]] = {
-                    'ase_atoms': structs[i].complexMol.ase_atoms, 
-                    'total_charge': int(structs[i].complexMol.charge),
-                    'xtb_n_unpaired_electrons': structs[i].complexMol.xtb_uhf,
-                    'calc_n_unpaired_electrons': structs[i].complexMol.uhf,
-                    'xtb_total_charge': int(structs[i].complexMol.xtb_charge),
-                    'metal_ox': inputDict['parameters']['metal_ox'],
-                    'init_energy': structs[i].calculator.init_energy,
-                    'energy': xtb_energies[i],
-                    'metal_center_symmetry': structs[i].complexMol.metal_center_geos[0]['metal_geo_type'],
-                    'metal_center_confidence': structs[i].complexMol.metal_center_geos[0]['confidence'],
-                    'mol2string': mol2strings[i],
-                    'init_mol2string': init_mol2strings[i],
-                    'energy_sorted_index': energy_sorted_inds[i],
-                    'total_possible_n_symmetries': structs[i].total_possible_n_symmetries,
-                    'inputDict': inputDict
-                        }
-            if (not iscopy) and inputDict['parameters']['return_timings']:
+                    "ase_atoms": structs[i].complexMol.ase_atoms,
+                    "total_charge": int(structs[i].complexMol.charge),
+                    "xtb_n_unpaired_electrons": structs[i].complexMol.xtb_uhf,
+                    "calc_n_unpaired_electrons": structs[i].complexMol.uhf,
+                    "xtb_total_charge": int(structs[i].complexMol.xtb_charge),
+                    "metal_ox": inputDict["parameters"]["metal_ox"],
+                    "init_energy": structs[i].calculator.init_energy,
+                    "energy": xtb_energies[i],
+                    "metal_center_symmetry": structs[i].complexMol.metal_center_geos[0][
+                        "metal_geo_type"
+                    ],
+                    "metal_center_confidence": structs[i].complexMol.metal_center_geos[
+                        0
+                    ]["confidence"],
+                    "mol2string": mol2strings[i],
+                    "init_mol2string": init_mol2strings[i],
+                    "energy_sorted_index": energy_sorted_inds[i],
+                    "total_possible_n_symmetries": structs[
+                        i
+                    ].total_possible_n_symmetries,
+                    "inputDict": inputDict,
+                }
+            if (not iscopy) and inputDict["parameters"]["return_timings"]:
                 tdict = ordered_conf_dict[keys[i]]
                 fin_time2 = time.time()
-                tdict.update({
-                    'core_preprocess_time': core_preprocess_time,
-                    'symmetry_preprocess_time': symmetry_preprocess_time,
-                    'total_liggen_time': np.sum([x.total_liggen_time for x in structs[i].ligandList]),
-                    'total_complex_assembly_time': structs[i].assemble_total_time,
-                    'final_relaxation_time': structs[i].final_eval_total_time,
-                    'sum_total_conformer_time_spent': fin_time2 - int_time1
-                })
+                tdict.update(
+                    {
+                        "core_preprocess_time": core_preprocess_time,
+                        "symmetry_preprocess_time": symmetry_preprocess_time,
+                        "total_liggen_time": np.sum(
+                            [x.total_liggen_time for x in structs[i].ligandList]
+                        ),
+                        "total_complex_assembly_time": structs[i].assemble_total_time,
+                        "final_relaxation_time": structs[i].final_eval_total_time,
+                        "sum_total_conformer_time_spent": fin_time2 - int_time1,
+                    }
+                )
                 ordered_conf_dict[keys[i]] = tdict
-            if (not iscopy) and inputDict['parameters']['return_full_complex_class']: # Return whole complex class (all ligand geometries!)
+            if (not iscopy) and inputDict["parameters"][
+                "return_full_complex_class"
+            ]:  # Return whole complex class (all ligand geometries!)
                 tdict = ordered_conf_dict[keys[i]]
-                tdict.update({'full_complex_class':
-                              structs[i]})
+                tdict.update({"full_complex_class": structs[i]})
                 ordered_conf_dict[keys[i]] = tdict
     return ordered_conf_dict, inputDict
 
@@ -739,43 +885,49 @@ def build_complex(inputDict):
     ordered_conf_dict, tmp_inputDict = build_complex_driver(inputDict)
     # Try larger radii generation for multidentate complexes if no complexes generated in an attempt to get at high-spin
     # > Covalent radii typically understimated for higher spin conformations
-    if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) == 0) and \
-       (max([len(x['coordList']) for x in tmp_inputDict['ligands']]) > 2):
-        newinpdict = io_ptable.map_metal_radii(tmp_inputDict, larger=True) # Run with larger radii
-        if tmp_inputDict['parameters']['debug']:
-            print('Trying with larger scaled metal radii.')
-        temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(
-            newinpdict)
+    if (
+        len([x for x in ordered_conf_dict.keys() if ("_init_only" not in x)]) == 0
+    ) and (max([len(x["coordList"]) for x in tmp_inputDict["ligands"]]) > 2):
+        newinpdict = io_ptable.map_metal_radii(
+            tmp_inputDict, larger=True
+        )  # Run with larger radii
+        if tmp_inputDict["parameters"]["debug"]:
+            print("Trying with larger scaled metal radii.")
+        temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(newinpdict)
         newdict_append = dict()
         for key, val in temp_ordered_conf_dict.items():
-            newdict_append[key+'_larger_scaled'] = val
+            newdict_append[key + "_larger_scaled"] = val
         ordered_conf_dict.update(newdict_append)
-        if (len([x for x in ordered_conf_dict.keys() if (
-           '_init_only' not in x)]) > 0):
+        if len([x for x in ordered_conf_dict.keys() if ("_init_only" not in x)]) > 0:
             try_smaller = False
-            if tmp_inputDict['parameters']['debug']:
-                print('Succeeded with larger scaled metal radii!')
+            if tmp_inputDict["parameters"]["debug"]:
+                print("Succeeded with larger scaled metal radii!")
         else:
             try_smaller = True
-            if tmp_inputDict['parameters']['debug']:
-                print('No possible structures for this structure even with larger radii structure.')
+            if tmp_inputDict["parameters"]["debug"]:
+                print(
+                    "No possible structures for this structure even with larger radii structure."
+                )
         if try_smaller:  # Run with smaller radii
-            if tmp_inputDict['parameters']['debug']:
-                print('Trying with smaller scaled metal radii.')
+            if tmp_inputDict["parameters"]["debug"]:
+                print("Trying with smaller scaled metal radii.")
             newinpdict = io_ptable.map_metal_radii(tmp_inputDict, larger=False)
-            temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(
-                newinpdict)
+            temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(newinpdict)
             newdict_append = dict()
             for key, val in temp_ordered_conf_dict.items():
-                newdict_append[key+'_smaller_scaled'] = val
+                newdict_append[key + "_smaller_scaled"] = val
             ordered_conf_dict.update(newdict_append)
-            if (len([x for x in ordered_conf_dict.keys() if (
-               '_init_only' not in x)]) > 0):
-                if tmp_inputDict['parameters']['debug']:
-                    print('Succeeded with smaller scaled metal radii!')
+            if (
+                len([x for x in ordered_conf_dict.keys() if ("_init_only" not in x)])
+                > 0
+            ):
+                if tmp_inputDict["parameters"]["debug"]:
+                    print("Succeeded with smaller scaled metal radii!")
             else:
-                if tmp_inputDict['parameters']['debug']:
-                    print('No possible structures for this structure even with smaller radii structure.')
+                if tmp_inputDict["parameters"]["debug"]:
+                    print(
+                        "No possible structures for this structure even with smaller radii structure."
+                    )
     # Final Reorder
     if len(ordered_conf_dict) > 0:
         out_ordered_conf_dict = OrderedDict()
@@ -783,120 +935,159 @@ def build_complex(inputDict):
         keys = []
         vals = []
         for key, val in ordered_conf_dict.items():
-            xtb_energies.append(val['energy'])
+            xtb_energies.append(val["energy"])
             keys.append(key)
             vals.append(val)
         order = np.argsort(xtb_energies)
         for j, i in enumerate(order):
-            if tmp_inputDict['parameters']['add_secondary_shell_species'] and \
-                  (j < tmp_inputDict['parameters'][
-                      'secondary_shell_n_conformers']):
-                if tmp_inputDict['parameters']['debug']:
-                    print('Starting secondary shell addition on {} of {}!'.format(j+1,
-                                                                                  len(order)))
-                    print('Normally adds a chunk of time to generation.')
-                # Use the docking function to add species specified in inputDict/parameters
-                mol_plus_species, species_list = \
-                    io_arch_dock.add_non_covbound_species(
-                        vals[i]['mol2string'],
-                        parameters=tmp_inputDict['parameters']
+            if tmp_inputDict["parameters"]["add_secondary_shell_species"] and (
+                j < tmp_inputDict["parameters"]["secondary_shell_n_conformers"]
+            ):
+                if tmp_inputDict["parameters"]["debug"]:
+                    print(
+                        "Starting secondary shell addition on {} of {}!".format(
+                            j + 1, len(order)
                         )
+                    )
+                    print("Normally adds a chunk of time to generation.")
+                # Use the docking function to add species specified in inputDict/parameters
+                mol_plus_species, species_list = io_arch_dock.add_non_covbound_species(
+                    vals[i]["mol2string"], parameters=tmp_inputDict["parameters"]
+                )
                 # Do a final relaxation again with molecule + species. Ensures matching level
                 calculator = CalcExecutor(
                     mol_plus_species,
-                    parameters=tmp_inputDict['parameters'],
-                    final_sanity_check=tmp_inputDict['parameters'][
-                        'full_sanity_checks'],
-                    relax=tmp_inputDict['parameters']['relax'],
+                    parameters=tmp_inputDict["parameters"],
+                    final_sanity_check=tmp_inputDict["parameters"][
+                        "full_sanity_checks"
+                    ],
+                    relax=tmp_inputDict["parameters"]["relax"],
                     assembly=False,
-                    skip_spin_assign=True)  # Skip spin-reassignment after generation.
+                    skip_spin_assign=True,
+                )  # Skip spin-reassignment after generation.
                 if calculator.successful:
                     mol_plus_species = calculator.mol
                 else:
-                    if tmp_inputDict['parameters']['debug']:
-                        print('Warning: Final calc after adding secondary solvation failed. Returning solvated species anyways!!!!')
+                    if tmp_inputDict["parameters"]["debug"]:
+                        print(
+                            "Warning: Final calc after adding secondary solvation failed. Returning solvated species anyways!!!!"
+                        )
                 # Add "docked" molecule to output.
                 mol_plus_species.classify_metal_geo_type()
-                vals[i].update({
-                    'mol2string': mol_plus_species.write_mol2(
-                        'Mol_Plus_Species_Example_Energy',
-                        writestring=True),
-                    'energy': calculator.energy,
-                    'sampled_solvation_shells': species_list,
-                    'ase_atoms': mol_plus_species.ase_atoms,
-                    'total_charge': int(mol_plus_species.charge),
-                    'metal_center_symmetry': mol_plus_species.metal_center_geos[0]['metal_geo_type'],
-                    'metal_center_confidence': mol_plus_species.metal_center_geos[0]['confidence'],
-                    'xtb_n_unpaired_electrons': mol_plus_species.xtb_uhf,
-                    'calc_n_unpaired_electrons': mol_plus_species.uhf,
-                    'xtb_total_charge': int(mol_plus_species.xtb_charge)
-                    })
+                vals[i].update(
+                    {
+                        "mol2string": mol_plus_species.write_mol2(
+                            "Mol_Plus_Species_Example_Energy", writestring=True
+                        ),
+                        "energy": calculator.energy,
+                        "sampled_solvation_shells": species_list,
+                        "ase_atoms": mol_plus_species.ase_atoms,
+                        "total_charge": int(mol_plus_species.charge),
+                        "metal_center_symmetry": mol_plus_species.metal_center_geos[0][
+                            "metal_geo_type"
+                        ],
+                        "metal_center_confidence": mol_plus_species.metal_center_geos[
+                            0
+                        ]["confidence"],
+                        "xtb_n_unpaired_electrons": mol_plus_species.xtb_uhf,
+                        "calc_n_unpaired_electrons": mol_plus_species.uhf,
+                        "xtb_total_charge": int(mol_plus_species.xtb_charge),
+                    }
+                )
             # Run crest sampling on lowest N-energy isomer(s) - default is just 1!
-            if tmp_inputDict['parameters']['crest_sampling'] and (j < tmp_inputDict['parameters']['crest_sampling_n_conformers']): 
-                if tmp_inputDict['parameters']['debug']:
-                    print('Starting CREST sampling on {} of {}!'.format(j+1,len(order)))
-                samples, energies = io_conformers.crest_conformers(vals[i]['mol2string'],
-                                                                   solvent=tmp_inputDict['parameters']['xtb_solvent'],
-                                                                   crest_options=tmp_inputDict['parameters']['crest_options'])
-                if tmp_inputDict['parameters']['debug']:
-                    print('Finished CREST sampling on {} of {}!'.format(j+1,
-                                                                        len(order)))
-                vals[i].update({'conformers': samples, 'energies': energies})
-                vals[i].update({'energy': min(energies)})
-                tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
-                posits = io_molecule.convert_io_molecule(
-                    samples[0]).ase_atoms.get_positions()
-                tmpmol.ase_atoms.set_positions(posits)
-                tmpmol.classify_metal_geo_type()
-                vals[i].update({'mol2string': tmpmol.write_mol2('CREST_Min_Energy', writestring=True),
-                                'metal_center_symmetry': tmpmol.metal_center_geos[0]['metal_geo_type'],
-                                'metal_center_confidence': tmpmol.metal_center_geos[0]['confidence'],
-                                })
-            if tmp_inputDict['parameters']['obmol_sampling'] and (j < tmp_inputDict['parameters']['obmol_sampling_n_conformers']):
-                if tmp_inputDict['parameters']['debug']:
-                    print('Starting OBMol sampling on {} of {}!'.format(
-                        j+1, len(order)))
-                samples, energies = io_conformers.obmol_conformers(
-                    vals[i]['mol2string'],
-                    obmol_total_confs=tmp_inputDict['parameters'][
-                        'obmol_total_confs'],
-                    obmol_rmsd_cutoff=tmp_inputDict['parameters'][
-                        'obmol_rmsd_cutoff'],
-                    obmol_energy_cutoff=tmp_inputDict['parameters'][
-                        'obmol_energy_cutoff'],
-                    parameters=tmp_inputDict['parameters'],
-                    relax=tmp_inputDict['parameters']['relax'],
-                    assembly=False,
-                    skip_spin_assign=True)
-                if tmp_inputDict['parameters']['debug']:
+            if tmp_inputDict["parameters"]["crest_sampling"] and (
+                j < tmp_inputDict["parameters"]["crest_sampling_n_conformers"]
+            ):
+                if tmp_inputDict["parameters"]["debug"]:
                     print(
-                       'Finished OBMol sampling on {} of {}!'.format(j+1,
-                                                                     len(order
-                                                                         ))
-                        )
-                vals[i].update({'conformers': samples, 'energies': energies})
-                vals[i].update({'energy': min(energies)})
-                tmpmol = io_molecule.convert_io_molecule(vals[i]['mol2string'])
+                        "Starting CREST sampling on {} of {}!".format(j + 1, len(order))
+                    )
+                samples, energies = io_conformers.crest_conformers(
+                    vals[i]["mol2string"],
+                    solvent=tmp_inputDict["parameters"]["xtb_solvent"],
+                    crest_options=tmp_inputDict["parameters"]["crest_options"],
+                )
+                if tmp_inputDict["parameters"]["debug"]:
+                    print(
+                        "Finished CREST sampling on {} of {}!".format(j + 1, len(order))
+                    )
+                vals[i].update({"conformers": samples, "energies": energies})
+                vals[i].update({"energy": min(energies)})
+                tmpmol = io_molecule.convert_io_molecule(vals[i]["mol2string"])
                 posits = io_molecule.convert_io_molecule(
-                    samples[0]).ase_atoms.get_positions()
+                    samples[0]
+                ).ase_atoms.get_positions()
                 tmpmol.ase_atoms.set_positions(posits)
                 tmpmol.classify_metal_geo_type()
-                vals[i].update({
-                    'mol2string': tmpmol.write_mol2('OBMol_Min_Energy',
-                                                    writestring=True),
-                    'metal_center_symmetry': tmpmol.metal_center_geos[0][
-                        'metal_geo_type'],
-                    'metal_center_confidence': tmpmol.metal_center_geos[0][
-                        'confidence'],
-                                })
+                vals[i].update(
+                    {
+                        "mol2string": tmpmol.write_mol2(
+                            "CREST_Min_Energy", writestring=True
+                        ),
+                        "metal_center_symmetry": tmpmol.metal_center_geos[0][
+                            "metal_geo_type"
+                        ],
+                        "metal_center_confidence": tmpmol.metal_center_geos[0][
+                            "confidence"
+                        ],
+                    }
+                )
+            if tmp_inputDict["parameters"]["obmol_sampling"] and (
+                j < tmp_inputDict["parameters"]["obmol_sampling_n_conformers"]
+            ):
+                if tmp_inputDict["parameters"]["debug"]:
+                    print(
+                        "Starting OBMol sampling on {} of {}!".format(j + 1, len(order))
+                    )
+                samples, energies = io_conformers.obmol_conformers(
+                    vals[i]["mol2string"],
+                    obmol_total_confs=tmp_inputDict["parameters"]["obmol_total_confs"],
+                    obmol_rmsd_cutoff=tmp_inputDict["parameters"]["obmol_rmsd_cutoff"],
+                    obmol_energy_cutoff=tmp_inputDict["parameters"][
+                        "obmol_energy_cutoff"
+                    ],
+                    parameters=tmp_inputDict["parameters"],
+                    relax=tmp_inputDict["parameters"]["relax"],
+                    assembly=False,
+                    skip_spin_assign=True,
+                )
+                if tmp_inputDict["parameters"]["debug"]:
+                    print(
+                        "Finished OBMol sampling on {} of {}!".format(j + 1, len(order))
+                    )
+                vals[i].update({"conformers": samples, "energies": energies})
+                vals[i].update({"energy": min(energies)})
+                tmpmol = io_molecule.convert_io_molecule(vals[i]["mol2string"])
+                posits = io_molecule.convert_io_molecule(
+                    samples[0]
+                ).ase_atoms.get_positions()
+                tmpmol.ase_atoms.set_positions(posits)
+                tmpmol.classify_metal_geo_type()
+                vals[i].update(
+                    {
+                        "mol2string": tmpmol.write_mol2(
+                            "OBMol_Min_Energy", writestring=True
+                        ),
+                        "metal_center_symmetry": tmpmol.metal_center_geos[0][
+                            "metal_geo_type"
+                        ],
+                        "metal_center_confidence": tmpmol.metal_center_geos[0][
+                            "confidence"
+                        ],
+                    }
+                )
             out_ordered_conf_dict[keys[i]] = vals[i]
     else:
         out_ordered_conf_dict = dict()
     # At the end move the .json files generated to the cwd -> done to save time!
-    if tmp_inputDict['parameters']['save_trajectories'] or tmp_inputDict[
-       'parameters']['dump_ase_atoms']:
-        shutil.copy(tmp_inputDict['parameters']['ase_db_tmp_name'],
-                    tmp_inputDict['parameters']['ase_atoms_db_name'])
+    if (
+        tmp_inputDict["parameters"]["save_trajectories"]
+        or tmp_inputDict["parameters"]["dump_ase_atoms"]
+    ):
+        shutil.copy(
+            tmp_inputDict["parameters"]["ase_db_tmp_name"],
+            tmp_inputDict["parameters"]["ase_atoms_db_name"],
+        )
     return out_ordered_conf_dict
 
 
@@ -911,37 +1102,40 @@ def build_complex_2D(inputDict):
     """
     inputDict = io_process_input.inparse_2D(inputDict)
 
-        # Initialize Atoms object for complex
-    complexMol = io_obabel.smiles2Atoms(inputDict['core']['smiles'], addHydrogens=False)
-    charge = inputDict['parameters']['metal_ox']
+    # Initialize Atoms object for complex
+    complexMol = io_obabel.smiles2Atoms(inputDict["core"]["smiles"], addHydrogens=False)
+    charge = inputDict["parameters"]["metal_ox"]
 
-    mol = io_molecule.Molecule() # Initialize molecule.
-    mol.load_ase(complexMol.copy(),atom_types=[complexMol[0].symbol])
+    mol = io_molecule.Molecule()  # Initialize molecule.
+    mol.load_ase(complexMol.copy(), atom_types=[complexMol[0].symbol])
 
     # Assemble complex
-    for i, ligand in enumerate(inputDict['ligands']):
-        obmollig = io_obabel.get_obmol_smiles(ligand['smiles'],
-                                              addHydrogens=True,
-                                              neutralize=False,
-                                              build=False)
+    for i, ligand in enumerate(inputDict["ligands"]):
+        obmollig = io_obabel.get_obmol_smiles(
+            ligand["smiles"], addHydrogens=True, neutralize=False, build=False
+        )
         ligcharge = obmollig.GetTotalCharge()
         charge = charge + ligcharge
         bestConformer = io_obabel.convert_obmol_ase(
-            obmollig,
-            posits=None,
-            set_zero=True)
-        io_obabel.add_dummy_metal(
-            obmollig, ligand['coordList'])
+            obmollig, posits=None, set_zero=True
+        )
+        io_obabel.add_dummy_metal(obmollig, ligand["coordList"])
         bo_dict, atypes = io_obabel.get_OBMol_bo_dict_atom_types(obmollig)
 
-        mol.append_ligand({'ase_atoms': bestConformer,'bo_dict': bo_dict,
-                           'atom_types': atypes,
-                           'ca_metal_dist_constraints': ligand.get('ca_metal_dist_constraints',
-                                                                   None)})
-    
+        mol.append_ligand(
+            {
+                "ase_atoms": bestConformer,
+                "bo_dict": bo_dict,
+                "atom_types": atypes,
+                "ca_metal_dist_constraints": ligand.get(
+                    "ca_metal_dist_constraints", None
+                ),
+            }
+        )
+
     # Charge -> charges already assigned to components during assembly
-    if (inputDict['parameters']['full_charge'] is not None):
-        charge = inputDict['parameters']['full_charge']
+    if inputDict["parameters"]["full_charge"] is not None:
+        charge = inputDict["parameters"]["full_charge"]
 
     mol_charge = charge
 
@@ -949,18 +1143,20 @@ def build_complex_2D(inputDict):
     metals = [x for x in symbols if x in io_ptable.all_metals]
 
     f_in_core = False
-    
+
     if len(metals) == 1:
         if metals[0] in io_ptable.heavy_metals:
             f_in_core = True
     else:
-        if inputDict['parameters']['debug']:
-            print('No metals - continuing anyway!')
+        if inputDict["parameters"]["debug"]:
+            print("No metals - continuing anyway!")
 
     # Handle spin / magnetism
-    even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms])-mol_charge) % 2
-    if (inputDict['parameters']['full_spin'] is not None):
-        uhf = inputDict['parameters']['full_spin']
+    even_odd_electrons = (
+        np.sum([atom.number for atom in mol.ase_atoms]) - mol_charge
+    ) % 2
+    if inputDict["parameters"]["full_spin"] is not None:
+        uhf = inputDict["parameters"]["full_spin"]
         if (even_odd_electrons == 1) and (uhf == 0):
             uhf = 1
         elif (even_odd_electrons == 1) and (uhf < 7) and (uhf % 2 == 0):
@@ -972,7 +1168,9 @@ def build_complex_2D(inputDict):
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
     else:
-        uhf = inputDict['parameters']['metal_spin']  # Metal spin set by io_process_input to defaults.
+        uhf = inputDict["parameters"][
+            "metal_spin"
+        ]  # Metal spin set by io_process_input to defaults.
         if (even_odd_electrons == 1) and (uhf == 0):
             uhf = 1
         elif (even_odd_electrons == 1) and (uhf < 7) and (uhf % 2 == 0):
@@ -987,13 +1185,16 @@ def build_complex_2D(inputDict):
     xtb_unpaired_electrons = copy.copy(uhf)
     xtb_charge = copy.copy(mol_charge)
 
-    if f_in_core:  # F in core assumes for a 3+ lanthanide with 11 valence electrons for XTB
-        xtb_charge = charge + (3 - inputDict['parameters']['metal_ox'])
-        even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms]))
-        even_odd_electrons = even_odd_electrons - io_ptable.elements.index(
-            metals[0]) + 11 - xtb_charge
+    if (
+        f_in_core
+    ):  # F in core assumes for a 3+ lanthanide with 11 valence electrons for XTB
+        xtb_charge = charge + (3 - inputDict["parameters"]["metal_ox"])
+        even_odd_electrons = np.sum([atom.number for atom in mol.ase_atoms])
+        even_odd_electrons = (
+            even_odd_electrons - io_ptable.elements.index(metals[0]) + 11 - xtb_charge
+        )
         even_odd_electrons = even_odd_electrons % 2
-        if (even_odd_electrons == 0):
+        if even_odd_electrons == 0:
             xtb_unpaired_electrons = 0
         else:
             xtb_unpaired_electrons = 1
@@ -1003,24 +1204,25 @@ def build_complex_2D(inputDict):
     mol.uhf = uhf
     mol.charge = mol_charge
 
-    return {'mol2string': mol.write_mol2('2D_Mol:', writestring=True),
-            'input_dict': inputDict}
+    return {
+        "mol2string": mol.write_mol2("2D_Mol:", writestring=True),
+        "input_dict": inputDict,
+    }
 
 
 # Main
-if (__name__ == '__main__'):
+if __name__ == "__main__":
     # Variables
     inputDict = {
-        "core": {"smiles": "[Fe]",
-                 "coreType": 'octahedral',
-                 },
+        "core": {
+            "smiles": "[Fe]",
+            "coreType": "octahedral",
+        },
         "ligands": [
-            {"smiles": "n1ccccc1-c2ccccn2",
-             "coordList": [0, 1],
-             'ligType': 'bi_cis'},
-                        ],  # If core CN specified and ligand locations remaining -> populate with water
-        "parameters": {}
-                }
+            {"smiles": "n1ccccc1-c2ccccn2", "coordList": [0, 1], "ligType": "bi_cis"},
+        ],  # If core CN specified and ligand locations remaining -> populate with water
+        "parameters": {},
+    }
 
     # Build complex
     complexMol_dict = build_complex(inputDict)
