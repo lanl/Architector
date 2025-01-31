@@ -1,12 +1,12 @@
 from setuptools import setup
-import versioneer
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+# 'xtb', # Xtb as install requirement is broken, installs correctly through conda.
 setup(
     name='architector',
-    version=versioneer.get_version(),
+    version='0.1.0',
     author='Michael G. Taylor et al.',
     packages=['architector'],
     package_data={"": ["data/*.csv"]},
@@ -16,7 +16,6 @@ setup(
         'py3Dmol',
         'pynauty',
         'scipy',
-        'xtb',
         'pandas',
         'mendeleev'
     ],
@@ -25,8 +24,7 @@ setup(
                  "Intended Audience :: Science/Research",
                  "Programming Language :: Python :: 3",
                  "Topic :: Scientific/Engineering :: Chemistry"],
-    description="The architector python package - for 3D inorganometallic complex design.",
+    description="The architector python package - for 3D Coordination Complex Design.",
     long_description=long_description,
     long_description_content_type='text/markdown',
-    cmdclass=versioneer.get_cmdclass(),
 )
