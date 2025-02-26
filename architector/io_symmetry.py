@@ -6,6 +6,11 @@ Developed by Jan Janssen/Michael Taylor!
 import numpy as np
 import itertools
 import architector.io_obabel as io_obabel
+import sys
+
+sys.setrecursionlimit(10000)  # Increase the recursion limit to 10000
+
+# Now your recursive function can handle deeper recursions
 
 
 def test_combos(combs, occupied):
@@ -455,7 +460,14 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
             out_energies = []
             out_combos = []
 
-            tmp = flatten(good_combos)  # Recursively flatten list of items 
+            try:
+                tmp = flatten(good_combos)  # Recursively flatten list of items 
+            except RecursionError:
+                raise RecursionError("Too many possible symmetries: {}, try assigning ligType to ligand, "
+                                     "restricting coreType or testing different chemistries, "
+                                     "known instance is CN=8 with three unassigned ligtype bidentate ligands."
+                                     "fixed by setting ligands to 'ligType:'bi_cis' in ligand dictionary.".format(len(good_combos))
+                )
             # Reshape into list of selected indices.
             tmp = np.array(tmp).reshape(int(len(tmp)/np.sum(denticities)), int(
                 np.sum(denticities)))
