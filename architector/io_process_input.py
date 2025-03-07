@@ -951,6 +951,7 @@ def inparse(inputDict):
             "alternate_metal_spin": None, # Secondary spin state to check. 
 
             # Method parameters.
+            "xtb_relax": True, # Use xtb geometry relaxation routines instead of ASE.
             "calculator":None, # ASE calculator class input for usage during construction or for optimization.
             "calculator_kwargs":dict(), # ASE calculator kwargs.
             "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.

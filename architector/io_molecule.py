@@ -71,6 +71,10 @@ def convert_io_molecule(
             obmol = io_obabel.convert_cif_obmol(structure, readstring=False)
             mol2 = io_obabel.convert_obmol_mol2(obmol)
             mol.read_mol2(mol2, readstring=True)
+        elif structure[-4:] == ".sdf":
+            obmol = io_obabel.convert_sdf_obmol(structure, readstring=False)
+            mol2 = io_obabel.convert_obmol_mol2(obmol)
+            mol.read_mol2(mol2, readstring=True)
         elif structure[-5:] == ".traj":  # Read in trajectory file.
             traj = Trajectory(structure)
             output = []
@@ -85,19 +89,26 @@ def convert_io_molecule(
         ):  # RXYZ string.
             mol.read_rxyz(structure, readstring=True)
         # checking for number at start of string -> indicates xyz string
-        elif (
+        elif (  # XYZ
             isinstance(structure, str)
             and (len(structure.split("\n")) > 3)
             and (structure.split("\n")[0].replace(" ", "").isnumeric())
         ):
             mol.read_xyz(structure, readstring=True)
         # checking for similar file without header
-        elif (
+        elif (  # XYZ
             isinstance(structure, str)
             and (len(structure.split("\n")[0].split()) == 4)
             and structure.split("\n")[0].split()[0]
         ):
             mol.read_xyz(structure, readstring=True)
+        elif (  # SDF
+            isinstance(structure, str)
+            and (structure.split("\n")[0].split("=")[0] == 'charge')
+        ):
+            obmol = io_obabel.convert_sdf_obmol(structure, readstring=True)
+            mol2 = io_obabel.convert_obmol_mol2(obmol)
+            mol.read_mol2(mol2, readstring=True)
         elif isinstance(structure, str):  # Smiles?
             try:
                 tmol = io_obabel.get_obmol_smiles(structure)

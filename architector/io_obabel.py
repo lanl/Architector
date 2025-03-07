@@ -881,13 +881,13 @@ def convert_mol_obmol(mol, readstring=True):
 
 
 def convert_cif_obmol(cif, readstring=True):
-    """convert_mol2_obmol
-    mol2 to OBMol
+    """convert_cif_obmol
+    cif to OBMol
 
     Parameters
     ----------
-    mol2 : str
-        either filename or mol2 string
+    cif : str
+        either filename or cif string
     readstring : bool, optional
         read from string or from file, by default True
 
@@ -903,6 +903,32 @@ def convert_cif_obmol(cif, readstring=True):
         conv.ReadString(obmol, cif)
     else:
         conv.ReadFile(obmol, cif)
+    return obmol
+
+
+def convert_sdf_obmol(sdf, readstring=True):
+    """convert_sdf_obmol
+    sdf to OBMol
+
+    Parameters
+    ----------
+    sdf : str
+        either filename or sdf string
+    readstring : bool, optional
+        read from string or from file, by default True
+
+    Returns
+    -------
+    obmol : ob.OBMol
+        openbabel of the sdf file
+    """
+    conv = ob.OBConversion()
+    obmol = ob.OBMol()
+    conv.SetInFormat('sdf')
+    if readstring:
+        conv.ReadString(obmol, sdf)
+    else:
+        conv.ReadFile(obmol, sdf)
     return obmol
 
 

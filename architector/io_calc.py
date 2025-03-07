@@ -91,6 +91,46 @@ params = {
     "force_generation": False,
     "species_run": False,
     "debug": False,
+    # "Secondary Solvation Shell" parameters
+    "freeze_molecule_add_species": False,  # Whether to free the original moleucule during all secondary
+    "species_method": "GFN2-xTB",  # Method to use on full species - right now only GFN2-xTB really works
+    "species_relax": True,  # Whether or not to relax the generated secondary solvation structures.
+    "species_intermediate_method": "GFN-FF",  # Method to use for intermediate species screening - Suggested GFN-FF
+    "species_intermediate_relax": True,  # Whether to perform the relaxation only after all secondary species are added
+    "ase_opt_method": None,  # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+    "targeted_indices_close": None,  # Indices of both base molecule and added molecule to add close to one another.
+}
+
+
+default_kwargs = {
+    "init_sanity_check": False,
+    "final_sanity_check": False,
+    "relax": False,
+    "xtb_relax": True,
+    "assembly": False,
+    "method": "GFN2-xTB",
+    "xtb_solvent": "none",
+    "xtb_accuracy": 1.0,
+    "xtb_electronic_temperature": 300,
+    "xtb_max_iterations": 250,
+    "fmax": 0.1,
+    "maxsteps": 1000,
+    "ff_preopt_run": False,
+    "detect_spin_charge": False,
+    "fix_m_neighbors": False,
+    "fix_indices": None,
+    "default_params": params,
+    "ase_opt_method": None,
+    "ase_opt_kwargs": {},
+    "species_run": False,
+    "intermediate": False,
+    "skip_spin_assign": False,
+    "save_trajectories": False,
+    "store_results": False,
+    "use_constraints": False,
+    "trans_oxo_triples": [],
+    "calculator": None,
+    "debug": False,
 }
 
 
@@ -99,33 +139,7 @@ class CalcExecutor:
         self,
         structure,
         parameters={},
-        init_sanity_check=False,
-        final_sanity_check=False,
-        relax=False,
-        assembly=False,
-        method="GFN2-xTB",
-        xtb_solvent="none",
-        xtb_accuracy=1.0,
-        xtb_electronic_temperature=300,
-        xtb_max_iterations=250,
-        fmax=0.1,
-        maxsteps=1000,
-        ff_preopt_run=False,
-        detect_spin_charge=False,
-        fix_m_neighbors=False,
-        fix_indices=None,
-        default_params=params,
-        ase_opt_method=None,
-        ase_opt_kwargs={},
-        species_run=False,
-        intermediate=False,
-        skip_spin_assign=False,
-        save_trajectories=False,
-        store_results=False,
-        use_constraints=False,
-        trans_oxo_triples=[],
-        calculator=None,
-        debug=False,
+        **kwargs,
     ):
         """CalcExecutor is the class handling all calculations of full metal-ligand complexes.
 
@@ -135,12 +149,15 @@ class CalcExecutor:
             Structure to evaluate.
         parameters : dict, optional
             parameters passed, by default None
+        Kwargs ...
         init_sanity_check : bool, optional
             perform initial sanity checks before proceeding, by default False
         final_sanity_check : bool, optional
             perform final sanity checks, by default False
         relax : bool, optional
             relax the complex, by default False
+        xtb_relax: bool, optional
+            relax the complex using xtb inbuilt optimizer, by default True
         assembly : bool, optional
             if this is an assembly calculation or not; if assembly will
             perform only single point and set to assembly cutoffs, by default False
@@ -192,7 +209,7 @@ class CalcExecutor:
 
         self.in_struct = structure
         self.mol = io_molecule.convert_io_molecule(structure)
-        if use_constraints:
+        if kwargs.get("use_constraints", False):
             if isinstance(self.in_struct, ase.atoms.Atoms):
                 if len(self.in_struct.constraints) > 0:
                     self.mol.ase_atoms.set_constraint(self.in_struct.constraints)
@@ -203,53 +220,37 @@ class CalcExecutor:
                     )
         else:
             self.mol.ase_atoms.constraints = []
-        self.method = method
+
         default_params = params.copy()
-        default_params["debug"] = debug
-        default_params["save_trajectories"] = save_trajectories
         default_params.update(parameters)
         self.parameters = default_params
-        if len(self.parameters) > 0:
-            for key, val in self.parameters.items():
+        for key, val in self.parameters.items():
+            setattr(self, key, val)
+
+        # Pass in default kwargs, only set if not already set by parameters.
+        tkwargs = default_kwargs.copy()
+        for key, val in tkwargs.items():
+            try:
+                getattr(self, key)
+            except AttributeError:
                 setattr(self, key, val)
-        self.init_sanity_check = init_sanity_check
-        self.final_sanity_check = final_sanity_check
-        self.calculator = calculator
-        self.relax = relax
-        self.ase_opt_method = ase_opt_method
-        self.assembly = assembly
-        self.ff_preopt_run = ff_preopt_run
-        self.xtb_solvent = xtb_solvent
-        self.xtb_accuracy = xtb_accuracy
-        self.xtb_electronic_temperature = xtb_electronic_temperature
-        self.xtb_max_iterations = xtb_max_iterations
-        self.fmax = fmax
-        self.fix_m_neighbors = fix_m_neighbors
-        self.maxsteps = maxsteps
-        self.species_run = species_run
-        self.store_results = store_results
-        self.fix_indices = fix_indices
-        self.ase_opt_kwargs = ase_opt_kwargs
-        self.skip_spin_assign = skip_spin_assign
-        self.force_generation = False
-        self.force_oxo_relax = False
-        self.replace_trics = False
-        self.trans_oxo_triples = trans_oxo_triples
-        self.results = None
-        self.detect_spin_charge = detect_spin_charge
-        if len(parameters) > 0:
-            for key, val in parameters.items():
-                setattr(self, key, val)
-        if assembly:
+                self.parameters[key] = val
+
+        # Make sure kwargs take precidence
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+        self.parameters.update(kwargs)
+
+        if self.assembly:
             self.init_sanity_check = True
             self.relax = False
             self.method = self.assemble_method
-        elif species_run:
-            if isinstance(intermediate, str):
-                if intermediate == "rotation":
+        elif self.species_run:
+            if isinstance(self.intermediate, str):
+                if self.intermediate == "rotation":
                     self.method = self.species_intermediate_method
                     self.relax = False
-                elif intermediate == "main":
+                elif self.intermediate == "main":
                     self.method = self.species_method
                     self.relax = self.species_intermediate_relax
                     self.force_oxo_relax = True
@@ -271,13 +272,13 @@ class CalcExecutor:
         else:
             self.opt_method = self.ase_opt_method
         # Temporary logfile or not for ase optimizer
-        if self.parameters["debug"]:  # Set logfile to suppress stdout output.
+        if self.debug:  # Set logfile to suppress stdout output.
             self.logfile = None
         else:
             self.logfile = "tmp.log"
 
         if ("xtb" in self.method.lower()) or ("uff" in self.method.lower()):
-            self.mol.swap_actinide(debug=self.parameters["debug"])
+            self.mol.swap_actinide(debug=self.debug)
 
         self.calc_instantiated = False
 
@@ -287,8 +288,24 @@ class CalcExecutor:
                 # Check if instantiated already
                 self.calc_instantiated = True
                 if "xtb" in self.calculator.name:
-                    self.mol.swap_actinide(debug=self.parameters["debug"])
+                    self.mol.swap_actinide(debug=self.debug)
                     self.method += "_xtb"
+
+        # Toggle off xtb_relax if not applicable
+        if (not self.relax) and (self.xtb_relax):
+            self.xtb_relax = False
+        # Any constraints? No xtb_relax.
+        elif (
+            (len(self.mol.ase_atoms.constraints) > 0)
+            or (self.freeze_molecule_add_species and self.species_run)
+            or isinstance(self.fix_indices, list)
+            or (len(self.mol.ase_constraints) > 0)
+            or (len(self.trans_oxo_triples) > 0)
+        ):
+            self.xtb_relax = False
+        # Store trajectory info
+        elif self.save_trajectories:
+            self.xtb_relax = False
 
         # Output properties
         self.energy = None
@@ -299,12 +316,17 @@ class CalcExecutor:
         self.rmsd = None
         self.calc_time = time.time()
         self.done = False
+        self.results = None
+
+        # Tracking Properties
+        self.force_oxo_relax = False
+        self.replace_trics = False
+
+        # Evaluate
         self.calculate()
 
     def calculate(self):
-        if self.init_sanity_check and self.parameters.get(
-            "assemble_sanity_checks", True
-        ):
+        if self.init_sanity_check and self.assemble_sanity_checks:
             self.mol.dist_sanity_checks(params=self.parameters, assembly=self.assembly)
             self.mol.graph_sanity_checks(params=self.parameters, assembly=self.assembly)
         if self.mol.dists_sane:
@@ -333,24 +355,27 @@ class CalcExecutor:
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif "gfn" in self.method.lower():
                 # Temporary workaround to use TBLite by default if applicable.
-                if (self.xtb_solvent == "none") and (self.method != "GFN-FF"):
+                if (
+                    (self.xtb_solvent == "none")
+                    and (self.method != "GFN-FF")
+                    and (not self.xtb_relax)
+                ):
                     calc = TBLite(
                         method=self.method,
                         max_iterations=self.xtb_max_iterations,
                         electronic_temperature=self.xtb_electronic_temperature,
-                        # spin_polarization=1.0, # Have spin polarization on if desired.
-                        #   verbosity=self.parameters['debug'])
                         verbosity=-1,
                     )
-                elif not has_xtb_python:
+                elif (not has_xtb_python) or (self.xtb_relax):
                     calc = XTB_Calculator(
                         xtb_method=self.method,
                         xtb_accuracy=self.xtb_accuracy,
                         xtb_max_iterations=self.xtb_max_iterations,
                         xtb_electronic_temperature=self.xtb_electronic_temperature,
                         xtb_solvent=self.xtb_solvent,
+                        xtb_relax=self.xtb_relax,
                     )
-                else:
+                else:  # legacy xtb-python
                     calc = XTB(
                         method=self.method,
                         solvent=self.xtb_solvent,
@@ -367,6 +392,7 @@ class CalcExecutor:
                         not self.force_oxo_relax
                     ):
                         self.relax = False
+                        self.xtb_relax = False
                         # E.g - don't relax if way off in oxidation states (III) vs (V or VI)
                     elif self.assembly:
                         # FF more stable for highly charged assembly complexes.
@@ -385,13 +411,10 @@ class CalcExecutor:
                 raise ValueError("Warning - no known method or calculator requested.")
             if not obabel_ff_requested:
                 self.mol.ase_atoms.calc = calc
-                if self.relax:
+                if (self.relax) and (not self.xtb_relax):
                     cs = self.mol.ase_atoms.constraints
-                    if (
-                        self.parameters.get("freeze_molecule_add_species", False)
-                        and self.species_run
-                    ):
-                        if self.parameters["debug"]:
+                    if self.freeze_molecule_add_species and self.species_run:
+                        if self.debug:
                             print("Fixing first component!")
                         fix_inds = self.mol.find_component_indices(component=0)
                         c = FixAtoms(indices=fix_inds.tolist())
@@ -433,7 +456,7 @@ class CalcExecutor:
                         cs.append(c)
                     self.mol.ase_atoms.set_constraint(cs)
                     with arch_context_manage.make_temp_directory(
-                        prefix=self.parameters["temp_prefix"]
+                        prefix=self.temp_prefix
                     ) as _:
                         if has_sella and self.ase_opt_kwargs.get(
                             "sella_internal_trics", False
@@ -453,33 +476,33 @@ class CalcExecutor:
                             self.init_energy = copy.deepcopy(
                                 self.mol.ase_atoms.get_total_energy()
                             )
-                            if self.parameters["save_trajectories"]:
+                            if self.save_trajectories:
                                 if self.logfile is not None:
                                     dyn = self.opt_method(
                                         self.mol.ase_atoms,
                                         trajectory="temp.traj",
                                         logfile=self.logfile,
-                                        **self.ase_opt_kwargs
+                                        **self.ase_opt_kwargs,
                                     )
                                 else:
                                     dyn = self.opt_method(
                                         self.mol.ase_atoms,
                                         trajectory="temp.traj",
-                                        **self.ase_opt_kwargs
+                                        **self.ase_opt_kwargs,
                                     )
                             else:
                                 if self.logfile is not None:
                                     dyn = self.opt_method(
                                         self.mol.ase_atoms,
                                         logfile=self.logfile,
-                                        **self.ase_opt_kwargs
+                                        **self.ase_opt_kwargs,
                                     )
                                 else:
                                     dyn = self.opt_method(
                                         self.mol.ase_atoms, **self.ase_opt_kwargs
                                     )
                             dyn.run(fmax=self.fmax, steps=self.maxsteps)
-                            if self.parameters["save_trajectories"]:
+                            if self.save_trajectories:
                                 self.read_traj()
                             self.energy = self.mol.ase_atoms.get_total_energy()
                             if self.store_results:
@@ -494,9 +517,9 @@ class CalcExecutor:
                             self.successful = True
                         except Exception as e:
                             self.errors.append(e)
-                            if self.parameters["save_trajectories"]:
+                            if self.save_trajectories:
                                 self.read_traj()
-                            if self.parameters["debug"]:
+                            if self.debug:
                                 print("Warning - method did not converge!", e)
                                 print(
                                     "Mol XTB Charge {} Spin {}\n".format(
@@ -513,15 +536,50 @@ class CalcExecutor:
                             self.init_energy = 10000
                             self.calc_time = time.time() - self.calc_time
                     # Remove constraint
-                    if self.parameters.get("freeze_molecule_add_species", False) and (
-                        self.species_run
-                    ):
-                        if self.parameters["debug"]:
+                    if self.freeze_molecule_add_species and (self.species_run):
+                        if self.debug:
                             print("Removing fixing first component!")
                         self.mol.ase_atoms.set_constraint()
+                elif self.xtb_relax:
+                    with arch_context_manage.make_temp_directory(
+                        prefix=self.temp_prefix
+                    ) as _:
+                        try:
+                            self.energy = self.mol.ase_atoms.get_total_energy()
+                            self.init_energy = None
+                            self.successful = True
+                            self.mol.ase_atoms.set_positions(
+                                self.mol.ase_atoms.calc.results["positions"]
+                            )
+                            self.rmsd = simple_rmsd(
+                                self.mol.ase_atoms,
+                                io_molecule.convert_io_molecule(
+                                    self.in_struct
+                                ).ase_atoms,
+                            )
+                            if self.store_results:
+                                self.results = self.mol.ase_atoms.calc.results.copy()
+                        except Exception as e:
+                            self.errors.append(e)
+                            if self.debug:
+                                print("Warning - method did not converge!", e)
+                                print(
+                                    "Mol XTB Charge {} Spin {}\n".format(
+                                        self.mol.xtb_charge, self.mol.xtb_uhf
+                                    )
+                                )
+                                print(
+                                    "Mol ase Charge {} Spin {}\n".format(
+                                        self.mol.ase_atoms.get_initial_charges().sum(),
+                                        self.mol.ase_atoms.get_initial_magnetic_moments().sum(),
+                                    )
+                                )
+                            self.energy = 10000
+                            self.init_energy = 10000
+                            self.calc_time = time.time() - self.calc_time
                 else:
                     with arch_context_manage.make_temp_directory(
-                        prefix=self.parameters["temp_prefix"]
+                        prefix=self.temp_prefix
                     ) as _:
                         try:
                             self.energy = self.mol.ase_atoms.get_total_energy()
@@ -531,7 +589,7 @@ class CalcExecutor:
                                 self.results = self.mol.ase_atoms.calc.results.copy()
                         except Exception as e:
                             self.errors.append(e)
-                            if self.parameters["debug"]:
+                            if self.debug:
                                 print("Warning - method did not converge!", e)
                                 print(
                                     "Mol XTB Charge {} Spin {}\n".format(
@@ -569,7 +627,7 @@ class CalcExecutor:
                         )
                     except Exception as e:
                         self.errors.append(e)
-                        if self.parameters["debug"]:
+                        if self.debug:
                             print("Warning - method did not converge!", e)
                 else:
                     try:
@@ -578,7 +636,7 @@ class CalcExecutor:
                         self.successful = True
                     except Exception as e:
                         self.errors.append(e)
-                        if self.parameters["debug"]:
+                        if self.debug:
                             print("Warning - method did not converge!", e)
             if (not self.successful) and (self.force_generation):
                 try:
@@ -587,7 +645,7 @@ class CalcExecutor:
                     self.successful = True
                 except Exception as e:
                     self.errors.append(e)
-                    if self.parameters["debug"]:
+                    if self.debug:
                         print("Warning - method did not converge!", e)
             self.calc_time = time.time() - self.calc_time
             self.done = True
@@ -595,7 +653,7 @@ class CalcExecutor:
             self.errors.append("Min dist checks failed. Not evaluated")
         # Check after done
         if ("xtb" in self.method.lower()) or ("uff" in self.method.lower()):
-            self.mol.swap_actinide(debug=self.parameters["debug"])
+            self.mol.swap_actinide(debug=self.debug)
 
         if self.final_sanity_check:
             self.mol.dist_sanity_checks(params=self.parameters, assembly=self.assembly)
@@ -610,21 +668,21 @@ class CalcExecutor:
             self.ase_opt_kwargs["sella_internal_trics"] = True
 
         if (
-            self.parameters["save_trajectories"]
+            self.save_trajectories
             and (self.trajectory is not None)
-            and (self.parameters["dump_ase_atoms"])
+            and (self.dump_ase_atoms)
         ):
             self.dump_traj()
-        elif self.parameters["save_trajectories"]:
+        elif self.save_trajectories:
             pass
         elif (
-            self.parameters["dump_ase_atoms"]
+            self.dump_ase_atoms
             and (self.mol.ase_atoms.calc is not None)
             and (not self.assembly)
         ):
             self.parameters["ase_db"].write(
                 self.mol.ase_atoms,
-                architector_run_label=self.parameters["architector_run_label"],
+                architector_run_label=self.architector_run_label,
                 mol2string=self.mol.write_mol2("final", writestring=True),
                 relaxed=self.relax,
             )
@@ -640,10 +698,10 @@ class CalcExecutor:
                 end = i
             for i, ats in enumerate(self.trajectory):
                 self.mol.ase_atoms = ats
-                if (i < end) and (i < self.parameters["save_first_n"]):
-                    self.parameters["ase_db"].write(
+                if (i < end) and (i < self.save_first_n):
+                    self.ase_db.write(
                         ats,
-                        architector_run_label=self.parameters["architector_run_label"],
+                        architector_run_label=self.architector_run_label,
                         geo_step=i,
                         mol2string=self.mol.write_mol2(
                             "intermediate", writestring=True
@@ -651,9 +709,9 @@ class CalcExecutor:
                         relaxed=False,
                     )
                 elif i == end:
-                    self.parameters["ase_db"].write(
+                    self.ase_db.write(
                         ats,
-                        architector_run_label=self.parameters["architector_run_label"],
+                        architector_run_label=self.architector_run_label,
                         geo_step=i,
                         mol2string=self.mol.write_mol2("final", writestring=True),
                         relaxed=True,

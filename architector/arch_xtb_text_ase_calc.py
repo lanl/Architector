@@ -32,7 +32,6 @@ class XTB_Calculator(Calculator):
         super().__init__(
             restart=restart,
             atoms=atoms,
-            ignore_bad_restart_file=False,
             label=label,
             **kwargs
         )
@@ -43,6 +42,7 @@ class XTB_Calculator(Calculator):
             "xtb_accuracy": xtb_accuracy,
             "xtb_electronic_temperature": xtb_electronic_temperature,
             "xtb_max_iterations": xtb_max_iterations,
+            "opt": kwargs.get('xtb_relax', False),
         }
 
     def calculate(self, atoms=None, *args, **kwargs):
@@ -80,45 +80,59 @@ class XTB_Calculator(Calculator):
             with open("structure.xyz", "w") as outFile:
                 outFile.write(xyzstr)
 
+            method = methods_dict[self.parameters.get("xtb_method",
+                                    "GFN2-xTB")].split()
+
+            exec_lst = ['{}'.format(xtbPath),
+                        'structure.xyz']
+            exec_lst += method
+
+            read_coords = False
+            if self.parameters.get('opt', False):
+                read_coords = True
+                exec_lst += ["--opt"]
+
+            exec_lst += [
+                        '--chrg',
+                        '{}'.format(int(charge)),
+                        '--uhf',
+                        '{}'.format(int(uhf)),
+                        '-P',
+                        '1',
+                        '-a',
+                        '{}'.format(self.parameters['xtb_accuracy']),
+                        '--etemp',
+                        '{}'.format(self.parameters['xtb_electronic_temperature']),
+                        '--iterations',
+                        '{}'.format(self.parameters['xtb_max_iterations']),
+                        '--grad',
+                        '--dipole',
+                        '--ceasefiles',
+                        ]
+
             if self.parameters.get("xtb_solvent", None) is not None:
 
                 with open("solv_options.txt", "w") as file1:
                     file1.write("$write\n")
                     file1.write("    gbsa=true\n")
 
-                # Run xtb
-                execStr = ("{} structure.xyz {} --chrg {} "
-                           " --uhf {} --alpb {} -a {} "
-                           "--etemp {} --iterations {} "
-                           "--grad -I solv_options.txt").format(
-                    xtbPath,
-                    methods_dict[self.parameters.get("xtb_method", "GFN2-xTB")],
-                    int(charge),
-                    int(uhf),
-                    self.parameters["xtb_solvent"],
-                    self.parameters["xtb_accuracy"],
-                    self.parameters["xtb_electronic_temperature"],
-                    self.parameters["xtb_max_iterations"],
-                )
-            else:
-                execStr = ("{} structure.xyz {} --chrg {}"
-                           " --uhf {} -a {} --etemp {}"
-                           " --iterations {} --grad").format(
-                    xtbPath,
-                    methods_dict[self.parameters.get("xtb_method", "GFN2-xTB")],
-                    int(charge),
-                    int(uhf),
-                    self.parameters["xtb_accuracy"],
-                    self.parameters["xtb_electronic_temperature"],
-                    self.parameters["xtb_max_iterations"],
-                )
+                exec_lst.append('--alpb')
+                exec_lst.append('{}'.format(
+                    self.parameters['xtb_solvent']))
+                exec_lst.append('-I')
+                exec_lst.append('solv_options.txt')
+
 
             with open("output.xtb", "w") as file1:
-                sub.run(execStr.split(), check=True, stderr=sub.DEVNULL, stdout=file1)
+
+                sub.run(exec_lst, check=True,
+                        stderr=sub.DEVNULL,
+                        stdout=file1)
 
             outpath = pathlib.Path(".")
 
-            self.results = self.read_results(outpath=outpath)
+            self.results = self.read_results(outpath=outpath,
+                                             read_coords=read_coords)
 
     def read_solv_params(self, outfilelines):
         """XTB output parser for solvent parameters
@@ -169,11 +183,14 @@ class XTB_Calculator(Calculator):
         }
         return outdict
 
-    def read_results(self, outpath):
+    def read_results(self, outpath, read_coords):
         """XTB output parser for
         1. energy #
         2. forces #
         3. charges #
+        4. positions #
+        5. covCNs #
+        6. dipole #
 
         on the full relaxation trajectory
 
@@ -188,19 +205,7 @@ class XTB_Calculator(Calculator):
         dictionary of output
         """
 
-        chargespath = outpath / "charges"
-
-        charges = None
-
-        if chargespath.exists():
-            charges = np.loadtxt(chargespath)
-        else:
-            chargespath = outpath / "gfnff_charges"
-            if chargespath.exists():
-                charges = np.loadtxt(chargespath)
-
         forces = None
-
         gradientspath = outpath / "gradient"
 
         if gradientspath.exists():
@@ -219,17 +224,66 @@ class XTB_Calculator(Calculator):
         outputpath = outpath / "output.xtb"
 
         energy = None
+        coords = None
+        charges = None
+        covCNs = None
+        dipole = None
 
         if outputpath.exists():
             with open(outputpath, "r") as file1:
                 lines = file1.readlines()
 
+            read_charges = False
+            read_dipole = False
             for line in lines:
+                sline = line.split()
                 if "TOTAL ENERGY" in line:
-                    energy = float(line.split()[3]) * units.Ha
+                    energy = float(sline[3]) * units.Ha
+                elif len(sline) == 6:
+                    if sline[3] == 'q':
+                        read_charges = True
+                        charges = []
+                        covCNs = []
+                elif read_charges:
+                    if len(sline) == 7:
+                        charges.append(float(sline[4]))
+                        covCNs.append(float(sline[3]))
+                    else:
+                        read_charges = False
+                        charges = np.array(charges)
+                        covCNs = np.array(covCNs)
+                elif 'molecular dipole:' in line:
+                    read_dipole = True
+                    dipole = []
+                elif read_dipole:
+                    if 'full:' in line:
+                        dipole = np.array(
+                            [float(x) for x in sline[1:4]]
+                            )
+                        read_dipole = False
+
+            if read_coords:
+                start = False
+                coords = []
+                for line in lines:
+                    sline = line.split()
+                    if "final structure:" in line:
+                        start = True
+                    elif start and (len(sline) == 0):
+                        break
+                    elif start and (len(sline) == 4):
+                        coords.append([float(x) for x in sline[1:]])
+                coords = np.array(coords)
 
         results = self.read_solv_params(lines)
 
-        results.update({"energy": energy, "forces": forces, "charges": charges})
+        results.update({"energy": energy,
+                        "forces": forces,
+                        "charges": charges,
+                        "coveCNs": covCNs,
+                        "dipole": dipole})
+
+        if coords is not None:
+            results.update({"positions": coords})
 
         return results

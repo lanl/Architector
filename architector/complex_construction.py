@@ -283,7 +283,7 @@ class Complex:
                 print("Ligand {} failed xtb/uff or overlapped.".format(i))
         return bestConformer, assembled
 
-    def final_eval(self, single_point=False):
+    def final_eval(self, single_point=None):
         """final_eval perform final evaulation of full complex conformer with XTB.
 
         Involves either a relaxation or not for each "sane" conformer.
@@ -293,6 +293,11 @@ class Complex:
         single_point : bool, optional
             Perform only a singlepoint calculation?, by default False
         """
+        trelax = False
+        if (single_point is not None):
+            trelax = (not single_point)
+        else:
+            trelax = self.parameters['relax']
         self.final_start_time = time.time()
         self.initMol.dist_sanity_checks(params=self.parameters, assembly=single_point)
         self.initMol.graph_sanity_checks(params=self.parameters, assembly=single_point)
@@ -321,11 +326,12 @@ class Complex:
                         single_point
                     )
                 )
+
             self.calculator = CalcExecutor(
                 self.complexMol,
                 parameters=self.parameters,
                 final_sanity_check=self.parameters["full_sanity_checks"],
-                relax=(not single_point),
+                relax=trelax,
                 assembly=False,
             )
             if (self.parameters["debug"]) and (self.calculator):
@@ -351,7 +357,7 @@ class Complex:
                     tmp_relax.mol,
                     parameters=self.parameters,
                     final_sanity_check=self.parameters["full_sanity_checks"],
-                    relax=(not single_point),
+                    relax=trelax,
                 )
         else:  # Ensure calculation object at least exists
             self.calculator = CalcExecutor(
