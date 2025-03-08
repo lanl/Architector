@@ -99,12 +99,12 @@ def convert_io_molecule(
         elif (  # XYZ
             isinstance(structure, str)
             and (len(structure.split("\n")[0].split()) == 4)
-            and structure.split("\n")[0].split()[0]
+            and (structure.split("\n")[0].split()[0] in io_ptable.elements)
         ):
             mol.read_xyz(structure, readstring=True)
         elif (  # SDF
             isinstance(structure, str)
-            and (structure.split("\n")[0].split("=")[0] == 'charge')
+            and ('$$$$' in structure)
         ):
             obmol = io_obabel.convert_sdf_obmol(structure, readstring=True)
             mol2 = io_obabel.convert_obmol_mol2(obmol)
