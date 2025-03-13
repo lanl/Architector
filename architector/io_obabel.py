@@ -288,6 +288,29 @@ def get_obmol_smiles(smilesStr,
         return tOBmol
 
 
+def mol2_to_sdf(mol2string):
+    """mol2_to_sdf
+    convert mol2string to sdf
+
+    Parameters
+    ----------
+    mol2string : str
+        mol2 file string
+
+    Returns
+    -------
+    sdf : str
+        sdf file as a str.
+    """
+    obConversion = ob.OBConversion()
+    obConversion.SetInFormat('mol2')
+    obConversion.SetOutFormat('sdf')
+    OBmol = ob.OBMol()
+    obConversion.ReadString(OBmol, mol2string)
+    sdf = obConversion.WriteString(OBmol)
+    return sdf
+
+
 def get_smiles_obmol(OBmol, canonicalize=False):
     """get_smiles_obmol
     convert smiles to OBmol instance

@@ -72,9 +72,20 @@ def convert_io_molecule(
             mol2 = io_obabel.convert_obmol_mol2(obmol)
             mol.read_mol2(mol2, readstring=True)
         elif structure[-4:] == ".sdf":
-            obmol = io_obabel.convert_sdf_obmol(structure, readstring=False)
-            mol2 = io_obabel.convert_obmol_mol2(obmol)
-            mol.read_mol2(mol2, readstring=True)
+            with open(structure, 'r') as file1:
+                structure_str = file1.read()
+            if structure_str.count('$$$$') > 1:  # More than one molecule
+                sdfs = load_split_sdf(structure_str)
+                mols = []
+                for sdf in sdfs:
+                    mol = convert_io_molecule(sdf)
+                    mols.append(mol)
+                return mols
+            else:
+                obmol = io_obabel.convert_sdf_obmol(structure,
+                                                    readstring=False)
+                mol2 = io_obabel.convert_obmol_mol2(obmol)
+                mol.read_mol2(mol2, readstring=True)
         elif structure[-5:] == ".traj":  # Read in trajectory file.
             traj = Trajectory(structure)
             output = []
@@ -102,13 +113,18 @@ def convert_io_molecule(
             and (structure.split("\n")[0].split()[0] in io_ptable.elements)
         ):
             mol.read_xyz(structure, readstring=True)
-        elif (  # SDF
-            isinstance(structure, str)
-            and ('$$$$' in structure)
-        ):
-            obmol = io_obabel.convert_sdf_obmol(structure, readstring=True)
-            mol2 = io_obabel.convert_obmol_mol2(obmol)
-            mol.read_mol2(mol2, readstring=True)
+        elif isinstance(structure, str) and ("$$$$" in structure):  # SDF
+            if structure.count("$$$$") > 1:  # More than 1 sdf.
+                sdfs = load_split_sdf(structure)
+                mols = []
+                for sdf in sdfs:
+                    mol = convert_io_molecule(sdf)
+                    mols.append(mol)
+                return mols
+            else:
+                obmol = io_obabel.convert_sdf_obmol(structure, readstring=True)
+                mol2 = io_obabel.convert_obmol_mol2(obmol)
+                mol.read_mol2(mol2, readstring=True)
         elif isinstance(structure, str):  # Smiles?
             try:
                 tmol = io_obabel.get_obmol_smiles(structure)
@@ -166,6 +182,22 @@ def convert_io_molecule(
             return struct
     else:
         raise ValueError("String needed for classifying structure type.")
+
+
+def load_split_sdf(sdfstr):
+    """Split SDF into initial/final strings based on $$$$ delimiter
+    """
+    lines = sdfstr.split('\n')
+    out_sdfs = []
+    for i, line in enumerate(lines):
+        if i == 0:
+            out_sdfs.append([line])
+        elif '$$$$' in line:  # Molecule delimiter
+            out_sdfs[-1].append(line)
+            out_sdfs.append([])
+        else:
+            out_sdfs[-1].append(line)
+    return ['\n'.join(x)+'\n' for x in out_sdfs if len(x) > 1]
 
 
 def convert_ase_xyz(ase_atoms):
@@ -256,7 +288,7 @@ class Molecule:
         """
         self.dists_sane = True
         self.sanity_check_dict = {}
-        self.ase_constraints = {}  ### Add distance constraints here.
+        self.ase_constraints = {}   ### Add distance constraints here.
         self.actinides_swapped = False
         if isinstance(in_ase, ase.atoms.Atoms):
             self.ase_atoms = in_ase.copy()
@@ -387,13 +419,44 @@ class Molecule:
         else:
             self.graph = []
 
-    def write_xyz(self, filename, writestring=False):
-        """convert_ase_xyz
+    def write_sdf(self, filename, writestring=False):
+        """write_sdf
 
         Parameters
         ----------
-        ase_atoms : ase.Atoms
-            ase atoms to write to xyz string
+        filename, str
+            filename to write out
+        writestring, bool, optional
+            write to string? default false
+
+        Returns
+        -------
+        outstring : str
+            sdf file string
+        """
+        tmpmol2 = self.write_mol2(filename=filename.strip('.sdf'),
+                                  writestring=True)
+        outstring = io_obabel.mol2_to_sdf(tmpmol2)
+        if writestring:
+            return outstring
+        else:
+            if filename[-4:] == ".sdf":
+                filename = filename
+            else:
+                filename = filename.replace(".", "") + ".sdf"
+            with open(filename, "w") as file1:
+                file1.write(outstring)
+
+    def write_xyz(self, filename, writestring=False):
+        """write_xyz
+        write an xyz file/str
+
+        Parameters
+        ----------
+        filename, str
+            filename to write out
+        writestring, bool, optional
+            write to string? default false
 
         Returns
         -------
@@ -2107,6 +2170,7 @@ class Molecule:
         bond_orders=[],
         functional_group_mol_inds=[],
         remove_hydrogens_when_adding=[],
+        remove_inds=None,
         uff_opt=True,
         xtb_opt=False,
         core_frozen=True,
@@ -2151,6 +2215,10 @@ class Molecule:
             which atoms in the functional group that should be bound to the metal, by default [0]
         remove_hydrogens_when_adding : list(bool), optional
             remove hydrogens when adding this functionalization?, by default True for all bonds added.
+        remove_inds : list(int), optional
+            atoms to delete when adding functionalization group, by default None
+            Note: be careful this does not overlap with hydrogens being removed
+            During functionalization, or functionalization attachment atoms.
         uff_opt : bool, optional
             Relax with UFF/openbabel (turning off NOT suggested), by default True
         xtb_opt : bool, optional
@@ -2186,6 +2254,24 @@ class Molecule:
                 if len(remove_hydrogens_when_adding) < i + 1:
                     remove_hydrogens_when_adding.append(True)
 
+        if isinstance(remove_inds, (list, np.ndarray)):
+            remove_inds = np.sort(np.array(remove_inds))[::-1]
+            for j in remove_inds:
+                self.remove_atom(j)
+            tmp_inds = []
+            # Reset functional group molecule indices
+            for j, idx in enumerate(functionalization_inds):
+                if isinstance(idx, (int, float)):
+                    tmp_inds.append(idx - len(np.where(remove_inds < idx)[0]))
+                elif isinstance(idx, (list, np.ndarray)):
+                    tmp = []
+                    for i, x in enumerate(idx):
+                        tmp.append(x - len(np.where(remove_inds < x)[0]))
+                    tmp_inds.append(tmp)
+                else:
+                    raise ValueError
+            functionalization_inds = tmp_inds
+
         init_n_atoms = len(self.ase_atoms)
         removed_indices = []
 
@@ -2220,7 +2306,8 @@ class Molecule:
                 # rotate functional group to +z
                 if len(funct_coords) > 1:
                     r = Rot.align_vectors(
-                        np.array([[0.0, 0.0, 1.0]] * len(funct_coords)), funct_coords
+                        np.array([[0.0, 0.0, 1.0]] * len(funct_coords)),
+                        funct_coords
                     )  # .reshape(1,-1))
                     funct_coords = r[0].apply(funct_coords) + np.array(
                         (0.0, 0.0, 2.0)
@@ -2601,9 +2688,7 @@ class Molecule:
         )
         return gyration_radii
 
-    def lig_dissociation_sample(self,
-                                max_dist=4,
-                                steps=10):
+    def lig_dissociation_sample(self, max_dist=4, steps=10):
         """Create N trajectories of ligand dissociation.
         Will move the ligands away in the direction of the coordination atoms.
         Note: will only generate dissociation trajectories
@@ -2612,7 +2697,7 @@ class Molecule:
         Parameters
         ----------
         max_dist : int, optional
-            maximum distance to expand out to, 
+            maximum distance to expand out to,
             by default 4 Angstroms past current distance.
         steps : int, optional
             number of steps to take, by default 10.
@@ -2625,28 +2710,26 @@ class Molecule:
         """
         info_dict = self.split_ligs()
         coords = self.ase_atoms.get_positions()
-        tcoords = coords - coords[info_dict.get('metal_ind')]
-        tmpmol = convert_io_molecule(self.write_mol2('tmp.mol2',
-                                                     writestring=True))
+        tcoords = coords - coords[info_dict.get("metal_ind")]
+        tmpmol = convert_io_molecule(self.write_mol2("tmp.mol2", writestring=True))
         output_scans = []
-        if info_dict.get('metal', None) is None:
-            raise ValueError('Cannot Split when no metal center.')
-        for i, lig in enumerate(info_dict['original_lig_inds']):
-            ca_inds = np.array(info_dict['lig_metal_coordatoms'][i])
+        if info_dict.get("metal", None) is None:
+            raise ValueError("Cannot Split when no metal center.")
+        for i, lig in enumerate(info_dict["original_lig_inds"]):
+            ca_inds = np.array(info_dict["lig_metal_coordatoms"][i])
             if len(ca_inds) < 4:  # Only up to tridentate.
                 tmp_scan = []
                 ca_direction = np.sum(tcoords[lig[ca_inds]], axis=0)
                 # Normalize
                 ca_direction = ca_direction / np.linalg.norm(ca_direction)
-                for j, step in enumerate(
-                     np.linspace(0, max_dist, steps)):
+                for j, step in enumerate(np.linspace(0, max_dist, steps)):
                     newcoords = copy.deepcopy(tcoords)
-                    newcoords[lig] += step*ca_direction
+                    newcoords[lig] += step * ca_direction
                     tmpmol.ase_atoms.set_positions(newcoords)
                     tmp_scan.append(
                         tmpmol.write_mol2(
-                            'DiscScan,Lig{},Step{}'.format(
-                                i, j
-                            ), writestring=True))
+                            "DiscScan,Lig{},Step{}".format(i, j), writestring=True
+                        )
+                    )
                 output_scans.append(tmp_scan)
         return output_scans
