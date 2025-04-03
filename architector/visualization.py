@@ -183,7 +183,8 @@ def view_structures(structures,
                     distopacity=0.85, distskin=0.3, distradius=None,
                     distlabelposit=1.0, distatompairs=None,
                     distatomtype_pairs=None,
-                    stack=False, stack_align=True, hydrogens=True):
+                    stack=False, stack_align=True, hydrogens=True,
+                    background_color='white'):
     """view_structures
     Jupyter-notebook-based visualization of molecular structures.
 
@@ -273,10 +274,13 @@ def view_structures(structures,
         Align all the molecules by rmsd for stacking, default True.
     hydrogens : bool,
         Keep the hydrogens?, default True.
+    background_color : str,
+        set the background color, default 'white'
     """
     mols = type_convert(structures)
     if len(mols) == 1:
         view_ats = py3Dmol.view(width=w, height=h)
+        view_ats.setBackgroundColor(background_color)
         mol = mols[0]
         if isinstance(labels, str):
             label = labels
@@ -382,6 +386,7 @@ def view_structures(structures,
         h = h*rows 
         # Initialize Layout
         view_ats = py3Dmol.view(width=w,height=h,linked=False,viewergrid=(rows,columns))
+        view_ats.setBackgroundColor(background_color)
         # Check for labels and populate
         if isinstance(labels,bool):
             if labels:
@@ -518,6 +523,7 @@ def view_structures(structures,
         view_ats.show()
     elif trajectory: # Animate a relaxation.
         view_ats = py3Dmol.view(width=w,height=h)
+        view_ats.setBackgroundColor(background_color)
         metal_inds = [i for i,x in enumerate(mols[0].ase_atoms) if (x.symbol in io_ptable.all_metals)]
         xyz = ""
         for k,mol in enumerate(mols):
@@ -557,6 +563,7 @@ def view_structures(structures,
         view_ats.show()
     elif stack:
         view_ats = py3Dmol.view(width=w,height=h)
+        view_ats.setBackgroundColor(background_color)
         metal_inds = [i for i,x in enumerate(mols[0].ase_atoms) if (x.symbol in io_ptable.all_metals)]
         xyz = ""
         mol0 = mols[0]
