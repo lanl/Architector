@@ -494,8 +494,7 @@ def add_non_covbound_species(mol, parameters={}):
             out_mol = init_mol
             species_add_list.append(out_mol)
     if len(species_add_list) > 0:
-        outmol = species_add_list[
-            np.argmin([x.param_dict["energy"] for x in species_add_list])]
+        outmol = min(species_add_list, key=lambda x: x.param_dict["energy"])
         return outmol, species_add_list
     else:
         return mol, []
