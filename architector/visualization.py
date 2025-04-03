@@ -259,6 +259,15 @@ def view_structures(
     pymol_w=600,
     pymol_h=600,
     pymol_dpi=300,
+    pymol_light_count=1,
+    pymol_metal_scale=0.45,
+    pymol_stick_scale=0.1,
+    pymol_h_scale=0.13,
+    pymol_other_scale=0.2,
+    pymol_shiny_metal=50,
+    pymol_shiny_other=40,
+    pymol_reflect_metal=0.2,
+    pymol_reflect_other=0.1,
     pymol_molecule_buffer=2.0,
     pymol_stick_option="set stick_color, grey20",
     pymol_dont_render=False,
@@ -367,6 +376,24 @@ def view_structures(
         height of the frame, by default 600
     pymol_dpi : int, optional
         dpi to render at, by default 300
+    pymol_light_count : int, optional
+        number of lights to add to pymol scene, default 1
+    pymol_metal_scale : float, optional
+        metal sphere size, default 0.45
+    pymol_stick_scale : float, optional
+        stick size, default 0.1
+    pymol_h_scale : float, optional
+        hydrogen sphere size, default 0.13
+    pymol_other_scale : float, optional
+        other atom sphere size, default 0.2
+    pymol_shiny_metal : float, optional
+        shininess of the metal, default 50
+    pymol_shiny_other : float, optional
+        shininess of non-metals, default 40
+    pymol_reflect_metal : float, optional
+        reflectivity of the metals, default 0.2
+    pymol_reflect_other : float, optional
+        reflectivity of non-metals, default 0.1
     pymol_molecule_buffer : float, optional
         how much space to add around molecules from the edge of the frame
         increase if molecules are going off of the frame, by default 2.0
@@ -405,7 +432,16 @@ def view_structures(
                 w=pymol_w,
                 h=pymol_h,
                 dpi=pymol_dpi,
+                light_count=pymol_light_count,
                 molecule_buffer=pymol_molecule_buffer,
+                metal_scale=pymol_metal_scale,
+                stick_scale=pymol_stick_scale,
+                h_scale=pymol_h_scale,
+                other_scale=pymol_other_scale,
+                shiny_metal=pymol_shiny_metal,
+                shiny_other=pymol_shiny_other,
+                reflect_metal=pymol_reflect_metal,
+                reflect_other=pymol_reflect_other,
                 stick_option=pymol_stick_option,
                 render=(not pymol_dont_render),
             )
@@ -978,6 +1014,12 @@ def view_structures(
 
 # Many thanks to Thomas Summers for sharing his base style selection.
 pymol_python_template = """
+#### Note: To re-render run in the pymol_renders directory: ####
+### pymol {render_name}.pml # -> Adjust viewport/any settings
+#### > ray {size_x}, {size_y}
+#### > png {render_name}.png, dpi={dpi}
+
+
 # Load molecule
 load {render_name}.mol2
 
@@ -993,31 +1035,48 @@ set ray_texture, 0
 set antialias, 3
 set ambient, 0.5
 set spec_count, 5
-set shininess, 40
+set shininess, {shiny_other}
 set specular, 1
-set reflect, 0.1
-set stick_radius, 0.09
+set reflect, {reflect_other}
+set stick_radius, {stick_scale}
 set dash_gap, 0.01
+set light_count, {light_count}
 set dash_radius, 0.035
 {stick_option}
-set sphere_scale, 0.2
-set sphere_scale, 0.13, elem H
+set sphere_scale, {other_scale}
+set sphere_scale, {h_scale}, elem H
 # Lanthanides
-set sphere_scale, 0.45, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
+set sphere_scale, {metal_scale}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
+set shininess, {shiny_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
+set reflect, {reflect_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
 # Actinides
-set sphere_scale, 0.45, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
+set sphere_scale, {metal_scale}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
+set shininess, {shiny_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
+set reflect, {reflect_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 # First row
-set sphere_scale, 0.45, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
+set sphere_scale, {metal_scale}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
+set shininess, {shiny_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
+set reflect, {reflect_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 # Second row
-set sphere_scale, 0.45, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
-# Third row + 
-set sphere_scale, 0.45, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
-# Alakai 
-set sphere_scale, 0.45, elem Li+Na+K+Rb+Cs+Fr
+set sphere_scale, {metal_scale}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
+set shininess, {shiny_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
+set reflect, {reflect_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
+# Third row +
+set sphere_scale, {metal_scale}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
+set shininess, {shiny_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
+set reflect, {reflect_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
+# Alakai
+set sphere_scale, {metal_scale}, elem Li+Na+K+Rb+Cs+Fr
+set shininess, {shiny_metal}, elem Li+Na+K+Rb+Cs+Fr
+set reflect, {reflect_metal}, elem Li+Na+K+Rb+Cs+Fr
 # Alakai Earth
-set sphere_scale, 0.45, elem Be+Mg+Ca+Sr+Ba+Ra
-# Post transition 
-set sphere_scale, 0.45, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
+set sphere_scale, {metal_scale}, elem Be+Mg+Ca+Sr+Ba+Ra
+set shininess, {shiny_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
+set reflect, {reflect_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
+# Post transition
+set sphere_scale, {metal_scale}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
+set shininess, {shiny_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
+set reflect, {reflect_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 
 # Set color space (CMYK doesn't affect atom colors, so this is optional)
 space cmyk
@@ -1139,7 +1198,7 @@ color 0xD90045, elem Sg
 color 0xE00038, elem Bh
 color 0xE6002E, elem Hs
 color 0xEB0026, elem Mt
- 
+
 # Fit and render
 orient
 zoom buffer={molecule_buffer}
@@ -1218,7 +1277,16 @@ def make_pml(
     w=600,
     h=600,
     dpi=300,
+    light_count=1,
     molecule_buffer=2.0,
+    metal_scale=0.45,
+    stick_scale=0.1,
+    h_scale=0.13,
+    other_scale=0.2,
+    shiny_other=40,
+    shiny_metal=50,
+    reflect_other=0.1,
+    reflect_metal=0.2,
     stick_option="set stick_color, grey20",
     render=True,
 ):
@@ -1239,9 +1307,27 @@ def make_pml(
         height of the frame, by default 600
     dpi : int, optional
         dpi to render at, by default 300
+    light_count : int, optional
+        number of lights to add to scene, default 1.
     molecule_buffer : float, optional
         how much space to add around molecules from the edge of the frame
         increase if molecules are going off of the frame, by default 2.0
+    metal_scale : float, optional
+        metal sphere size, default 0.45
+    stick_scale : float, optional
+        stick size, default 0.1
+    h_scale : float, optional
+        hydrogen sphere size, default 0.13
+    other_scale : float, optional
+        other atom sphere size, default 0.2
+    shiny_metal : float, optional
+        shininess of the metal, default 50
+    shiny_other : float, optional
+        shininess of non-metals, default 40
+    reflect_metal : float, optional
+        reflectivity of the metals, default 0.2
+    reflect_other : float, optional
+        reflectivity of non-metals, default 0.1
     stick_option : str, optional
         stick options passed to pymol, by default 'set stick_color, grey20'
     render : bool, optional
@@ -1260,6 +1346,15 @@ def make_pml(
         render_name=render_name,
         stick_option=stick_option,
         molecule_buffer=molecule_buffer,
+        light_count=light_count,
+        metal_scale=metal_scale,
+        stick_scale=stick_scale,
+        h_scale=h_scale,
+        other_scale=other_scale,
+        shiny_metal=shiny_metal,
+        shiny_other=shiny_other,
+        reflect_metal=reflect_metal,
+        reflect_other=reflect_other,
         size_x=w,
         size_y=h,
         dpi=dpi,
