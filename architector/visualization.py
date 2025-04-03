@@ -1,14 +1,19 @@
 """
 Py3Dmol install: (works in both Python2/3 conda environments)
-conda install -c conda-forge py3dmol 
+conda install -c conda-forge py3dmol
 Some Documentation: https://pypi.org/project/py3Dmol/
 3DMol.js backend: http://3dmol.csb.pitt.edu/index.html
+
+pymol install:
+conda install -c conda-forge pymol-open-source
 
 Visualization routine for handling jupyter notebook use of architector.
 
 Normal modes code adapted from: https://github.com/duerrsimon/normal-mode-jupyter
 
 Developed by Michael Taylor
+
+pymol default rendering style by Thomas Summers.
 """
 
 import os
@@ -971,6 +976,7 @@ def view_structures(
         )
 
 
+# Many thanks to Thomas Summers for sharing his base style selection.
 pymol_python_template = """
 # Load molecule
 load {render_name}.mol2
