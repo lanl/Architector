@@ -270,6 +270,10 @@ def view_structures(
     pymol_reflect_other=0.1,
     pymol_molecule_buffer=2.0,
     pymol_stick_option="set stick_color, grey20",
+    pymol_tag_indices=[],
+    pymol_tag_radii=0.6,
+    pymol_tag_color='yellow',
+    pymol_tag_transparency=0.55,
     pymol_dont_render=False,
 ):
     """view_structures
@@ -399,6 +403,14 @@ def view_structures(
         increase if molecules are going off of the frame, by default 2.0
     pymol_stick_option : str, optional
         stick options passed to pymol, by default 'set stick_color, grey20'
+    pymol_tag_indices : list(int), optional
+        which indices to tag, default []
+    pymol_tag_radii : float, optional
+        radii of the tags, default 0.6
+    pymol_tag_color : str, optional
+        color of the tag, default "yellow"
+    pymol_tag_transparency : float, optional
+        transparency of the tag, default 0.55
     pymol_dont_render : bool, optional
         run pymol for rendering?, default False
     """
@@ -424,6 +436,48 @@ def view_structures(
                 labels = [str(x) for x in labels]
         else:
             raise ValueError("What sort of labels are wanting? Not recognized.")
+        if len(pymol_tag_indices) > 0:
+            if len(mols) == 1:  # Only 1 molecule.
+                # Test if array. If it is, keep the same. Otherwise make sublist.
+                if not isinstance(pymol_tag_indices[0], (list, np.ndarray)):
+                    pymol_tag_indices = [pymol_tag_indices]
+            else:
+                # Test if first element is list/array
+                if isinstance(pymol_tag_indices[0], (list, np.ndarray)):
+                    # If there's fewer lists than indices.
+                    if len(pymol_tag_indices) < len(mols):
+                        pymol_tag_indices = pymol_tag_indices + \
+                            [[]] * (len(mols) - len(pymol_tag_indices))
+                        print(
+                            '⚠️ Warning: Multiple molecules being rendered, but fewer tag indices flagged.\n'
+                            'I am filling out the rest of the indices with empty lists.\n'
+                            'If you want tags to apply to all use the format: \n'
+                            'view_structures(["CC","C"], render_pymol=True, \n'
+                            '                 pymol_tag_indices=[[0],[0]]\n'
+                            'As an example tagging the first carbon in each molecule.'
+                            )
+                    elif len(pymol_tag_indices) != len(mols):
+                        print(
+                            '⚠️ Warning: Multiple molecules being rendered, but more tag indices than molecules flagged.\n'
+                            'I am ignoring extra indices passed.\n'
+                            'If you want tags to apply to all use the format: \n'
+                            'view_structures(["CC","C"], render_pymol=True, \n'
+                            '                 pymol_tag_indices=[[0],[0]]\n'
+                            'As an example tagging the first carbon in each molecule.'
+                            )
+                else:  # Assume first element is a number.
+                    pymol_tag_indices = [pymol_tag_indices]
+                    pymol_tag_indices = pymol_tag_indices + \
+                        [[]] * (len(mols) - len(pymol_tag_indices))
+                    print(
+                        '⚠️ Warning: Multiple molecules being rendered, but nested list of tag_indices not passed.\n'
+                        'I am assuming the list should be passed to only the first molecule.\n'
+                        'I am filling out the rest of the indices with empty lists.\n'
+                        'If you want tags to apply to all use the format: \n'
+                        'view_structures(["CC","C"], render_pymol=True, \n'
+                        '                 pymol_tag_indices=[[0],[0]]\n'
+                        'As an example tagging the first carbon in each molecule.'
+                    )
         for i, mol in enumerate(mols):
             make_pml(
                 mol,
@@ -443,6 +497,10 @@ def view_structures(
                 reflect_metal=pymol_reflect_metal,
                 reflect_other=pymol_reflect_other,
                 stick_option=pymol_stick_option,
+                tag_indices=pymol_tag_indices[i],
+                tag_color=pymol_tag_color,
+                tag_radii=pymol_tag_radii,
+                tag_transparency=pymol_tag_transparency,
                 render=(not pymol_dont_render),
             )
     elif len(mols) == 1:
@@ -1078,6 +1136,8 @@ set sphere_scale, {metal_scale}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 set shininess, {shiny_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 set reflect, {reflect_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 
+{tag_section}
+
 # Set color space (CMYK doesn't affect atom colors, so this is optional)
 space cmyk
 
@@ -1270,6 +1330,55 @@ def get_next_version_filename(base_name, ext, directory="."):
     return f"{base_name}_v{next_version}"
 
 
+tag_template = """
+# Tag atom
+pseudoatom {tag_label}, pos={tag_posit}
+show spheres, {tag_label}
+color {tag_color}, {tag_label}
+set sphere_scale, {tag_radii}, {tag_label}
+set sphere_transparency, {tag_transparency}, {tag_label}
+
+"""
+
+
+def make_tag_section(
+                     molecule,
+                     tag_indices=[],
+                     tag_radii=0.6,
+                     tag_color='yellow',
+                     tag_transparency=0.55):
+    """create the tag section
+
+    molecule : architector molecule
+        molecule to add tags to.
+    tag_indices : list(int), optional
+        which indices to tag, default []
+    tag_radii : float, optional
+        radii of the tags, default 0.6
+    tag_color : str, optional
+        color of the tag, default "yellow"
+    tag_transparency : float, optional
+        transparency of the tag, default 0.55
+    """
+    out = ''
+    if len(tag_indices) > 0:
+        for i, ind in enumerate(tag_indices):
+            tag_label = 'tag_at' + str(i)
+            tag_posit = '[' + '{}, {}, {}'.format(
+                molecule.ase_atoms.positions[ind][0],
+                molecule.ase_atoms.positions[ind][1],
+                molecule.ase_atoms.positions[ind][2]
+            ) + ']'
+            out += tag_template.format(
+                tag_label=tag_label,
+                tag_posit=tag_posit,
+                tag_radii=tag_radii,
+                tag_color=tag_color,
+                tag_transparency=tag_transparency
+                )
+    return out
+
+
 def make_pml(
     molecule,
     render_name="0",
@@ -1287,6 +1396,10 @@ def make_pml(
     shiny_metal=50,
     reflect_other=0.1,
     reflect_metal=0.2,
+    tag_indices=[],
+    tag_radii=0.6,
+    tag_color='yellow',
+    tag_transparency=0.55,
     stick_option="set stick_color, grey20",
     render=True,
 ):
@@ -1342,6 +1455,13 @@ def make_pml(
         print("File exists, making new file/image with name: ", render_name)
     mol = convert_io_molecule(molecule)
     mol.write_mol2(str(pmpath / (render_name + ".mol2")))
+    tag_section = make_tag_section(
+        molecule=mol,
+        tag_indices=tag_indices,
+        tag_color=tag_color,
+        tag_radii=tag_radii,
+        tag_transparency=tag_transparency
+    )
     render_str = pymol_python_template.format(
         render_name=render_name,
         stick_option=stick_option,
@@ -1355,6 +1475,7 @@ def make_pml(
         shiny_other=shiny_other,
         reflect_metal=reflect_metal,
         reflect_other=reflect_other,
+        tag_section=tag_section,
         size_x=w,
         size_y=h,
         dpi=dpi,
