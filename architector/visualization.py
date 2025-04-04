@@ -478,6 +478,8 @@ def view_structures(
                         '                 pymol_tag_indices=[[0],[0]]\n'
                         'As an example tagging the first carbon in each molecule.'
                     )
+        else:
+            pymol_tag_indices = [[]] * len(mols)
         for i, mol in enumerate(mols):
             make_pml(
                 mol,
