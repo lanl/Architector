@@ -78,7 +78,7 @@ def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
     rings = OBmol.GetSSSR()
     is_cp = False
     for ring in rings:
-        if all(ring.IsInRing(x+1) for x in ligcoords) and (len(ligcoords) > 2) and (ring.IsAromatic()):
+        if all(ring.IsInRing(int(x+1)) for x in ligcoords) and (len(ligcoords) > 2) and (ring.IsAromatic()):
             is_cp = True
     total_edge_bound = 0  # Check for coordination atoms that are neighbors of each other.
     for i, ca1 in enumerate(ligcoords[:-1]):
