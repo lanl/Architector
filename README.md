@@ -1,5 +1,7 @@
 # Architector
 
+<img src="assets/architector_logo.svg" alt="Logo" width="400"/>
+
 Architector is a 3D chemical structure generation software package designed to take minimal 2D information about ligands and metal centers and generates chemically sensible 3D conformers and stereochemistry of the organometallic compounds.
 It is capable of high-throughput in-silico construction of s-, p-, d-, and f-block organometallic complexes. Architector represents a transformative step towards cross-periodic table computational design of metal complex chemistry.
 
