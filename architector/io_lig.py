@@ -53,6 +53,7 @@ import warnings
 
 warnings.filterwarnings("ignore")  # Supress numpy warnings.
 warnings.simplefilter("ignore", UserWarning)  # Supress SciPy warnings.
+warnings.simplefilter("default", category=UserWarning) # Supress SciPy warnings.
 
 # Conditional Numba import
 has_numba = True

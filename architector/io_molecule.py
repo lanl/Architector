@@ -72,9 +72,9 @@ def convert_io_molecule(
             mol2 = io_obabel.convert_obmol_mol2(obmol)
             mol.read_mol2(mol2, readstring=True)
         elif structure[-4:] == ".sdf":
-            with open(structure, 'r') as file1:
+            with open(structure, "r") as file1:
                 structure_str = file1.read()
-            if structure_str.count('$$$$') > 1:  # More than one molecule
+            if structure_str.count("$$$$") > 1:  # More than one molecule
                 sdfs = load_split_sdf(structure_str)
                 mols = []
                 for sdf in sdfs:
@@ -82,8 +82,7 @@ def convert_io_molecule(
                     mols.append(mol)
                 return mols
             else:
-                obmol = io_obabel.convert_sdf_obmol(structure,
-                                                    readstring=False)
+                obmol = io_obabel.convert_sdf_obmol(structure, readstring=False)
                 mol2 = io_obabel.convert_obmol_mol2(obmol)
                 mol.read_mol2(mol2, readstring=True)
         elif structure[-5:] == ".traj":  # Read in trajectory file.
@@ -185,19 +184,18 @@ def convert_io_molecule(
 
 
 def load_split_sdf(sdfstr):
-    """Split SDF into initial/final strings based on $$$$ delimiter
-    """
-    lines = sdfstr.split('\n')
+    """Split SDF into initial/final strings based on $$$$ delimiter"""
+    lines = sdfstr.split("\n")
     out_sdfs = []
     for i, line in enumerate(lines):
         if i == 0:
             out_sdfs.append([line])
-        elif '$$$$' in line:  # Molecule delimiter
+        elif "$$$$" in line:  # Molecule delimiter
             out_sdfs[-1].append(line)
             out_sdfs.append([])
         else:
             out_sdfs[-1].append(line)
-    return ['\n'.join(x)+'\n' for x in out_sdfs if len(x) > 1]
+    return ["\n".join(x) + "\n" for x in out_sdfs if len(x) > 1]
 
 
 def convert_ase_xyz(ase_atoms):
@@ -236,6 +234,114 @@ def convert_xyz_ase(structure_str):
         ase atoms to write to xyz string
     """
     return ase.io.read(StringIO(structure_str), format="xyz")
+
+
+def generate_unit_sphere(n_points):
+    """generate_unit_sphere
+    Generate uniform points around a unit sphere centered around (0,0,0)
+    Golden spiral method detailed:
+    https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere
+
+    Parameters
+    ----------
+    n_points : int
+        number of points
+
+    Returns
+    -------
+    xyz_triple : np.ndarray
+        xyz triples around unit sphere.
+    """
+
+    point_indices = np.arange(0, n_points, dtype=float) + 0.5
+    phi = np.arccos(1 - 2 * point_indices / n_points)
+    theta = np.pi * (1 + 5**0.5) * point_indices
+    x, y, z = (
+        np.cos(theta) * np.sin(phi),
+        np.sin(theta) * np.sin(phi),
+        np.cos(phi),
+    )
+    xyz_triple = np.stack([x, y, z], axis=1)
+    return xyz_triple
+
+
+def compute_neighbors(X, k=6):
+    """compute neighbors
+    find the k indices corresponding to 6 closest neighbors
+
+    Parameters
+    ----------
+    X : np.ndarray
+        nx3 array (usually coordinates)
+    k : int, optional
+        number of neighbors, by default 6
+
+    Returns
+    -------
+    neighbors : np.ndarray
+        nxk array of neighbors
+    """
+    # Compute pairwise squared distances
+    X_sq = np.sum(X**2, axis=1).reshape(-1, 1)  # (N, 1)
+    dist_sq = X_sq - 2 * (X @ X.T) + X_sq.T  # (N, N)
+    # To exclude self-distance, set diagonal to infinity
+    np.fill_diagonal(dist_sq, np.inf)
+    # Get indices of k smallest distances per row
+    neighbors = np.argsort(dist_sq, axis=1)[:, :k]  # (N, k)
+    return neighbors
+
+
+def find_patches(mask, neighbors, patch_neighbors=2, min_patch_size=10):
+    """find patches
+    take a mask and neighbors and find connected "patches" from there.
+
+    Parameters
+    ----------
+    mask : np.ndarray
+        (nx1) boolean array corresponding to if points are occluded or not.
+    neighbors : np.ndarray
+        (nxk) array of neighbors of points in mask
+    patch_neighbors : int, optional
+        number of neighbors needed to be a part of a "patch", by default 2
+    min_patch_size : int, optional
+        minimum patch size, by default 10
+
+    Returns
+    -------
+    patch_inds : np.ndarray
+        (nx1) array with 0s where not part of a patch, postive int tagged by patches.
+    """
+    # Initialize visited, patch_ids
+    N = len(mask)
+    visited = np.zeros(N, dtype=bool)
+    patch_ids = np.zeros(N, dtype=int)
+    current_patch = 1
+    for i in range(N):
+        if not mask[i] or visited[i]:
+            continue
+        # Start a new patch
+        stack = [i]
+        patch_members = []
+        while stack:
+            node = stack.pop()
+            if visited[node] or not mask[node]:
+                continue
+            # Count how many neighbors are also valid and not yet visited
+            valid_neighbors = [n for n in neighbors[node] if mask[n]]
+            if len(valid_neighbors) > patch_neighbors:
+                visited[node] = True
+                patch_members.append(node)
+                # Filter to only non-visited neighbors
+                valid_neighbors = [
+                    x for x in valid_neighbors if (not visited[x])
+                ]
+                stack.extend(valid_neighbors)
+        # If the patch has enough connectivity, assign patch ID
+        if len(patch_members) >= min_patch_size:
+            for idx in patch_members:
+                patch_ids[idx] = current_patch
+            current_patch += 1
+    return patch_ids
 
 
 class Molecule:
@@ -288,7 +394,7 @@ class Molecule:
         """
         self.dists_sane = True
         self.sanity_check_dict = {}
-        self.ase_constraints = {}   ### Add distance constraints here.
+        self.ase_constraints = {}  ### Add distance constraints here.
         self.actinides_swapped = False
         if isinstance(in_ase, ase.atoms.Atoms):
             self.ase_atoms = in_ase.copy()
@@ -301,7 +407,9 @@ class Molecule:
             self.actinides = actinides
             self.cell = cell
             if len(BO_dict) > 0:
-                self.graph = np.zeros((len(self.ase_atoms), len(self.ase_atoms)))
+                self.graph = np.zeros(
+                    (len(self.ase_atoms), len(self.ase_atoms))
+                )
                 for key, _ in self.BO_dict.items():
                     i = (
                         int(key[0]) - 1
@@ -321,7 +429,9 @@ class Molecule:
             self.xtb_charge = xtb_charge
             self.cell = cell
             if len(BO_dict) > 0:
-                self.graph = np.zeros((len(self.ase_atoms), len(self.ase_atoms)))
+                self.graph = np.zeros(
+                    (len(self.ase_atoms), len(self.ase_atoms))
+                )
                 for key, _ in self.BO_dict.items():
                     i = (
                         int(key[0]) - 1
@@ -384,7 +494,9 @@ class Molecule:
         if isinstance(in_ase, ase.atoms.Atoms):
             self.ase_atoms = in_ase.copy()
         else:
-            raise ValueError("Need ase.atoms.Atoms as input for molecule class!")
+            raise ValueError(
+                "Need ase.atoms.Atoms as input for molecule class!"
+            )
         self.BO_dict = BO_dict.copy()
         self.atom_types = atom_types
         self.actinides = [
@@ -404,7 +516,9 @@ class Molecule:
         if xtb_uhf is not None:
             self.xtb_uhf = xtb_uhf
         else:
-            self.xtb_uhf = int(np.sum(self.ase_atoms.get_initial_magnetic_moments()))
+            self.xtb_uhf = int(
+                np.sum(self.ase_atoms.get_initial_magnetic_moments())
+            )
         if xtb_charge is not None:
             self.xtb_charge = xtb_charge
         else:
@@ -412,7 +526,9 @@ class Molecule:
         if len(self.BO_dict) > 0:
             self.graph = np.zeros((len(self.ase_atoms), len(self.ase_atoms)))
             for key, _ in self.BO_dict.items():
-                i = int(key[0]) - 1  # BO Dict is 1-index (thanks to  OBmol/mol2 format)
+                i = (
+                    int(key[0]) - 1
+                )  # BO Dict is 1-index (thanks to  OBmol/mol2 format)
                 j = int(key[1]) - 1
                 self.graph[i, j] = 1
                 self.graph[j, i] = 1
@@ -434,8 +550,9 @@ class Molecule:
         outstring : str
             sdf file string
         """
-        tmpmol2 = self.write_mol2(filename=filename.strip('.sdf'),
-                                  writestring=True)
+        tmpmol2 = self.write_mol2(
+            filename=filename.strip(".sdf"), writestring=True
+        )
         outstring = io_obabel.mol2_to_sdf(tmpmol2)
         if writestring:
             return outstring
@@ -467,7 +584,10 @@ class Molecule:
         outstring = "{}\n\n".format(len(ase_atoms))
         for atom in ase_atoms:
             outstring += "{} {} {} {}\n".format(
-                atom.symbol, atom.position[0], atom.position[1], atom.position[2]
+                atom.symbol,
+                atom.position[0],
+                atom.position[1],
+                atom.position[2],
             )
         outstring = outstring.strip("\n")
         if writestring:
@@ -574,7 +694,9 @@ class Molecule:
         csg = csgraph_from_dense(self.graph)
         disjoint_components = connected_components(csg)
         if disjoint_components[0] > 1:
-            atom_group_names = ["RES" + str(x + 1) for x in disjoint_components[1]]
+            atom_group_names = [
+                "RES" + str(x + 1) for x in disjoint_components[1]
+            ]
             atom_groups = [str(x + 1) for x in disjoint_components[1]]
         else:
             atom_group_names = ["RES1"] * natoms
@@ -610,7 +732,9 @@ class Molecule:
             if atom.symbol != self.atom_types[i]:
                 atom_types_mol2 = self.atom_types[i]
             elif atom.symbol in list(atom_default_dict.keys()):
-                atom_types_mol2 = atom.symbol + "." + atom_default_dict[atom.symbol]
+                atom_types_mol2 = (
+                    atom.symbol + "." + atom_default_dict[atom.symbol]
+                )
             else:
                 atom_types_mol2 = atom.symbol
             type_ind = atom_types.index(atom.symbol)
@@ -672,7 +796,9 @@ class Molecule:
                     "1",
                     "1",
                 )
-            elif len(self.cell) == 8:  # abc,alphabetagamma and space group defined
+            elif (
+                len(self.cell) == 8
+            ):  # abc,alphabetagamma and space group defined
                 ss += "@<TRIPOS>CRYSIN\n"
                 ss += "{0:10.4f}{1:10.4f}{2:10.4f}{3:10.4f}{4:10.4f}{5:10.4f}{6:6d}{7:6d}\n".format(
                     self.cell[0],
@@ -732,7 +858,9 @@ class Molecule:
                 xtb_charge = int(line.split()[8])
             if ("<TRIPOS>BOND" in line) or ("<TRIPOS>UNITY_ATOM_ATTR" in line):
                 read_atoms = False
-            if ("<TRIPOS>SUBSTRUCTURE" in line) or ("<TRIPOS>UNITY_ATOM_ATTR" in line):
+            if ("<TRIPOS>SUBSTRUCTURE" in line) or (
+                "<TRIPOS>UNITY_ATOM_ATTR" in line
+            ):
                 read_bonds = False
                 read_atoms = False
             if read_atoms:
@@ -774,7 +902,9 @@ class Molecule:
                 s_line = line.split()
                 graph[int(s_line[1]) - 1, int(s_line[2]) - 1] = 1
                 graph[int(s_line[2]) - 1, int(s_line[1]) - 1] = 1
-                bo_dict[tuple(sorted([int(s_line[1]), int(s_line[2])]))] = s_line[3]
+                bo_dict[tuple(sorted([int(s_line[1]), int(s_line[2])]))] = (
+                    s_line[3]
+                )
             if read_cell:
                 s_line = line.split()
                 self.cell = [
@@ -796,7 +926,9 @@ class Molecule:
                 bo_dict = dict()
             if "<TRIPOS>CRYSIN" in line:
                 read_cell = True
-        if isinstance(graph, np.ndarray):  # Enforce mol2 molecular graph if it exists
+        if isinstance(
+            graph, np.ndarray
+        ):  # Enforce mol2 molecular graph if it exists
             self.graph = graph
             self.BO_dict = bo_dict
         else:
@@ -823,7 +955,9 @@ class Molecule:
             charge = np.sum(
                 [
                     io_ptable.metal_charge_dict[x]
-                    for x in np.array(self.ase_atoms.get_chemical_symbols())[metals]
+                    for x in np.array(self.ase_atoms.get_chemical_symbols())[
+                        metals
+                    ]
                 ]
             )
             mol2str = self.write_mol2("thing.mol2", writestring=True)
@@ -915,7 +1049,9 @@ class Molecule:
         if len(self.graph) > 0:
             self.graph = np.delete(np.delete(self.graph, ind, 0), ind, 1)
         del self.atom_types[ind]
-        BO_dict_tmp = {x: y for x, y in self.BO_dict.items() if (ind + 1 not in x)}
+        BO_dict_tmp = {
+            x: y for x, y in self.BO_dict.items() if (ind + 1 not in x)
+        }
         bo_dict_out = dict()
         for x, y in BO_dict_tmp.items():
             newx = []
@@ -942,7 +1078,9 @@ class Molecule:
     def remove_hydrogens(self):
         """remove hydrogens from the model"""
         hydrogens = [
-            i for i, x in enumerate(self.ase_atoms.get_atomic_numbers()) if x == 1
+            i
+            for i, x in enumerate(self.ase_atoms.get_atomic_numbers())
+            if x == 1
         ]
         for i in sorted(hydrogens)[::-1]:
             self.remove_atom(i)
@@ -996,7 +1134,9 @@ class Molecule:
         graph = np.zeros((len(self.ase_atoms), len(self.ase_atoms)))
         coords = self.ase_atoms.get_positions()
         # Calculate interatomic distances.
-        act_dist_mat = np.linalg.norm(coords[:, None, :] - coords[None, :, :], axis=-1)
+        act_dist_mat = np.linalg.norm(
+            coords[:, None, :] - coords[None, :, :], axis=-1
+        )
         delta_dist_mat = act_dist_mat - cutoff_dist_mat
         graph[np.where(delta_dist_mat < 0)] = 1
         graph = graph - np.eye(len(self.ase_atoms))
@@ -1039,7 +1179,9 @@ class Molecule:
         if len(self.BO_dict) > 0:
             self.graph = np.zeros((len(self.ase_atoms), len(self.ase_atoms)))
             for key, _ in self.BO_dict.items():
-                i = int(key[0]) - 1  # BO Dict is 1-index (thanks to  OBmol/mol2 format)
+                i = (
+                    int(key[0]) - 1
+                )  # BO Dict is 1-index (thanks to  OBmol/mol2 format)
                 j = int(key[1]) - 1
                 self.graph[i, j] = 1
                 self.graph[j, i] = 1
@@ -1084,7 +1226,9 @@ class Molecule:
         self.BO_dict.update(newligbodict)
         self.ase_atoms += lig_ase_atoms
         self.atom_types += lig_atom_types
-        if non_coordinating:  # Assume all these are additive without covalent bonds!
+        if (
+            non_coordinating
+        ):  # Assume all these are additive without covalent bonds!
             self.uhf += ligand["uhf"]
             self.charge += ligand["charge"]
             self.xtb_uhf += ligand["xtb_uhf"]
@@ -1166,13 +1310,19 @@ class Molecule:
                             for x in self.ase_atoms.get_atomic_numbers()
                         ]
                     )
-                    if (not (m_ind is None)) and (not (mrad is None)) and (not multi):
+                    if (
+                        (not (m_ind is None))
+                        and (not (mrad is None))
+                        and (not multi)
+                    ):
                         if mrad >= cov_radii[m_ind]:
                             cov_radii[m_ind] = mrad
                     for key, _ in self.BO_dict.items():
                         i = key[0] - 1
                         j = key[1] - 1
-                        if all_dists[i, j] > factor * (cov_radii[i] + cov_radii[j]):
+                        if all_dists[i, j] > factor * (
+                            cov_radii[i] + cov_radii[j]
+                        ):
                             sane = False
                             graph_dists_dict.update({"Cutoff": factor})
                             graph_dists_dict.update(
@@ -1184,7 +1334,8 @@ class Molecule:
                             if params.get("debug", False):
                                 print(
                                     "Graph distance long: ",
-                                    all_dists[i, j] / (cov_radii[i] + cov_radii[j]),
+                                    all_dists[i, j]
+                                    / (cov_radii[i] + cov_radii[j]),
                                 )
                             break
         self.dists_sane = sane
@@ -1228,13 +1379,17 @@ class Molecule:
             smallest_dist_cutoff = params.get(
                 "full_smallest_dist_cutoff", smallest_dist_cutoff
             )
-            min_dist_cutoff = params.get("full_min_dist_cutoff", min_dist_cutoff)
+            min_dist_cutoff = params.get(
+                "full_min_dist_cutoff", min_dist_cutoff
+            )
         elif len(params) > 0:
             run_check = params.get("assemble_sanity_checks", run_check)
             smallest_dist_cutoff = params.get(
                 "assemble_smallest_dist_cutoff", smallest_dist_cutoff
             )
-            min_dist_cutoff = params.get("assemble_min_dist_cutoff", min_dist_cutoff)
+            min_dist_cutoff = params.get(
+                "assemble_min_dist_cutoff", min_dist_cutoff
+            )
         if debug:
             params.update({"debug": debug})
         if isinstance(pair_cutoffs, dict):
@@ -1295,7 +1450,11 @@ class Molecule:
                     cov_radii = np.array(
                         [io_ptable.rcov1[x] for x in atoms.get_atomic_numbers()]
                     )
-                    if (not (m_ind is None)) and (not (mrad is None)) and (not multi):
+                    if (
+                        (not (m_ind is None))
+                        and (not (mrad is None))
+                        and (not multi)
+                    ):
                         cov_radii[m_ind] = mrad
                     for i in range(0, len(atoms)):
                         j_list = list(range(0, len(atoms)))
@@ -1320,7 +1479,9 @@ class Molecule:
                                     if params.get("debug", False):
                                         print(
                                             'Warning: pair distance cutoffs for "{}" not implemented'.format(
-                                                new_pair_dict.get("type", "None")
+                                                new_pair_dict.get(
+                                                    "type", "None"
+                                                )
                                             )
                                         )
                                         print(
@@ -1343,7 +1504,9 @@ class Molecule:
                                 )
                                 if params.get("debug", False):
                                     print("Dist short: ", all_dists[i, j])
-                        if min(i_dists) > min_dist_cutoff:  # Catch cases where atom
+                        if (
+                            min(i_dists) > min_dist_cutoff
+                        ):  # Catch cases where atom
                             # shot off metal center or blown up structure
                             sane = False
                             min_dist_dict.update({"Cutoff": min_dist_cutoff})
@@ -1384,7 +1547,9 @@ class Molecule:
             except:
                 det = np.linalg.det(tmpgraph / 100.0)
         if "e+" in str(det):
-            safedet = str(det).split("e+")[0][0:10] + "e+" + str(det).split("e+")[1]
+            safedet = (
+                str(det).split("e+")[0][0:10] + "e+" + str(det).split("e+")[1]
+            )
         else:
             safedet = str(det)[0:10]
         return safedet
@@ -1422,7 +1587,9 @@ class Molecule:
                     )
                 else:
                     mol2str = self.write_mol2("cool.mol2", writestring=True)
-                    tmol = io_obabel.convert_mol2_obmol(mol2str, readstring=True)
+                    tmol = io_obabel.convert_mol2_obmol(
+                        mol2str, readstring=True
+                    )
                     charge_vect[0] = tmol.GetTotalCharge()
 
         mol_charge = np.sum(charge_vect)
@@ -1446,7 +1613,9 @@ class Molecule:
                 if self.uhf is None:
                     syms = self.ase_atoms.get_chemical_symbols()
                     # If no metals -> uhf will start at 0
-                    uhf = np.sum([io_ptable.metal_spin_dict[syms[x]] for x in metals])
+                    uhf = np.sum(
+                        [io_ptable.metal_spin_dict[syms[x]] for x in metals]
+                    )
                 else:
                     uhf = self.uhf
             else:
@@ -1478,7 +1647,9 @@ class Molecule:
         ):
             xtb_uhf = uhf
         else:  # F in core assumes for a 3+ lanthanide there are 11 valence electrons (8 once the 3+ is taken into account)
-            even_odd_electrons = np.sum([atom.number for atom in self.ase_atoms])
+            even_odd_electrons = np.sum(
+                [atom.number for atom in self.ase_atoms]
+            )
             even_odd_electrons = (
                 even_odd_electrons
                 - io_ptable.elements.index(
@@ -1519,7 +1690,8 @@ class Molecule:
             syms = self.ase_atoms.get_chemical_symbols()
             ln_symbols = [syms[x] for x in self.actinides]
             an_symbols = [
-                io_ptable.actinides[io_ptable.lanthanides.index(x)] for x in ln_symbols
+                io_ptable.actinides[io_ptable.lanthanides.index(x)]
+                for x in ln_symbols
             ]
             for i, j in enumerate(self.actinides):
                 syms[j] = an_symbols[i]
@@ -1532,7 +1704,8 @@ class Molecule:
             syms = self.ase_atoms.get_chemical_symbols()
             an_symbols = [syms[x] for x in self.actinides]
             ln_symbols = [
-                io_ptable.lanthanides[io_ptable.actinides.index(x)] for x in an_symbols
+                io_ptable.lanthanides[io_ptable.actinides.index(x)]
+                for x in an_symbols
             ]
             for i, j in enumerate(self.actinides):
                 syms[j] = ln_symbols[i]
@@ -1640,7 +1813,9 @@ class Molecule:
                         self.ase_atoms.positions[neighs]
                         - self.ase_atoms.positions[metal_indx]
                     )
-                    act_geo_vect = calc_all_coord_atom_angles(coord_at_positions)
+                    act_geo_vect = calc_all_coord_atom_angles(
+                        coord_at_positions
+                    )
                     ref_geo_labels = geo_dict.cn_geo_dict[len(neighs)]
                     ref_geos = [
                         calc_all_coord_atom_angles(geo_dict.geometry_dict[x])
@@ -1651,13 +1826,19 @@ class Molecule:
                     ]  # Calc MAE loss between interatomic angles
                     sort_order = np.argsort(mae_losses)
                     m_geo_type = ref_geo_labels[np.argmin(mae_losses)]
-                    tmpdict["metal"] = self.ase_atoms.get_chemical_symbols()[metal_indx]
+                    tmpdict["metal"] = self.ase_atoms.get_chemical_symbols()[
+                        metal_indx
+                    ]
                     tmpdict["metal_ind"] = metal_indx
                     tmpdict["metal_geo_type"] = m_geo_type
-                    tmpdict["mae_angle_loss"] = mae_losses[np.argmin(mae_losses)]
+                    tmpdict["mae_angle_loss"] = mae_losses[
+                        np.argmin(mae_losses)
+                    ]
                     if len(sort_order) > 1:
                         tmpdict["confidence"] = (
-                            1 - tmpdict["mae_angle_loss"] / mae_losses[sort_order[1]]
+                            1
+                            - tmpdict["mae_angle_loss"]
+                            / mae_losses[sort_order[1]]
                         )
                     else:
                         tmpdict["confidence"] = 1
@@ -1665,7 +1846,9 @@ class Molecule:
                         ref_geo_labels[i]: mae_losses[i] for i in sort_order
                     }
                 else:
-                    tmpdict["metal"] = self.ase_atoms.get_chemical_symbols()[metal_indx]
+                    tmpdict["metal"] = self.ase_atoms.get_chemical_symbols()[
+                        metal_indx
+                    ]
                     tmpdict["metal_ind"] = metal_indx
                     tmpdict["metal_geo_type"] = len(neighs)
                 metal_center_geos.append(tmpdict)
@@ -1684,18 +1867,23 @@ class Molecule:
                     calc_all_coord_atom_angles(geo_dict.geometry_dict[x])
                     for x in ref_geo_labels
                 ]
-                mae_losses = [np.mean(np.abs(act_geo_vect - x)) for x in ref_geos]
+                mae_losses = [
+                    np.mean(np.abs(act_geo_vect - x)) for x in ref_geos
+                ]
                 sort_order = np.argsort(mae_losses)
                 m_geo_type = ref_geo_labels[np.argmin(mae_losses)]
-                metal_center_geos["metal"] = self.ase_atoms.get_chemical_symbols()[
-                    metal_indx
-                ]
+                metal_center_geos["metal"] = (
+                    self.ase_atoms.get_chemical_symbols()[metal_indx]
+                )
                 metal_center_geos["metal_ind"] = metal_indx
                 metal_center_geos["metal_geo_type"] = m_geo_type
-                metal_center_geos["mae_angle_loss"] = mae_losses[np.argmin(mae_losses)]
+                metal_center_geos["mae_angle_loss"] = mae_losses[
+                    np.argmin(mae_losses)
+                ]
                 if len(sort_order) > 1:
                     metal_center_geos["confidence"] = (
-                        mae_losses[sort_order[1]] - metal_center_geos["mae_angle_loss"]
+                        mae_losses[sort_order[1]]
+                        - metal_center_geos["mae_angle_loss"]
                     ) / mae_losses[sort_order[1]]
                 else:
                     metal_center_geos["confidence"] = 1
@@ -1703,9 +1891,9 @@ class Molecule:
                     ref_geo_labels[i]: mae_losses[i] for i in sort_order
                 }
             else:
-                metal_center_geos["metal"] = self.ase_atoms.get_chemical_symbols()[
-                    metal_indx
-                ]
+                metal_center_geos["metal"] = (
+                    self.ase_atoms.get_chemical_symbols()[metal_indx]
+                )
                 metal_center_geos["metal_ind"] = metal_indx
                 metal_center_geos["metal_geo_type"] = len(neighs)
             metal_center_geos = [metal_center_geos]
@@ -1802,20 +1990,26 @@ class Molecule:
                     con_atom_dists = distmat[met][con_atoms]
                     m_visited = False
                     for j, c in enumerate(con_atoms):
-                        for i, ind_set in enumerate(info_dict["original_lig_inds"]):
-                            if c in ind_set:  # Find ligand this atom belongs to.
+                        for i, ind_set in enumerate(
+                            info_dict["original_lig_inds"]
+                        ):
+                            if (
+                                c in ind_set
+                            ):  # Find ligand this atom belongs to.
                                 ind_in_ligand = np.where(ind_set == c)[0][0]
                                 ml_dist_dicts.append(
                                     {
                                         "atom_pair": (met, c),
                                         "bond_type": "explicit_bond",
                                         "smiles": ligsmiles[i],
-                                        "smiles_index": info_dict["mapped_smiles_inds"][
-                                            i
-                                        ][ind_in_ligand],
+                                        "smiles_index": info_dict[
+                                            "mapped_smiles_inds"
+                                        ][i][ind_in_ligand],
                                         "distance": con_atom_dists[j],
                                         "sum_cov_radii": io_ptable.rcov1[
-                                            io_ptable.elements.index(symbols[met])
+                                            io_ptable.elements.index(
+                                                symbols[met]
+                                            )
                                         ]
                                         + io_ptable.rcov1[
                                             io_ptable.elements.index(symbols[c])
@@ -1826,7 +2020,9 @@ class Molecule:
                                     }
                                 )
                                 index += 1
-                            elif (c in metals) and (c != met) and (not m_visited):
+                            elif (
+                                (c in metals) and (c != met) and (not m_visited)
+                            ):
                                 m_visited = True
                                 ml_dist_dicts.append(
                                     {
@@ -1836,7 +2032,9 @@ class Molecule:
                                         "smiles_index": None,
                                         "distance": con_atom_dists[j],
                                         "sum_cov_radii": io_ptable.rcov1[
-                                            io_ptable.elements.index(symbols[met])
+                                            io_ptable.elements.index(
+                                                symbols[met]
+                                            )
                                         ]
                                         + io_ptable.rcov1[
                                             io_ptable.elements.index(symbols[c])
@@ -1853,7 +2051,9 @@ class Molecule:
                                 distmat[met] < (np.max(con_atom_dists) + skin)
                             )[0]
                         else:
-                            other_close_atoms = np.where(distmat[met] < (radius))[0]
+                            other_close_atoms = np.where(
+                                distmat[met] < (radius)
+                            )[0]
                         other_close_atoms = np.array(
                             [
                                 x
@@ -1862,7 +2062,9 @@ class Molecule:
                             ]
                         )
                         if len(other_close_atoms) > 0:
-                            other_close_atom_dists = distmat[met][other_close_atoms]
+                            other_close_atom_dists = distmat[met][
+                                other_close_atoms
+                            ]
                             for j, c in enumerate(other_close_atoms):
                                 m_visited = False
                                 for i, ind_set in enumerate(
@@ -1871,7 +2073,9 @@ class Molecule:
                                     if (
                                         c in ind_set
                                     ):  # Find ligand this atom belongs to.
-                                        ind_in_ligand = np.where(ind_set == c)[0][0]
+                                        ind_in_ligand = np.where(ind_set == c)[
+                                            0
+                                        ][0]
                                         ml_dist_dicts.append(
                                             {
                                                 "atom_pair": (met, c),
@@ -1880,14 +2084,18 @@ class Molecule:
                                                 "smiles_index": info_dict[
                                                     "mapped_smiles_inds"
                                                 ][i][ind_in_ligand],
-                                                "distance": other_close_atom_dists[j],
+                                                "distance": other_close_atom_dists[
+                                                    j
+                                                ],
                                                 "sum_cov_radii": io_ptable.rcov1[
                                                     io_ptable.elements.index(
                                                         symbols[met]
                                                     )
                                                 ]
                                                 + io_ptable.rcov1[
-                                                    io_ptable.elements.index(symbols[c])
+                                                    io_ptable.elements.index(
+                                                        symbols[c]
+                                                    )
                                                 ],
                                                 "atom_symbols": "{}-{}".format(
                                                     symbols[met], symbols[c]
@@ -1896,7 +2104,9 @@ class Molecule:
                                         )
                                         index += 1
                                     elif (
-                                        (c in metals) and (c != met) and (not m_visited)
+                                        (c in metals)
+                                        and (c != met)
+                                        and (not m_visited)
                                     ):
                                         m_visited = True
                                         ml_dist_dicts.append(
@@ -1905,14 +2115,18 @@ class Molecule:
                                                 "bond_type": "implicit_bond",
                                                 "smiles": None,
                                                 "smiles_index": None,
-                                                "distance": other_close_atom_dists[j],
+                                                "distance": other_close_atom_dists[
+                                                    j
+                                                ],
                                                 "sum_cov_radii": io_ptable.rcov1[
                                                     io_ptable.elements.index(
                                                         symbols[met]
                                                     )
                                                 ]
                                                 + io_ptable.rcov1[
-                                                    io_ptable.elements.index(symbols[c])
+                                                    io_ptable.elements.index(
+                                                        symbols[c]
+                                                    )
                                                 ],
                                                 "atom_symbols": "{}-{}".format(
                                                     symbols[met], symbols[c]
@@ -1933,8 +2147,12 @@ class Molecule:
                             "sum_cov_radii": io_ptable.rcov1[
                                 io_ptable.elements.index(symbols[i0])
                             ]
-                            + io_ptable.rcov1[io_ptable.elements.index(symbols[i1])],
-                            "atom_symbols": "{}-{}".format(symbols[i0], symbols[i1]),
+                            + io_ptable.rcov1[
+                                io_ptable.elements.index(symbols[i1])
+                            ],
+                            "atom_symbols": "{}-{}".format(
+                                symbols[i0], symbols[i1]
+                            ),
                         }
                     )
             elif (atom_type_pairs is not None) and (len(metals) > 0):
@@ -1955,7 +2173,9 @@ class Molecule:
                                     if (
                                         c in ind_set
                                     ):  # Find ligand this atom belongs to.
-                                        ind_in_ligand = np.where(ind_set == c)[0][0]
+                                        ind_in_ligand = np.where(ind_set == c)[
+                                            0
+                                        ][0]
                                         ml_dist_dicts.append(
                                             {
                                                 "atom_pair": (t1, c),
@@ -1971,7 +2191,9 @@ class Molecule:
                                                     )
                                                 ]
                                                 + io_ptable.rcov1[
-                                                    io_ptable.elements.index(symbols[c])
+                                                    io_ptable.elements.index(
+                                                        symbols[c]
+                                                    )
                                                 ],
                                                 "atom_symbols": "{}-{}".format(
                                                     symbols[t1], symbols[c]
@@ -1994,7 +2216,9 @@ class Molecule:
                                                     )
                                                 ]
                                                 + io_ptable.rcov1[
-                                                    io_ptable.elements.index(symbols[c])
+                                                    io_ptable.elements.index(
+                                                        symbols[c]
+                                                    )
                                                 ],
                                                 "atom_symbols": "{}-{}".format(
                                                     symbols[t1], symbols[c]
@@ -2009,7 +2233,9 @@ class Molecule:
                                     if (
                                         c in ind_set
                                     ):  # Find ligand this atom belongs to.
-                                        ind_in_ligand = np.where(ind_set == c)[0][0]
+                                        ind_in_ligand = np.where(ind_set == c)[
+                                            0
+                                        ][0]
                                         ml_dist_dicts.append(
                                             {
                                                 "atom_pair": (t1, c),
@@ -2025,7 +2251,9 @@ class Molecule:
                                                     )
                                                 ]
                                                 + io_ptable.rcov1[
-                                                    io_ptable.elements.index(symbols[c])
+                                                    io_ptable.elements.index(
+                                                        symbols[c]
+                                                    )
                                                 ],
                                                 "atom_symbols": "{}-{}".format(
                                                     symbols[t1], symbols[c]
@@ -2048,7 +2276,9 @@ class Molecule:
                                                     )
                                                 ]
                                                 + io_ptable.rcov1[
-                                                    io_ptable.elements.index(symbols[c])
+                                                    io_ptable.elements.index(
+                                                        symbols[c]
+                                                    )
                                                 ],
                                                 "atom_symbols": "{}-{}".format(
                                                     symbols[t1], symbols[c]
@@ -2097,7 +2327,9 @@ class Molecule:
         for i, row in df.iterrows():
             if tuple(sorted(row["atom_pair"])) in visited_keys:
                 duplicates.append(row["atom_pair"])
-            elif row["atom_pair"][0] == row["atom_pair"][1]:  # Check for identical
+            elif (
+                row["atom_pair"][0] == row["atom_pair"][1]
+            ):  # Check for identical
                 duplicates.append(row["atom_pair"])
             else:
                 visited_keys.add(tuple(sorted(row["atom_pair"])))
@@ -2292,7 +2524,9 @@ class Molecule:
                 funct_coords = funct_mol.ase_atoms.get_positions()
                 funct_anums = funct_mol.ase_atoms.get_atomic_numbers()
 
-                funct_coords = funct_coords - funct_coords[functional_group_mol_ind]
+                funct_coords = (
+                    funct_coords - funct_coords[functional_group_mol_ind]
+                )
                 mol_coords = mol_coords - mol_coords[idx]
 
                 # rotate molecule to -z
@@ -2307,13 +2541,15 @@ class Molecule:
                 if len(funct_coords) > 1:
                     r = Rot.align_vectors(
                         np.array([[0.0, 0.0, 1.0]] * len(funct_coords)),
-                        funct_coords
+                        funct_coords,
                     )  # .reshape(1,-1))
                     funct_coords = r[0].apply(funct_coords) + np.array(
                         (0.0, 0.0, 2.0)
                     )  # Move to 2
                 else:
-                    funct_coords = np.array((0.0, 0.0, 2.0)).reshape(1, -1)  # Move to 2
+                    funct_coords = np.array((0.0, 0.0, 2.0)).reshape(
+                        1, -1
+                    )  # Move to 2
 
                 funct_mol.ase_atoms.set_positions(funct_coords)
 
@@ -2322,7 +2558,9 @@ class Molecule:
                 ]:  # Only if remove_hydrogens requested.
 
                     fg_hydrogens_inds = np.intersect1d(
-                        np.nonzero(funct_mol.graph[functional_group_mol_ind])[0],
+                        np.nonzero(funct_mol.graph[functional_group_mol_ind])[
+                            0
+                        ],
                         np.where(np.array(funct_anums) == 1)[0],
                     )
 
@@ -2344,7 +2582,8 @@ class Molecule:
 
                     # Distance from FG for molecule
                     mol_hydrogen_dists = np.linalg.norm(
-                        mol_coords[mol_hydrogens_inds] - np.array((0.0, 0.0, 2.0)),
+                        mol_coords[mol_hydrogens_inds]
+                        - np.array((0.0, 0.0, 2.0)),
                         axis=1,
                     )
                     # Distance from molecule for FG
@@ -2370,7 +2609,9 @@ class Molecule:
                     removed_indices += removed_inds
 
                     fg_delete_inds = sorted(
-                        fg_hydrogens_inds[fg_hydrogen_dists.argsort()[: bond_orders[i]]]
+                        fg_hydrogens_inds[
+                            fg_hydrogen_dists.argsort()[: bond_orders[i]]
+                        ]
                     )[::-1]
 
                     for j in fg_delete_inds:
@@ -2385,7 +2626,12 @@ class Molecule:
                     newkey = tuple(newkey)
                     newligbodict.update({newkey: val})
                 newligbodict.update(
-                    {(idx + 1, natoms + 1 + functional_group_mol_ind): bond_orders[i]}
+                    {
+                        (
+                            idx + 1,
+                            natoms + 1 + functional_group_mol_ind,
+                        ): bond_orders[i]
+                    }
                 )
 
                 self.ase_atoms += funct_mol.ase_atoms
@@ -2464,13 +2710,16 @@ class Molecule:
                 # rotate functional group to +z
                 if len(funct_coords) > 1:
                     r = Rot.align_vectors(
-                        np.array([[0.0, 0.0, 1.0]] * len(funct_coords)), funct_coords
+                        np.array([[0.0, 0.0, 1.0]] * len(funct_coords)),
+                        funct_coords,
                     )  # .reshape(1,-1))
                     funct_coords = r[0].apply(funct_coords) + np.array(
                         (0.0, 0.0, 2.0)
                     )  # Move to 2
                 else:
-                    funct_coords = np.array((0.0, 0.0, 2.0)).reshape(1, -1)  # Move to 2
+                    funct_coords = np.array((0.0, 0.0, 2.0)).reshape(
+                        1, -1
+                    )  # Move to 2
 
                 funct_mol.ase_atoms.set_positions(funct_coords)
 
@@ -2478,7 +2727,9 @@ class Molecule:
                 fg_delete_inds = []
 
                 for j, fg_mol_ind in enumerate(functional_group_mol_ind):
-                    if remove_hydrogens[j]:  # Only if removing hydrogens requested
+                    if remove_hydrogens[
+                        j
+                    ]:  # Only if removing hydrogens requested
                         fg_hydrogens_inds = np.intersect1d(
                             np.nonzero(funct_mol.graph[fg_mol_ind])[0],
                             np.where(np.array(funct_anums) == 1)[0],
@@ -2502,7 +2753,8 @@ class Molecule:
 
                         # Distance from FG for molecule
                         mol_hydrogen_dists = np.linalg.norm(
-                            mol_coords[mol_hydrogens_inds] - np.array((0.0, 0.0, 2.0)),
+                            mol_coords[mol_hydrogens_inds]
+                            - np.array((0.0, 0.0, 2.0)),
                             axis=1,
                         )
                         # Distance from molecule for FG
@@ -2515,7 +2767,14 @@ class Molecule:
                         ].tolist()
 
                         if (
-                            len([x for x in mol_del_inds if x in mol_delete_inds]) > 0
+                            len(
+                                [
+                                    x
+                                    for x in mol_del_inds
+                                    if x in mol_delete_inds
+                                ]
+                            )
+                            > 0
                         ):  # Repeated deleted hydrogen
                             mol_del_inds = [
                                 x
@@ -2530,10 +2789,13 @@ class Molecule:
                         ].tolist()
 
                         if (
-                            len([x for x in fg_del_inds if x in fg_delete_inds]) > 0
+                            len([x for x in fg_del_inds if x in fg_delete_inds])
+                            > 0
                         ):  # Repeated deleted hydrogen
                             fg_del_inds = [
-                                x for x in fg_hydrogens_inds if x not in fg_delete_inds
+                                x
+                                for x in fg_hydrogens_inds
+                                if x not in fg_delete_inds
                             ][: bond_orders[i][j]]
 
                         fg_delete_inds += fg_del_inds
@@ -2572,7 +2834,11 @@ class Molecule:
                     else:
                         tmpind = idx[j]
                     newligbodict.update(
-                        {(tmpind + 1, natoms + 1 + fg_mol_ind): bond_orders[i][j]}
+                        {
+                            (tmpind + 1, natoms + 1 + fg_mol_ind): bond_orders[
+                                i
+                            ][j]
+                        }
                     )
 
                 self.ase_atoms += funct_mol.ase_atoms
@@ -2614,7 +2880,9 @@ class Molecule:
                 fix_indices=freeze_indices,
                 trans_oxo_triples=self.detect_trans_oxos(),
             )
-            self.ase_atoms.set_positions(obmol_opt.mol.ase_atoms.get_positions())
+            self.ase_atoms.set_positions(
+                obmol_opt.mol.ase_atoms.get_positions()
+            )
         if xtb_opt:
             tmpmol = self.write_mol2("temp.mol2", writestring=True)
             obmol_opt = CalcExecutor(
@@ -2624,7 +2892,9 @@ class Molecule:
                 fix_indices=freeze_indices,
                 trans_oxo_triples=self.detect_trans_oxos(),
             )
-            self.ase_atoms.set_positions(obmol_opt.mol.ase_atoms.get_positions())
+            self.ase_atoms.set_positions(
+                obmol_opt.mol.ase_atoms.get_positions()
+            )
 
     def split_ligs(self):
         """Split the molecule into ligands with labelled information.
@@ -2711,7 +2981,9 @@ class Molecule:
         info_dict = self.split_ligs()
         coords = self.ase_atoms.get_positions()
         tcoords = coords - coords[info_dict.get("metal_ind")]
-        tmpmol = convert_io_molecule(self.write_mol2("tmp.mol2", writestring=True))
+        tmpmol = convert_io_molecule(
+            self.write_mol2("tmp.mol2", writestring=True)
+        )
         output_scans = []
         if info_dict.get("metal", None) is None:
             raise ValueError("Cannot Split when no metal center.")
@@ -2728,8 +3000,137 @@ class Molecule:
                     tmpmol.ase_atoms.set_positions(newcoords)
                     tmp_scan.append(
                         tmpmol.write_mol2(
-                            "DiscScan,Lig{},Step{}".format(i, j), writestring=True
+                            "DiscScan,Lig{},Step{}".format(i, j),
+                            writestring=True,
                         )
                     )
                 output_scans.append(tmp_scan)
         return output_scans
+
+    def get_asa(
+        self,
+        probe_radius=1.4,
+        n_points=500,
+        ind=None,
+        surf_scale=None,
+        return_patch_midpoints=False,
+    ):
+        """get_asa
+
+        calculate the available surface are on an atom.
+        by default it will look for single metal center.
+
+        Makes sure asa comprises of "patches" instead of isolated islands.
+        Possible to return the area of the patches as well.
+
+        initialially developed by Thomas Summers!
+
+        Parameters
+        ----------
+        probe_radius : float, optional
+            radius of probe to scan the surface, by default 1.4
+            from approximation of radius of water for ASA:
+            https://en.wikipedia.org/wiki/Accessible_surface_area
+        n_points : int, optional
+            number of points to sample on the surface, by default 500
+        ind : int, optional
+            index of atom to use, by default None
+        surf_scale : float, optional
+            scale of the surface beyond the atom identified to put a possible
+            next atom.
+            by default None, which will set new positions at the atom rcov1 +
+            average of [CNOPS] rcov1s.
+        return_patch_midpoints : bool, optional
+            get the midpoints of patches in order of size?, by default False
+
+        Returns
+        -------
+        out : tuple
+            if return_midpoints requested ->
+                (total_asa_ratio, total_asa,list(dict(patch asa info)))
+            else ->
+                (total_asa_ratio, total_asa)
+        """
+        if ind is None:
+            metals = self.find_metals()
+            if len(metals) > 1:
+                print(
+                    "Warning: more than one metal in complex, and no index passed."
+                    "skipping ASA calculation."
+                )
+                out = (None, None)
+                if return_patch_midpoints:
+                    out = (None, None, dict())
+                return out
+            else:
+                ind = metals[0]
+        if surf_scale is None:
+            elems = ["C", "N", "O", "P", "S"]
+            surf_scale = np.mean(
+                [io_ptable.rcov1[io_ptable.elements.index(x)] for x in elems]
+            )
+        atom_vdw_radii = np.vectorize(io_ptable.rvdw.__getitem__)(
+            self.ase_atoms.numbers
+        )
+        atom_cov_radii = np.vectorize(io_ptable.rcov1.__getitem__)(
+            self.ase_atoms.numbers
+        )
+        metal_surface = generate_unit_sphere(n_points)
+        surf_neighbors = compute_neighbors(metal_surface, k=6)
+        # scale unit sphere by (metal radius + probe + skin)
+        # skin so that all points on surface not tagged
+        metal_surface1 = metal_surface * (
+            atom_vdw_radii[ind] + probe_radius + 1e-5
+        )
+        # translate metal surface to metal xyz coords
+        smaller_surface = metal_surface * (atom_cov_radii[ind] + surf_scale)
+        metal_surface1 = metal_surface1 + self.ase_atoms.positions[ind]
+        smaller_surface = smaller_surface + self.ase_atoms.positions[ind]
+        # Caclulate distances from coordinates to the metal surface.
+        distances = np.linalg.norm(
+            self.ase_atoms.positions[:, None, :] - metal_surface1[None, :, :],
+            axis=-1,
+        )
+        distances = distances - (atom_vdw_radii + probe_radius)[:, None]
+        # Find metal surface points that are not below any of the atom vdw surfaces.
+        exposed_bool = np.min(distances, axis=0) > 0
+        # Make sure these are contiguous patches
+        # Min patch size is a 50th of the number of points requested.
+        # Make sure a point has 2 or more neighbors
+        # that are also unexposed.
+        exposed_patches = find_patches(
+            exposed_bool,
+            surf_neighbors,
+            patch_neighbors=2,
+            min_patch_size=int(n_points / 50),
+        )
+        new_exposed_bool = np.zeros(n_points)
+        new_exposed_bool[np.where(exposed_patches != 0)[0]] = 1
+        total_area = 4 * np.pi * (atom_vdw_radii[ind] + probe_radius) ** 2
+        metal_asa = (sum(new_exposed_bool) / n_points) * total_area
+        asa_ratio = sum(new_exposed_bool) / n_points
+        if return_patch_midpoints:
+            patch_ns, counts = np.unique(
+                exposed_patches[exposed_patches > 0], return_counts=True
+            )
+            order = np.argsort(counts)[::-1]  # Largest to smallest
+            patch_ns = patch_ns[order]
+            counts = counts[order]
+            midpoints = []
+            for i, pn in enumerate(patch_ns):
+                sa_ratio = counts[i] / n_points
+                sa = sa_ratio * total_area
+                points = smaller_surface[np.where(exposed_patches == pn)[0]]
+                centroid = np.mean(points, axis=0)
+                dists = np.linalg.norm(points - centroid, axis=1)
+                ind = np.argmin(dists)
+                midpoints.append(
+                    {
+                        "patch_asa": sa,
+                        "patch_asa_ratio": sa_ratio,
+                        "patch_midpoint": points[ind],
+                    }
+                )
+            return (asa_ratio, metal_asa, midpoints)
+        else:
+            return (asa_ratio, metal_asa)
