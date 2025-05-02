@@ -427,7 +427,7 @@ class Geometries:
 
         # For higher denticity ligands set them to
         # all possible combinations of locations
-        for dent in [10, 11, 12]:
+        for dent in [10, 11, 12, 13]:
             labels.append(str(dent))
             cn_min = dent
             outdict = dict()

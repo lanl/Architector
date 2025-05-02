@@ -837,7 +837,7 @@ def build_complex_driver(inputDict1):
                     ],
                     "metal_center_confidence": structs[i].complexMol.metal_center_geos[
                         0
-                    ]["confidence"],
+                    ].get("confidence",1),
                     "mol2string": mol2strings[i],
                     "init_mol2string": init_mol2strings[i],
                     "energy_sorted_index": energy_sorted_inds[i],

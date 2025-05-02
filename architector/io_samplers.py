@@ -48,7 +48,7 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
     mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
     init_ase = convert_io_molecule(mol2).ase_atoms
     relaxed_atoms = relaxed_mol.ase_atoms
-    skip_n = int(warm_up/interval) 
+    skip_n = int(warm_up/interval)
     good = True
     displaced_structures = []
     energies = []

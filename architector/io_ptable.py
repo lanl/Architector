@@ -626,6 +626,10 @@ ligands_dict = {
 'bisdimethylphosphinesulfidemethane':{'smiles':'CP(C)(=S)CP(C)(C)=S','coordList':[3,8],'ligType':'bi_cis'},
 'bisdimethylphosphineselenidemethane':{'smiles':'CP(C)(=[Se])CP(C)(C)=[Se]','coordList':[3,8],'ligType':'bi_cis'},
 'bisdimethylphosphineteluridemethane':{'smiles':'CP(C)(=[Te])CP(C)(C)=[Te]','coordList':[3,8],'ligType':'bi_cis'},
+'macropa':{
+    'smiles':'O=C([O-])C1=NC(CN2CCOCCOCCN(CC3=NC(C([O-])=O)=CC=C3)CCOCCOCC2)=CC(N)=C1',
+    'coordList':[7,10,13,16,29,32,4,19,2,22]
+    }
 }
 
 

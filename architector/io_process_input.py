@@ -89,7 +89,7 @@ def assign_ligType_default(core_geo_class, ligsmiles, ligcoords, metal,
                 total_edge_bound += 1
     if is_cp:
         return 'sandwich'
-    elif len(ligcoords) > 9:  # 10-12 are saved under these monikers.
+    elif len(ligcoords) > 9:  # 10-13 are saved under these monikers.
         return str(len(ligcoords))
     elif len(ligcoords) == 1:
         return 'mono'
@@ -223,7 +223,7 @@ def assign_ligType_bruteforce(core_geo_class, ligsmiles, ligcoords, metal,
                 total_edge_bound += 1
     if is_cp:
         return 'sandwich'
-    elif len(ligcoords) > 9:  # 10-12 are saved under these monikers.
+    elif len(ligcoords) > 9:  # 10-13 are saved under these monikers.
         return str(len(ligcoords))
     elif len(ligcoords) == 1:
         return 'mono'
