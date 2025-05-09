@@ -8,10 +8,10 @@ Adapted by Michael Taylor
 
 Adapted from:
 
-[1] J. M. Blaney and J. S. Dixon, "Distance Geometry in Molecular Modeling", 
+[1] J. M. Blaney and J. S. Dixon, "Distance Geometry in Molecular Modeling",
                                  in Reviews in Computational Chemistry, VCH (1994)
 
-[2] G. Crippen and T. F. Havel, "Distance Geometry and Molecular Conformation", 
+[2] G. Crippen and T. F. Havel, "Distance Geometry and Molecular Conformation",
                                   in Chemometrics Research Studies Series, Wiley (1988)
 With concepts from:
 
@@ -25,9 +25,9 @@ import itertools
 import scipy
 import architector.io_ptable as io_ptable
 import architector.io_molecule as io_molecule
+import architector.io_align_mol as io_align_mol
 import architector.io_obabel as io_obabel
 import architector.arch_context_manage as arch_context_manage
-
 
 from openbabel import openbabel
 from scipy import optimize
@@ -53,7 +53,6 @@ import warnings
 
 warnings.filterwarnings("ignore")  # Supress numpy warnings.
 warnings.simplefilter("ignore", UserWarning)  # Supress SciPy warnings.
-warnings.simplefilter("default", category=UserWarning) # Supress SciPy warnings.
 
 # Conditional Numba import
 has_numba = True
@@ -262,7 +261,8 @@ def get_bounds_matrix(
     )
     distmat = np.sqrt(
         np.sum(
-            (allcoords[:, np.newaxis, :] - allcoords[np.newaxis, :, :]) ** 2, axis=-1
+            (allcoords[:, np.newaxis, :] - allcoords[np.newaxis, :, :]) ** 2,
+            axis=-1,
         )
     )
 
@@ -271,17 +271,23 @@ def get_bounds_matrix(
     if not isCp:
         next_neighs = np.where(depth[dummy_idx] == 2)[0]
     else:
-        tcp = [x for x in catoms if x not in cp_catoms]  # Pull out non-cp ring coords
+        tcp = [
+            x for x in catoms if x not in cp_catoms
+        ]  # Pull out non-cp ring coords
         for i, catom in enumerate(tcp):
             next_neigh = np.nonzero(np.ravel(molgraph[catom]))[0]
             new_neighs = [
-                x for x in next_neigh if (x not in next_neighs) and (x not in catoms)
+                x
+                for x in next_neigh
+                if (x not in next_neighs) and (x not in catoms)
             ]
             next_neighs += new_neighs
         for i, catom in enumerate(cp_catoms):
             next_neigh = np.nonzero(np.ravel(molgraph[catom]))[0]
             new_neighs = [
-                x for x in next_neigh if (x not in cpneighs) and (x not in catoms)
+                x
+                for x in next_neigh
+                if (x not in cpneighs) and (x not in catoms)
             ]
             cpneighs += new_neighs
 
@@ -340,10 +346,18 @@ def get_bounds_matrix(
                         + ml_dists[j] ** 2
                         - 2 * ml_dists[i] * ml_dists[j] * np.cos(theta)
                     )
-                    UB[catoms[i], catoms[j]] = lig_distance * (1 + ca_angle_tol)
-                    UB[catoms[j], catoms[i]] = lig_distance * (1 + ca_angle_tol)
-                    LB[catoms[i], catoms[j]] = lig_distance * (1 - ca_angle_tol)
-                    LB[catoms[j], catoms[i]] = lig_distance * (1 - ca_angle_tol)
+                    UB[catoms[i], catoms[j]] = lig_distance * (
+                        1 + ca_angle_tol
+                    )
+                    UB[catoms[j], catoms[i]] = lig_distance * (
+                        1 + ca_angle_tol
+                    )
+                    LB[catoms[i], catoms[j]] = lig_distance * (
+                        1 - ca_angle_tol
+                    )
+                    LB[catoms[j], catoms[i]] = lig_distance * (
+                        1 - ca_angle_tol
+                    )
         elif len(catoms) > 1:  # Set to broad range
             for i in range(len(catoms[:-1])):
                 for j in range(i + 1, len(catoms)):
@@ -356,8 +370,12 @@ def get_bounds_matrix(
                     )
                     UB[catoms[i], catoms[j]] = vdwradii[-1] * 3
                     UB[catoms[j], catoms[i]] = vdwradii[-1] * 3
-                    LB[catoms[i], catoms[j]] = vdw_summat[catoms[i], catoms[j]] * 0.7
-                    LB[catoms[j], catoms[i]] = vdw_summat[catoms[i], catoms[j]] * 0.7
+                    LB[catoms[i], catoms[j]] = (
+                        vdw_summat[catoms[i], catoms[j]] * 0.7
+                    )
+                    LB[catoms[j], catoms[i]] = (
+                        vdw_summat[catoms[i], catoms[j]] * 0.7
+                    )
 
         # Adding depth (graph distance) from the metal constraints!
         m_depth = depth[-1]
@@ -368,10 +386,14 @@ def get_bounds_matrix(
                 i in cpneighs
             ):  # Don't force nearest neighbors quite so far away for cp ligands
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 0.9 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 0.9
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 0.9 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 0.9
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 10
                 UB[j, i] = 10
@@ -379,10 +401,14 @@ def get_bounds_matrix(
                 anums[i] != 1
             ):  # Make next nearest neighbors longer than vdwrad sum.
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.2 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.2
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.2 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.2
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 20
                 UB[j, i] = 20
@@ -390,10 +416,14 @@ def get_bounds_matrix(
                 anums[i] == 1
             ):  # Make next nearest hydrogen neighbors a little closer
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 20
                 UB[j, i] = 20
@@ -403,10 +433,14 @@ def get_bounds_matrix(
                 anums[i] != 1
             ):  # Encourage further away conformers.
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.3 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.3
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.3 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.3
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 50
                 UB[j, i] = 50
@@ -414,40 +448,56 @@ def get_bounds_matrix(
                 anums[i] == 1
             ):  # Encourage further away conformers.
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 50
                 UB[j, i] = 50
             # Allow closer atoms for huge lanthanides
             elif (m_depth[i] >= 4) and (anums[j] > 56):
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.2 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.2
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.2 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.2
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 100
                 UB[j, i] = 100  # Set upper bound very high
             # Force non-hydrogens further away at greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] != 1):
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.5 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.5
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.5 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.5
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 100
                 UB[j, i] = 100  # Set upper bound very high
             # Force hydrogens not so far away for greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] == 1):
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.3 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.3
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.3 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.3
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 100
                 UB[j, i] = 100  # Set upper bound very high
@@ -468,10 +518,14 @@ def get_bounds_matrix(
                 anums[i] != 1
             ):  # Make next nearest neighbors longer than vdwrad sum.
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.0 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.0
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.0 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.0
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 20
                 UB[j, i] = 20
@@ -479,10 +533,14 @@ def get_bounds_matrix(
                 anums[i] == 1
             ):  # Make next nearest hydrogen neighbors a little closer
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.0 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.0
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.0 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.0
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 20
                 UB[j, i] = 20
@@ -492,10 +550,14 @@ def get_bounds_matrix(
                 anums[i] != 1
             ):  # Encourage further away conformers.
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 50
                 UB[j, i] = 50
@@ -503,40 +565,56 @@ def get_bounds_matrix(
                 anums[i] == 1
             ):  # Encourage further away conformers.
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.1 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.1
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 50
                 UB[j, i] = 50
             # Allow closer atoms for huge lanthanides
             elif (m_depth[i] >= 4) and (anums[j] > 56):
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.2 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.2
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.2 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.2
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 100
                 UB[j, i] = 100  # Set upper bound very high
             # Force non-hydrogens further away at greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] != 1):
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.5 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.5
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.5 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.5
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 100
                 UB[j, i] = 100  # Set upper bound very high
             # Force hydrogens not so far away for greater graph depths
             elif (m_depth[i] >= 4) and (anums[i] == 1):
                 LB[i, j] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.3 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.3
+                    * metal_center_lb_multiplier
                 )
                 LB[j, i] = (
-                    (vdwradii[i] + vdwradii[j]) * 1.3 * metal_center_lb_multiplier
+                    (vdwradii[i] + vdwradii[j])
+                    * 1.3
+                    * metal_center_lb_multiplier
                 )
                 UB[i, j] = 100
                 UB[j, i] = 100  # Set upper bound very high
@@ -826,7 +904,9 @@ def get_ideal_angles(ligating_coords, metal_coords=np.array((0, 0, 0))):
     if len(ligating_coords) > 1:
         inds = list(range(len(ligating_coords)))
         for i, j in itertools.combinations(inds, 2):
-            val = calc_angle(ligating_coords[i], metal_coords, ligating_coords[j])
+            val = calc_angle(
+                ligating_coords[i], metal_coords, ligating_coords[j]
+            )
             angles_out[i, j] = val
             angles_out[j, i] = val
     angles_out[0, 0] = 0
@@ -883,12 +963,16 @@ def detect_cps(OBMol, ligcoordList):
                 for ring in rings:
                     if all(ring.IsInRing(x + 1) for x in tcord_list):
                         cp_rings.append(tcord_list)
-                        shared_coords.append([int(x) for x in shared.split(",")])
+                        shared_coords.append(
+                            [int(x) for x in shared.split(",")]
+                        )
         else:
             # Flag sets of coordination indices
             rings = OBMol.GetSSSR()
             for ring in rings:
-                if all([ring.IsInRing(int(x) + 1) for x in multiflag_lig_coords]):
+                if all(
+                    [ring.IsInRing(int(x) + 1) for x in multiflag_lig_coords]
+                ):
                     cp_rings.append(multiflag_lig_coords)
                     shared_coords.append(
                         [int(x) for x in shared_coord_indices[0].split(",")]
@@ -996,7 +1080,9 @@ def manage_cps(
             newbasis_vect / np.linalg.norm(newbasis_vect) * scaledist
         )  # Push back out
         cp_ring_coords = allcoords[cp_ring_inds]
-        centroid, normal = find_best_plane_n_points(cp_ring_coords)  # Rotate to X axis
+        centroid, normal = find_best_plane_n_points(
+            cp_ring_coords
+        )  # Rotate to X axis
         cp_ring_coords = cp_ring_coords - centroid
         r = Rot.align_vectors(
             np.array((1.0, 0.0, 0.0)).reshape(1, -1), normal.reshape(1, -1)
@@ -1008,7 +1094,8 @@ def manage_cps(
 
         # Rotate centroid to the new basis position
         r1 = Rot.align_vectors(
-            newbasis_vect.reshape(1, -1), np.array((scaledist, 0.0, 0.0)).reshape(1, -1)
+            newbasis_vect.reshape(1, -1),
+            np.array((scaledist, 0.0, 0.0)).reshape(1, -1),
         )
         # Rotate all coordinates to area around new basis position
         new_core_coords = r1[0].apply(rot_cp_ring_coords)
@@ -1172,7 +1259,8 @@ def clean_conformation_ff(
         refdict = get_oxo_refdict()
         bondls = float(refdict.get(msym, refdict.get("Others", None)))
         bondls = bondls * (
-            io_ptable.rcov1[io_ptable.elements.index(msym)] + io_ptable.rcov1[8]
+            io_ptable.rcov1[io_ptable.elements.index(msym)]
+            + io_ptable.rcov1[8]
         )
         oxo = True
     else:
@@ -1200,15 +1288,20 @@ def clean_conformation_ff(
         if has_dist_constraints:
             if debug:
                 print(
-                    "Adding m-ligand distance constraints:", ca_metal_dist_constraints
+                    "Adding m-ligand distance constraints:",
+                    ca_metal_dist_constraints,
                 )
             for key, val in ca_metal_dist_constraints.items():
-                constr.AddDistanceConstraint(int(key) + 1, last_atom_index, float(val))
+                constr.AddDistanceConstraint(
+                    int(key) + 1, last_atom_index, float(val)
+                )
         if edge_ligand:
             if debug:
                 print("Edge-ligand, freezing Coordinating Atoms from DG!")
             for ca in catoms:
-                constr.AddAtomConstraint(int(ca + 1))  # Freeze coordinating atoms
+                constr.AddAtomConstraint(
+                    int(ca + 1)
+                )  # Freeze coordinating atoms
         s = ff.Setup(OBMol, constr)
         if not s:
             if debug:
@@ -1219,7 +1312,9 @@ def clean_conformation_ff(
                 ff.SteepestDescent(10)
                 ff.ConjugateGradients(10)
             ff.GetCoordinates(OBMol)
-            if add_hydrogens:  # Add hydrogens back only after initial optimization
+            if (
+                add_hydrogens
+            ):  # Add hydrogens back only after initial optimization
                 OBMol.AddHydrogens()
                 constr = openbabel.OBFFConstraints()
                 ff = openbabel.OBForceField.FindForceField("UFF")
@@ -1227,7 +1322,10 @@ def clean_conformation_ff(
                 # Oxo set distance based on CSD
                 if oxo and (not has_dist_constraints):
                     if debug:
-                        print("Adding oxo constraints to ligand generation!", bondls)
+                        print(
+                            "Adding oxo constraints to ligand generation!",
+                            bondls,
+                        )
                     constr.AddDistanceConstraint(1, 2, bondls)
                 if has_dist_constraints:
                     if debug:
@@ -1264,7 +1362,9 @@ def clean_conformation_ff(
                 and (len(catoms) > 1)
             ):
                 if debug:
-                    print("Finished initial UFF relaxation without angle constraints.")
+                    print(
+                        "Finished initial UFF relaxation without angle constraints."
+                    )
                 ff = openbabel.OBForceField.FindForceField("UFF")
                 constr = openbabel.OBFFConstraints()
                 constr.AddAtomConstraint(int(last_atom_index))
@@ -1292,7 +1392,9 @@ def clean_conformation_ff(
                 print("Never Finished UFF relaxation.")
     else:
         tligcoordList = ligcoordList.copy()
-        if add_hydrogens:  # Re-add hydrogens after generation and UFF relaxation.
+        if (
+            add_hydrogens
+        ):  # Re-add hydrogens after generation and UFF relaxation.
             OBMol.AddHydrogens()
     ########## Second stage of cleaning removes the metal - MMFF94 #################
     #### Uses constraints on the bonding atoms to ensure the binding conformation is maintained
@@ -1309,11 +1411,15 @@ def clean_conformation_ff(
         smiobmol = io_obabel.get_obmol_smiles(ligsmiles, build=False)
         cansmi = io_obabel.get_smiles_obmol(smiobmol, canonicalize=True)
         smiobmol1 = io_obabel.get_obmol_smiles(cansmi, build=False)
-        smi_symmetry = io_obabel.get_stereo_label(smiobmol1, tetrahedral=True, ct=False)
+        smi_symmetry = io_obabel.get_stereo_label(
+            smiobmol1, tetrahedral=True, ct=False
+        )
 
         out_cansmi = io_obabel.get_smiles_obmol(OBMol, canonicalize=True)
         out_obmol = io_obabel.get_obmol_smiles(out_cansmi, build=False)
-        out_symmetry = io_obabel.get_stereo_label(out_obmol, tetrahedral=True, ct=False)
+        out_symmetry = io_obabel.get_stereo_label(
+            out_obmol, tetrahedral=True, ct=False
+        )
 
         match_symmetry = smi_symmetry == out_symmetry
         if debug:
@@ -1385,9 +1491,9 @@ def clean_conformation_ff(
         ase_atoms_tmp = set_XTB_calc(ase_atoms_tmp)
         try:  # Optimize structure with GFNFF
             with arch_context_manage.make_temp_directory() as _:
-                dyn = BFGSLineSearch(ase_atoms_tmp,
-                                     master=True,
-                                     logfile='tmp.log')
+                dyn = BFGSLineSearch(
+                    ase_atoms_tmp, master=True, logfile="tmp.log"
+                )
                 dyn.run(fmax=0.1, steps=1000)
         except Exception as e:
             if debug:
@@ -1437,9 +1543,13 @@ def set_position_align(
     conformerMolCpy = ase_atoms.copy()
     init_posits = conformerMolCpy.get_positions()
     fail = np.any(np.isnan(init_posits))  # Check for any nan in positions.
-    if any([True for val in ligcoordList if isinstance(val[1], list)]) and (not fail):
+    if any([True for val in ligcoordList if isinstance(val[1], list)]) and (
+        not fail
+    ):
         ### NOTE CURRENTLY ASSUMES ONLY ONE CP LIGAND in Multi-orientation styling
-        shared = [val[1] for val in ligcoordList if isinstance(val[1], list)][0]
+        shared = [val[1] for val in ligcoordList if isinstance(val[1], list)][
+            0
+        ]
         cp_ring_inds = np.array(
             [val[0] for val in ligcoordList if isinstance(val[1], list)]
         )
@@ -1448,7 +1558,9 @@ def set_position_align(
         for s in shared:
             newbasis_vect += np.array(corecoordList[s])
         cp_ring_coords = init_posits[cp_ring_inds]
-        centroid, normal = find_best_plane_n_points(cp_ring_coords)  # Rotate to X axis
+        centroid, normal = find_best_plane_n_points(
+            cp_ring_coords
+        )  # Rotate to X axis
         scaledist = np.linalg.norm(centroid)
         newbasis_vect = (
             newbasis_vect / np.linalg.norm(newbasis_vect) * scaledist
@@ -1462,7 +1574,8 @@ def set_position_align(
             rot_cp_ring_coords[:, 0] + scaledist
         )  # Shift out to new distance
         r1 = Rot.align_vectors(
-            newbasis_vect.reshape(1, -1), np.array((scaledist, 0.0, 0.0)).reshape(1, -1)
+            newbasis_vect.reshape(1, -1),
+            np.array((scaledist, 0.0, 0.0)).reshape(1, -1),
         )
         newposits = r1[0].apply(
             rot_cp_ring_coords
@@ -1474,11 +1587,15 @@ def set_position_align(
         sane = temp_mol.dists_sane
         minval = 1  # Set to 1 to not bias any conformers.
     elif not fail:
-        con_inds = np.array([val[1] for val in ligcoordList])  # Coordination indices
+        con_inds = np.array(
+            [val[1] for val in ligcoordList]
+        )  # Coordination indices
         ideal = np.array(
             [np.asarray(corecoordList[val[1]]) for val in ligcoordList]
         )  # Ideal positions to fit to
-        actual = np.array([np.asarray(init_posits[val[0]]) for val in ligcoordList])
+        actual = np.array(
+            [np.asarray(init_posits[val[0]]) for val in ligcoordList]
+        )
         if len(ideal) > 2:
             # Add reflection planes in case of mirrored molecule generated
             mirrors = [[1, 1, 1], [-1, 1, 1]]  # Add mirror vectors
@@ -1504,7 +1621,10 @@ def set_position_align(
             ) or isCp:  # Take combinations of coordinating atoms to try and maximize overlap with coordination sites.
                 inds = np.arange(0, len(ideal), 1)
                 orderings = np.array(
-                    [np.array(x) for x in itertools.permutations(inds, len(inds))]
+                    [
+                        np.array(x)
+                        for x in itertools.permutations(inds, len(inds))
+                    ]
                 )
                 if len(orderings) > 100:
                     ordering_inds = np.random.choice(
@@ -1565,7 +1685,9 @@ def set_position_align(
         if len(con_inds) == 1:
             con_ind = con_inds[0]
             con_atom_posit = newposits[con_ind]
-            actual = newposits - con_atom_posit  # Center coordinates at con atom
+            actual = (
+                newposits - con_atom_posit
+            )  # Center coordinates at con atom
             new_ideal = np.array(
                 (ideal.flatten()).tolist()
             )  # Rotate to angle minimizing deviation from metal-coord atom line.
@@ -1586,7 +1708,9 @@ def set_position_align(
             axis = ideal.sum(
                 axis=0
             ).flatten()  # Take the sum of the vectors to be the rotation axis
-            axis = axis / np.linalg.norm(axis)  # Normalize for rotation around axis
+            axis = axis / np.linalg.norm(
+                axis
+            )  # Normalize for rotation around axis
             ivect = np.array([axis for x in range(len(newposits))])
             angle_rot = Rot.from_rotvec(ivect * rot_angle, degrees=True)
             outnewposits = angle_rot[0].apply(newposits)
@@ -1668,7 +1792,9 @@ def get_aligned_conformer(
         Conf3D.AddAtom(dummy_metal)
         for i in catoms:
             Conf3D.AddBond(int(i + 1), Conf3D.NumAtoms(), 1)
-        allcoords, anums, graph = io_obabel.get_OBMol_coords_anums_graph(Conf3D)
+        allcoords, anums, graph = io_obabel.get_OBMol_coords_anums_graph(
+            Conf3D
+        )
         bo_dict, atypes = io_obabel.get_OBMol_bo_dict_atom_types(Conf3D)
         init_charges_lig[0] = Conf3D.GetTotalCharge()
         cp_catoms = []
@@ -1686,7 +1812,9 @@ def get_aligned_conformer(
         if not any([True for x in catoms if (anums[x] == 1)]):
             # If not - run DG without hydrogens - add back during FF relaxation!
             Conf3D = io_obabel.get_obmol_smiles(ligsmiles, addHydrogens=False)
-            dummy_metal = openbabel.OBAtom()  # Add the dummy metal to the OBmol
+            dummy_metal = (
+                openbabel.OBAtom()
+            )  # Add the dummy metal to the OBmol
             dummy_metal.SetAtomicNum(
                 io_ptable.elements.index(tmetal)
             )  # Match atomic number
@@ -1694,7 +1822,9 @@ def get_aligned_conformer(
             for i in catoms:
                 Conf3D.AddBond(int(i + 1), Conf3D.NumAtoms(), 1)
             natoms = Conf3D.NumAtoms()
-            allcoords, anums, graph = io_obabel.get_OBMol_coords_anums_graph(Conf3D)
+            allcoords, anums, graph = io_obabel.get_OBMol_coords_anums_graph(
+                Conf3D
+            )
             add_hydrogens = True
         else:
             natoms = Conf3D.NumAtoms()
@@ -1710,7 +1840,11 @@ def get_aligned_conformer(
         if isCp:  # Specifiy distances from geometry
             for cp_at in cp_catoms:
                 tdist = np.linalg.norm(
-                    [corecoordList[x[1]] for x in ligcoordList if x[0] == cp_at][0]
+                    [
+                        corecoordList[x[1]]
+                        for x in ligcoordList
+                        if x[0] == cp_at
+                    ][0]
                 )
                 ml_dists.append(tdist)
         for c_atom in [x for x in catoms if x not in cp_catoms]:
@@ -1739,7 +1873,9 @@ def get_aligned_conformer(
             try:
                 tLB = LB.copy()
                 tUB = UB.copy()
-                D = metrize(tLB, tUB, natoms, non_triangle=non_triangle, debug=debug)
+                D = metrize(
+                    tLB, tUB, natoms, non_triangle=non_triangle, debug=debug
+                )
                 D0 = get_cm_dists(D, natoms)
                 G = get_metric_matrix(D, D0, natoms)
                 L, V = get_3_eigs(G, natoms)
@@ -1785,7 +1921,11 @@ def get_aligned_conformer(
                     tLB = LB.copy()
                     tUB = UB.copy()
                     D = metrize(
-                        tLB, tUB, natoms, non_triangle=non_triangle, debug=debug
+                        tLB,
+                        tUB,
+                        natoms,
+                        non_triangle=non_triangle,
+                        debug=debug,
                     )
                     D0 = get_cm_dists(D, natoms)
                     G = get_metric_matrix(D, D0, natoms)
@@ -1839,7 +1979,11 @@ def get_aligned_conformer(
                     tLB = LB.copy()
                     tUB = UB.copy()
                     D = metrize(
-                        tLB, tUB, natoms, non_triangle=non_triangle, debug=debug
+                        tLB,
+                        tUB,
+                        natoms,
+                        non_triangle=non_triangle,
+                        debug=debug,
                     )
                     D0 = get_cm_dists(D, natoms)
                     G = get_metric_matrix(D, D0, natoms)
@@ -1892,7 +2036,11 @@ def get_aligned_conformer(
                     tLB = LB.copy()
                     tUB = UB.copy()
                     D = metrize(
-                        tLB, tUB, natoms, non_triangle=non_triangle, debug=debug
+                        tLB,
+                        tUB,
+                        natoms,
+                        non_triangle=non_triangle,
+                        debug=debug,
                     )
                     D0 = get_cm_dists(D, natoms)
                     G = get_metric_matrix(D, D0, natoms)
@@ -1945,7 +2093,11 @@ def get_aligned_conformer(
                     tLB = LB.copy()
                     tUB = UB.copy()
                     D = metrize(
-                        tLB, tUB, natoms, non_triangle=non_triangle, debug=debug
+                        tLB,
+                        tUB,
+                        natoms,
+                        non_triangle=non_triangle,
+                        debug=debug,
                     )
                     D0 = get_cm_dists(D, natoms)
                     G = get_metric_matrix(D, D0, natoms)
@@ -1994,32 +2146,38 @@ def get_aligned_conformer(
                 tligcoordList = ligcoordList.copy()
             else:
                 X = np.reshape(res1, (natoms, 3))
-                Conf3D_out, fail, final_relax, tligcoordList, symmetry_match = (
-                    clean_conformation_ff(
-                        X,
-                        Conf3D,
-                        catoms,
-                        shape,
-                        graph,
-                        anums,
-                        ligcoordList,
-                        ligsmiles=ligsmiles,  #
-                        original_metal=metal,
-                        add_angle_constraints=add_angle_constraints,
-                        ca_metal_dist_constraints=ca_metal_dist_constraints,
-                        isCp=isCp,
-                        edge_ligand=edge_ligand,
-                        cp_catoms=cp_catoms,
-                        skip_mff=skip_mmff,
-                        add_hydrogens=add_hydrogens,
-                        enforce_symmetry=enforce_symmetry,  #
-                        debug=debug,
-                    )
+                (
+                    Conf3D_out,
+                    fail,
+                    final_relax,
+                    tligcoordList,
+                    symmetry_match,
+                ) = clean_conformation_ff(
+                    X,
+                    Conf3D,
+                    catoms,
+                    shape,
+                    graph,
+                    anums,
+                    ligcoordList,
+                    ligsmiles=ligsmiles,  #
+                    original_metal=metal,
+                    add_angle_constraints=add_angle_constraints,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    isCp=isCp,
+                    edge_ligand=edge_ligand,
+                    cp_catoms=cp_catoms,
+                    skip_mff=skip_mmff,
+                    add_hydrogens=add_hydrogens,
+                    enforce_symmetry=enforce_symmetry,  #
+                    debug=debug,
                 )
 
                 # Set charges from total charge from OBmol
                 Conf3D_out.set_initial_charges(init_charges_lig)
-                if ((enforce_symmetry) and (symmetry_match)) or (not enforce_symmetry):
+                if ((enforce_symmetry) and (symmetry_match)) or (
+                    not enforce_symmetry
+                ):
                     leave_loop = True
         else:
             if debug > 1:
@@ -2050,7 +2208,10 @@ def get_aligned_conformer(
             if add_hydrogens:
                 LB_dists = (
                     np.array(
-                        [io_ptable.rcov1[x] for x in outatoms.get_atomic_numbers()]
+                        [
+                            io_ptable.rcov1[x]
+                            for x in outatoms.get_atomic_numbers()
+                        ]
                     )
                     + cov1metal
                 )
@@ -2063,7 +2224,8 @@ def get_aligned_conformer(
                 sane = False
             # Add penalty against crowded conformations.
             crowding_penalty += len(np.where(dists < LB_dists * 0.8)[0])
-            # Super penalize conformers with any atoms closer than the max connecting atom distance.
+            # Super penalize conformers with any atoms
+            # closer than the max connecting atom distance.
             if np.any(np.delete(dists, catoms) < max_catom_dist):
                 crowding_penalty += 100
             ### Potentially add penalty for crowding other binding sites.
@@ -2083,7 +2245,7 @@ def find_conformers(
     ligcoordList,
     corecoordList,
     metal="Fe",
-    nconformers=3,
+    nconformers=1,
     ligtype=None,
     ca_metal_dist_constraints=None,
     skip_mmff=False,
@@ -2109,7 +2271,9 @@ def find_conformers(
     originalMetal :  str, optional
         original metal identity, by default 'Fe'
     nconformers : int, optional
-        number of conformers to test, by default 5
+        number of conformers to test, by default 1
+        Note: This will loop generation iterations, which will result in different
+        nconformers per ligand depending on the type.
     ca_metal_dist_constraints : dict/None, optional
         Metal-ligand distance constraints, by default None
     ligtype : str, optional
@@ -2148,181 +2312,191 @@ def find_conformers(
         print("Init seeds (pre-ligand generation): ", seeds)
     OBmol_lig = io_obabel.get_obmol_smiles(ligsmiles)
 
-    if OBmol_lig.NumAtoms() < 4:  # Limit smaller molecules conformers (not useful)
-        conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
-            get_aligned_conformer(
-                ligsmiles,
-                ligcoordList,
-                corecoordList,
-                metal=metal,
-                ca_metal_dist_constraints=ca_metal_dist_constraints,
-                skip_mmff=skip_mmff,
-                covrad_metal=covrad_metal,
-                vdwrad_metal=vdwrad_metal,
-                no_ff=no_ff,
-                ligtype=ligtype,
-                enforce_symmetry=enforce_symmetry,
-                debug=debug,
+    if (
+        OBmol_lig.NumAtoms() < 4
+    ):  # Limit smaller molecules conformers (not useful)
+        for _ in range(nconformers):
+            conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    ligtype=ligtype,
+                    enforce_symmetry=enforce_symmetry,
+                    debug=debug,
+                )
             )
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
-        else:
-            if debug:
-                print("Failed sanity checks after rotation!")
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
+            else:
+                if debug:
+                    print("Failed sanity checks after rotation!")
     elif ("cis" in ligtype) or ("mer" in ligtype) or ("fac" in ligtype):
         if debug:
             print("Generating cis/mer/facs")
-        conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
-            get_aligned_conformer(
-                ligsmiles,
-                ligcoordList,
-                corecoordList,
-                metal=metal,
-                ca_metal_dist_constraints=ca_metal_dist_constraints,
-                skip_mmff=skip_mmff,
-                covrad_metal=covrad_metal,
-                ligtype=ligtype,
-                vdwrad_metal=vdwrad_metal,
-                no_ff=no_ff,
-                enforce_symmetry=enforce_symmetry,
-                debug=debug,
+        for _ in range(nconformers):
+            conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    ligtype=ligtype,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    enforce_symmetry=enforce_symmetry,
+                    debug=debug,
+                )
             )
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
-        else:
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
+            else:
+                if debug:
+                    print("Failed sanity checks after rotation!")
             if debug:
-                print("Failed sanity checks after rotation!")
-        if debug:
-            print("Generating cis/mer/facs.")
-        conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
-            get_aligned_conformer(
-                ligsmiles,
-                ligcoordList,
-                corecoordList,
-                metal=metal,
-                ca_metal_dist_constraints=ca_metal_dist_constraints,
-                skip_mmff=True,
-                covrad_metal=covrad_metal,
-                ligtype=ligtype,
-                vdwrad_metal=vdwrad_metal,
-                enforce_symmetry=enforce_symmetry,
-                no_ff=no_ff,
-                debug=debug,
+                print("Generating cis/mer/facs.")
+            conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    skip_mmff=True,
+                    covrad_metal=covrad_metal,
+                    ligtype=ligtype,
+                    vdwrad_metal=vdwrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
             )
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
-        else:
-            if debug:
-                print("Failed sanity checks after rotation!")
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
+            else:
+                if debug:
+                    print("Failed sanity checks after rotation!")
 
-        # Limit conformers for bidentate cis/tri_mer/tri_fac -> generate rotated/flipped versions!!!
-        # for i in range(1):
-        conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
-            get_aligned_conformer(
-                ligsmiles,
-                ligcoordList,
-                corecoordList,
-                metal=metal,
-                ca_metal_dist_constraints=ca_metal_dist_constraints,
-                ligtype=ligtype,
-                skip_mmff=skip_mmff,
-                covrad_metal=covrad_metal,
-                enforce_symmetry=enforce_symmetry,
-                vdwrad_metal=vdwrad_metal,
-                no_ff=no_ff,
-                debug=debug,
+            # Limit conformers for bidentate cis/tri_mer/tri_fac -> generate rotated/flipped versions!!!
+            # for i in range(1):
+            conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    ligtype=ligtype,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
             )
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
-        else:
-            if debug:
-                print("Failed sanity checks after rotation!")
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
+            else:
+                if debug:
+                    print("Failed sanity checks after rotation!")
 
-        # Add N+1 without the explicit angle constraints
-        conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(
-            ligsmiles,
-            ligcoordList,
-            corecoordList,
-            metal=metal,
-            ligtype=ligtype,
-            ca_metal_dist_constraints=ca_metal_dist_constraints,
-            add_angle_constraints=False,
-            skip_mmff=skip_mmff,
-            covrad_metal=covrad_metal,
-            enforce_symmetry=enforce_symmetry,
-            vdwrad_metal=vdwrad_metal,
-            no_ff=no_ff,
-            debug=debug,
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
+            # Add N+1 without the explicit angle constraints
+            conf, val, sane, final_relax, _, _, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ligtype=ligtype,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    add_angle_constraints=False,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
+            )
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
 
-        # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
-        conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(
-            ligsmiles,
-            ligcoordList,
-            corecoordList,
-            metal=metal,
-            ligtype=ligtype,
-            add_angle_constraints=True,
-            ca_metal_dist_constraints=ca_metal_dist_constraints,
-            non_triangle=True,
-            skip_mmff=skip_mmff,
-            covrad_metal=covrad_metal,
-            enforce_symmetry=enforce_symmetry,
-            vdwrad_metal=vdwrad_metal,
-            no_ff=no_ff,
-            debug=debug,
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
+            # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
+            conf, val, sane, final_relax, _, _, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ligtype=ligtype,
+                    add_angle_constraints=True,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    non_triangle=True,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
+            )
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
 
-        # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
-        conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(
-            ligsmiles,
-            ligcoordList,
-            corecoordList,
-            metal=metal,
-            ligtype=ligtype,
-            add_angle_constraints=False,
-            ca_metal_dist_constraints=ca_metal_dist_constraints,
-            non_triangle=True,
-            skip_mmff=skip_mmff,
-            covrad_metal=covrad_metal,
-            enforce_symmetry=enforce_symmetry,
-            vdwrad_metal=vdwrad_metal,
-            no_ff=no_ff,
-            debug=debug,
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
+            # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
+            conf, val, sane, final_relax, _, _, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ligtype=ligtype,
+                    add_angle_constraints=False,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    non_triangle=True,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
+            )
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
     else:
-        for i in range(nconformers):
+        for _ in range(nconformers+1):
             conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
                 get_aligned_conformer(
                     ligsmiles,
@@ -2348,102 +2522,110 @@ def find_conformers(
                 if debug:
                     print("Failed sanity checks after rotation!")
 
-        # Add N+1 without the explicit angle constraints
-        conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(
-            ligsmiles,
-            ligcoordList,
-            corecoordList,
-            metal=metal,
-            ligtype=ligtype,
-            add_angle_constraints=False,
-            ca_metal_dist_constraints=ca_metal_dist_constraints,
-            skip_mmff=skip_mmff,
-            covrad_metal=covrad_metal,
-            enforce_symmetry=enforce_symmetry,
-            vdwrad_metal=vdwrad_metal,
-            no_ff=no_ff,
-            debug=debug,
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
-
-        # print('Add conformer with no MMFF relaxation')
-        conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
-            get_aligned_conformer(
-                ligsmiles,
-                ligcoordList,
-                corecoordList,
-                metal=metal,
-                ligtype=ligtype,
-                ca_metal_dist_constraints=ca_metal_dist_constraints,
-                skip_mmff=True,
-                covrad_metal=covrad_metal,
-                vdwrad_metal=vdwrad_metal,
-                enforce_symmetry=enforce_symmetry,
-                no_ff=no_ff,
-                debug=debug,
+            # Add N+1 without the explicit angle constraints
+            conf, val, sane, final_relax, _, _, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ligtype=ligtype,
+                    add_angle_constraints=False,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
             )
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
-        else:
-            if debug:
-                print("Failed sanity checks after rotation!")
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
 
-        # Add N+2 with the triangle angle constraint for metal (encouraging different conformers for multidentate)
-        conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(
-            ligsmiles,
-            ligcoordList,
-            corecoordList,
-            metal=metal,
-            ligtype=ligtype,
-            add_angle_constraints=True,
-            non_triangle=True,
-            ca_metal_dist_constraints=ca_metal_dist_constraints,
-            skip_mmff=skip_mmff,
-            covrad_metal=covrad_metal,
-            enforce_symmetry=enforce_symmetry,
-            vdwrad_metal=vdwrad_metal,
-            no_ff=no_ff,
-            debug=debug,
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
+            # print('Add conformer with no MMFF relaxation')
+            conf, val, sane, final_relax, bo_dict, atypes, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ligtype=ligtype,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    skip_mmff=True,
+                    covrad_metal=covrad_metal,
+                    vdwrad_metal=vdwrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
+            )
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
+            else:
+                if debug:
+                    print("Failed sanity checks after rotation!")
 
-        # Add N+2 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
-        conf, val, sane, final_relax, _, _, tligcoordList = get_aligned_conformer(
-            ligsmiles,
-            ligcoordList,
-            corecoordList,
-            metal=metal,
-            add_angle_constraints=False,
-            non_triangle=True,
-            ligtype=ligtype,
-            ca_metal_dist_constraints=ca_metal_dist_constraints,
-            skip_mmff=skip_mmff,
-            covrad_metal=covrad_metal,
-            enforce_symmetry=enforce_symmetry,
-            vdwrad_metal=vdwrad_metal,
-            no_ff=no_ff,
-            debug=debug,
-        )
-        if sane:
-            conf_list.append(conf)
-            val_list.append(val)
-            tligcoordList_out.append(tligcoordList)
-            rot_list.append(0)
+            # Add N+2 with the triangle angle constraint for metal (encouraging different conformers for multidentate)
+            conf, val, sane, final_relax, _, _, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    ligtype=ligtype,
+                    add_angle_constraints=True,
+                    non_triangle=True,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
+            )
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
+
+            # Add N+3 without the triangle angle constraint for metal (encouraging different conformers for multidentate)
+            conf, val, sane, final_relax, _, _, tligcoordList = (
+                get_aligned_conformer(
+                    ligsmiles,
+                    ligcoordList,
+                    corecoordList,
+                    metal=metal,
+                    add_angle_constraints=False,
+                    non_triangle=True,
+                    ligtype=ligtype,
+                    ca_metal_dist_constraints=ca_metal_dist_constraints,
+                    skip_mmff=skip_mmff,
+                    covrad_metal=covrad_metal,
+                    enforce_symmetry=enforce_symmetry,
+                    vdwrad_metal=vdwrad_metal,
+                    no_ff=no_ff,
+                    debug=debug,
+                )
+            )
+            if sane:
+                conf_list.append(conf)
+                val_list.append(val)
+                tligcoordList_out.append(tligcoordList)
+                rot_list.append(0)
 
     if (
-        (len(ligcoordList) == 1) and (len(conf_list) > 0) and (OBmol_lig.NumAtoms() > 1)
+        (len(ligcoordList) == 1)
+        and (len(conf_list) > 0)
+        and (OBmol_lig.NumAtoms() > 1)
     ):  # Add aligned monodentate and 45 and 90-degree rotated conformers
         conf = conf_list[0]
         rotatedConformer, _, _ = set_position_align(
@@ -2459,7 +2641,9 @@ def find_conformers(
         val_list.append(val_list[0])
         rot_list.append(0)
         tligcoordList_out.append(tligcoordList_out[0])
-        if OBmol_lig.NumAtoms() > 2:  # For 3 add rotation versions of the ligands
+        if (
+            OBmol_lig.NumAtoms() > 2
+        ):  # For 3 add rotation versions of the ligands
             rotatedConformer, _, _ = set_position_align(
                 conf,
                 tligcoordList_out[0],
@@ -2541,6 +2725,31 @@ def find_conformers(
     if debug:
         seeds = [np.random.randint(1, 100) for x in range(nconformers)]
         print("Final seeds (post-ligand generation): ", seeds)
+
+    # Get rid of nearly identical ligands.
+    if len(conf_list) > 1:
+        out_setlist = io_align_mol.rmsd_group(
+            conf_list=conf_list,
+            rmsd_cutoff=0.2,
+            # Set permutation. Indexing likely switches
+            # Making simple rmsd less useful for screening confs.
+            rmsd_type='permute' 
+            )
+        out_conf_list = []
+        out_val_list = []
+        out_tligcoordList_out = []
+        out_rot_list = []
+        for s in out_setlist:
+            inds = np.array(list(s))
+            saveind = inds[np.argmin(np.array(val_list)[inds])]
+            out_conf_list.append(conf_list[saveind])
+            out_val_list.append(val_list[saveind])
+            out_tligcoordList_out.append(tligcoordList_out[saveind])
+            out_rot_list.append(rot_list[saveind])
+        conf_list = out_conf_list
+        val_list = out_val_list
+        tligcoordList_out = out_tligcoordList_out
+        rot_list = out_rot_list
 
     return (
         conf_list,

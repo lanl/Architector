@@ -1,7 +1,7 @@
 import ase
 import numpy as np
 import os.path as osp
-from architector.io_align_mol import (reorder_align_rmsd, simple_rmsd)
+from architector.io_align_mol import mirror_permute_align_rmsd, simple_rmsd
 from ase.vibrations import Vibrations
 from ase.constraints import FixBondLengths
 from scipy.stats import bernoulli
@@ -13,12 +13,20 @@ from ase.io.trajectory import Trajectory
 import architector.arch_context_manage as arch_context_manage
 from architector.io_molecule import convert_io_molecule
 from architector.vibrations_free_energy import vibration_analysis
-from architector.io_obabel import (convert_mol2_obmol, convert_obmol_ase)
+from architector.io_obabel import convert_mol2_obmol, convert_obmol_ase
 
 
-def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
-               timestep=1.0, friction=0.02,
-               return_energies=False, debug=False):
+def md_sampler(
+    relaxed_mol,
+    temp=298.15,
+    interval=20,
+    n=50,
+    warm_up=1000,
+    timestep=1.0,
+    friction=0.02,
+    return_energies=False,
+    debug=False,
+):
     """md_sampler
     Use langevin dynamics and specified temperature to sample structures.
 
@@ -45,55 +53,68 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
     """
     # Friction increased to get to convergence faster.
     calc = relaxed_mol.ase_atoms.get_calculator()
-    mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
+    mol2 = relaxed_mol.write_mol2("init.mol2", writestring=True)
     init_ase = convert_io_molecule(mol2).ase_atoms
     relaxed_atoms = relaxed_mol.ase_atoms
-    skip_n = int(warm_up/interval)
+    skip_n = int(warm_up / interval)
     good = True
     displaced_structures = []
     energies = []
     full_results = []
     simple_rmsds = []
     aligned_rmsds = []
-    try: # Catch TB convergence failures.
-        with tqdm(total=n+int(warm_up/interval)) as pbar:
+    try:  # Catch TB convergence failures.
+        with tqdm(total=n + int(warm_up / interval)) as pbar:
             with arch_context_manage.make_temp_directory() as tdir:
-                dyn = Langevin(relaxed_atoms,
-                               timestep*ase.units.fs,
-                               temp*ase.units.kB,
-                               friction=friction)
+                dyn = Langevin(
+                    relaxed_atoms,
+                    timestep * ase.units.fs,
+                    temp * ase.units.kB,
+                    friction=friction,
+                )
 
-                def printenergy(a=relaxed_atoms):  # store a reference to atoms in the definition.
+                def printenergy(
+                    a=relaxed_atoms,
+                ):  # store a reference to atoms in the definition.
                     """Function to print the potential, kinetic and total energy."""
                     epot = a.get_potential_energy() / len(a)
                     ekin = a.get_kinetic_energy() / len(a)
-                    print('Energy per atom: Epot = %.3feV  Ekin = %.3feV (T=%3.0fK)  '
-                          'Etot = %.3feV' % (epot, ekin, ekin / (
-                              1.5 * ase.units.kB), epot + ekin))
+                    print(
+                        "Energy per atom: Epot = %.3feV  Ekin = %.3feV (T=%3.0fK)  "
+                        "Etot = %.3feV"
+                        % (
+                            epot,
+                            ekin,
+                            ekin / (1.5 * ase.units.kB),
+                            epot + ekin,
+                        )
+                    )
 
                 def incremental(a=relaxed_atoms):
                     pbar.update(1)
 
                 if debug:
                     dyn.attach(printenergy, interval=interval)
-                traj = Trajectory('moldyn3.traj', 'w', relaxed_atoms)
+                traj = Trajectory("moldyn3.traj", "w", relaxed_atoms)
                 dyn.attach(traj.write, interval=interval)
                 dyn.attach(incremental, interval=interval)
                 # Now run the dynamics
-                dyn.run(warm_up + n*interval)
-                traj = Trajectory(osp.join(tdir, 'moldyn3.traj'))
+                dyn.run(warm_up + n * interval)
+                traj = Trajectory(osp.join(tdir, "moldyn3.traj"))
                 trunc_traj = traj[skip_n:]
                 for image in trunc_traj:
                     tmpmol = convert_io_molecule(mol2)
-                    out = CalcExecutor(image,
-                                       method='custom',
-                                       calculator=calc,
-                                       relax=False,
-                                       debug=debug)
+                    out = CalcExecutor(
+                        image,
+                        method="custom",
+                        calculator=calc,
+                        relax=False,
+                        debug=debug,
+                    )
                     s_rmsd = simple_rmsd(init_ase, image)
-                    _, align_rmsd = reorder_align_rmsd(init_ase,
-                                                       image,
-                                                       return_rmsd=True)
+                    _, align_rmsd = mirror_permute_align_rmsd(
+                        init_ase, image, return_rmsd=True
+                    )
                     energies.append(out.energy)
                     full_results.append(out.mol.ase_atoms.calc.results)
                     tmpmol.ase_atoms = image
@@ -101,8 +122,13 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
                     simple_rmsds.append(s_rmsd)
                     aligned_rmsds.append(align_rmsd)
         if good and return_energies:
-            return (displaced_structures, energies, 
-                    full_results, simple_rmsds, aligned_rmsds)
+            return (
+                displaced_structures,
+                energies,
+                full_results,
+                simple_rmsds,
+                aligned_rmsds,
+            )
         elif return_energies:
             return ([], energies, full_results, simple_rmsds, aligned_rmsds)
         elif good:
@@ -111,8 +137,13 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
             return []
     except:
         if good and return_energies:
-            return (displaced_structures, energies, full_results,
-                    simple_rmsds, aligned_rmsds)
+            return (
+                displaced_structures,
+                energies,
+                full_results,
+                simple_rmsds,
+                aligned_rmsds,
+            )
         elif return_energies:
             return ([], energies, full_results, simple_rmsds, aligned_rmsds)
         elif good:
@@ -121,20 +152,22 @@ def md_sampler(relaxed_mol, temp=298.15, interval=20, n=50, warm_up=1000,
             return []
 
 
-def bond_length_sampler(relaxed_mol,
-                        n=10,
-                        seed=42,
-                        max_dev_low=0.1,
-                        max_dev_hi=0.3,
-                        smallest_dist_cutoff=0.55,
-                        min_dist_cutoff=3,
-                        final_relax=False,
-                        final_relax_steps=50,
-                        ase_opt_method=None,
-                        ase_opt_kwargs={},
-                        max_attempts=10000,
-                        return_energies=False,
-                        debug=False):
+def bond_length_sampler(
+    relaxed_mol,
+    n=10,
+    seed=42,
+    max_dev_low=0.1,
+    max_dev_hi=0.3,
+    smallest_dist_cutoff=0.55,
+    min_dist_cutoff=3,
+    final_relax=False,
+    final_relax_steps=50,
+    ase_opt_method=None,
+    ase_opt_kwargs={},
+    max_attempts=10000,
+    return_energies=False,
+    debug=False,
+):
     """bond_length_sampler
     Attempt to sample based on bond length deviations.
 
@@ -158,11 +191,11 @@ def bond_length_sampler(relaxed_mol,
         Perform "cleaning" relxation with usually GFN2-xTB, by default False.
     final_relax_steps : int, optional
         Take n stpes before stopping. It won't converge because of constraints, but will finish.
-    return_energies : bool, optional 
+    return_energies : bool, optional
         return energies and rmsds. default False
-    ase_opt_method : None, optional 
+    ase_opt_method : None, optional
         ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
-    ase_opt_kwargs : dict(), 
+    ase_opt_kwargs : dict(),
         ASE optimizer kwargs. Do not include "trajectory" nor "logfile" kwargs.
     max_attempts : int, optional
         maximum possible number of attempts beyond n, by default 1000
@@ -170,7 +203,7 @@ def bond_length_sampler(relaxed_mol,
         print debugging statements, by default False
     """
     good = True
-    mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
+    mol2 = relaxed_mol.write_mol2("init.mol2", writestring=True)
     relaxed_atoms = relaxed_mol.ase_atoms
     calc = relaxed_atoms.get_calculator()
     if seed:
@@ -191,18 +224,20 @@ def bond_length_sampler(relaxed_mol,
             count += 1
             fail = False
             OBMol = convert_mol2_obmol(mol2)
-            distortion = np.random.uniform(low=1-max_dev_low,
-                                           high=1+max_dev_hi,
-                                           size=(bond_dists.shape[0]))
-            new_bond_dists = bond_dists*distortion
+            distortion = np.random.uniform(
+                low=1 - max_dev_low,
+                high=1 + max_dev_hi,
+                size=(bond_dists.shape[0]),
+            )
+            new_bond_dists = bond_dists * distortion
             ase_dist_constrs = []
             constr = openbabel.OBFFConstraints()
-            ff = openbabel.OBForceField.FindForceField('UFF')
+            ff = openbabel.OBForceField.FindForceField("UFF")
             for i, a in enumerate(inda):
                 a = int(a) + 1
                 b = int(indb[i]) + 1
                 constr.AddDistanceConstraint(a, b, float(new_bond_dists[i]))
-                ase_dist_constrs.append([a-1, b-1])
+                ase_dist_constrs.append([a - 1, b - 1])
             s = ff.Setup(OBMol, constr)
             if not s:
                 fail = True
@@ -220,27 +255,30 @@ def bond_length_sampler(relaxed_mol,
                 out_atoms.set_positions(tmp_atoms.positions)
                 tmpmol.dists_sane = True
                 tmpmol.ase_atoms = out_atoms
-                tmpmol.dist_sanity_checks(min_dist_cutoff=min_dist_cutoff,
-                                          smallest_dist_cutoff=smallest_dist_cutoff,
-                                          debug=debug)
+                tmpmol.dist_sanity_checks(
+                    min_dist_cutoff=min_dist_cutoff,
+                    smallest_dist_cutoff=smallest_dist_cutoff,
+                    debug=debug,
+                )
                 if final_relax:
                     c = FixBondLengths(ase_dist_constrs)
                     out_atoms.set_constraint(c)
                 if tmpmol.dists_sane and return_energies:
-                    out = CalcExecutor(out_atoms,
-                                       method='custom',
-                                       calculator=calc,
-                                       relax=final_relax,
-                                       maxsteps=final_relax_steps,
-                                       ase_opt_method=ase_opt_method,
-                                       ase_opt_kwargs=ase_opt_kwargs,
-                                       debug=debug)
+                    out = CalcExecutor(
+                        out_atoms,
+                        method="custom",
+                        calculator=calc,
+                        relax=final_relax,
+                        maxsteps=final_relax_steps,
+                        ase_opt_method=ase_opt_method,
+                        ase_opt_kwargs=ase_opt_kwargs,
+                        debug=debug,
+                    )
                     if out.successful:
-                        s_rmsd = simple_rmsd(relaxed_atoms,
-                                             out.mol.ase_atoms)
-                        _,align_rmsd = reorder_align_rmsd(relaxed_atoms,
-                                                          out.mol.ase_atoms,
-                                                          return_rmsd=True)
+                        s_rmsd = simple_rmsd(relaxed_atoms, out.mol.ase_atoms)
+                        _, align_rmsd = mirror_permute_align_rmsd(
+                            relaxed_atoms, out.mol.ase_atoms, return_rmsd=True
+                        )
                         aligned_rmsds.append(align_rmsd)
                         simple_rmsds.append(s_rmsd)
                         energies.append(out.energy)
@@ -251,19 +289,23 @@ def bond_length_sampler(relaxed_mol,
                         total_out += 1
                         pbar.update(1)
                 elif tmpmol.dists_sane:
-                    s_rmsd = simple_rmsd(relaxed_atoms,
-                                         out_atoms)
-                    _,align_rmsd = reorder_align_rmsd(relaxed_atoms,
-                                                      out_atoms,
-                                                      return_rmsd=True)
+                    s_rmsd = simple_rmsd(relaxed_atoms, out_atoms)
+                    _, align_rmsd = mirror_permute_align_rmsd(
+                        relaxed_atoms, out_atoms, return_rmsd=True
+                    )
                     simple_rmsds.append(s_rmsd)
                     aligned_rmsds.append(align_rmsd)
                     displaced_structures.append(tmpmol)
                     total_out += 1
                     pbar.update(1)
     if good and return_energies:
-        return (displaced_structures, energies,
-                full_results, simple_rmsds, aligned_rmsds)
+        return (
+            displaced_structures,
+            energies,
+            full_results,
+            simple_rmsds,
+            aligned_rmsds,
+        )
     elif return_energies:
         return ([], energies, full_results, simple_rmsds, aligned_rmsds)
     elif good:
@@ -272,10 +314,18 @@ def bond_length_sampler(relaxed_mol,
         return []
 
 
-def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
-                   min_dist_cutoff=3, smallest_dist_cutoff=0.55,
-                   return_energies=False, max_attempts=10000,
-                   debug=False):
+def random_sampler(
+    relaxed_mol,
+    n=10,
+    seed=42,
+    min_rmsd=0.1,
+    max_rmsd=0.5,
+    min_dist_cutoff=3,
+    smallest_dist_cutoff=0.55,
+    return_energies=False,
+    max_attempts=10000,
+    debug=False,
+):
     """random_sampler
     fully random sampling
 
@@ -299,7 +349,7 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
         maximum rmsd for difference, default 0.5
     mindist : float, optional
         minimum interatomic distance for atoms, by default 0.5
-    return_energies : bool, optional, 
+    return_energies : bool, optional,
         return energies and rmsds. default False
     max_attempts : int, optional
         maximum possible number of attempts beyond n, by default 10000
@@ -314,7 +364,7 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
     good = True
     relaxed_atoms = relaxed_mol.ase_atoms
     calc = relaxed_atoms.get_calculator()
-    mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
+    mol2 = relaxed_mol.write_mol2("init.mol2", writestring=True)
     if seed:
         np.random.seed(seed)
     na = len(relaxed_atoms)
@@ -329,33 +379,39 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
     with tqdm(total=n) as pbar:
         while (total_out < n) and (count < max_attempts):
             # Randomize magnitude of displacement
-            max_dist = max_rmsd*np.random.random()
+            max_dist = max_rmsd * np.random.random()
             count += 1
             out_atoms = relaxed_atoms.copy()
             # Generate random displacements
             newcoords = out_atoms.positions + np.random.uniform(
-                low=-max_dist,
-                high=max_dist,
-                size=(na, 3))
+                low=-max_dist, high=max_dist, size=(na, 3)
+            )
             out_atoms.set_positions(newcoords)
             tmpmol = convert_io_molecule(mol2)
             tmpmol.dists_sane = True
             s_rmsd = simple_rmsd(relaxed_atoms, out_atoms)
-            _, align_rmsd = reorder_align_rmsd(relaxed_atoms,
-                                               out_atoms,
-                                               return_rmsd=True)
+            _, align_rmsd = mirror_permute_align_rmsd(
+                relaxed_atoms, out_atoms, return_rmsd=True
+            )
             tmpmol.ase_atoms = out_atoms
             tmpmol.dist_sanity_checks(
                 min_dist_cutoff=min_dist_cutoff,
                 smallest_dist_cutoff=smallest_dist_cutoff,
-                debug=debug)
-            if (tmpmol.dists_sane) and (s_rmsd > min_rmsd) and (
-             s_rmsd < max_rmsd) and (return_energies):
-                out = CalcExecutor(out_atoms,
-                                   method='custom',
-                                   calculator=calc,
-                                   relax=False,
-                                   debug=debug)
+                debug=debug,
+            )
+            if (
+                (tmpmol.dists_sane)
+                and (s_rmsd > min_rmsd)
+                and (s_rmsd < max_rmsd)
+                and (return_energies)
+            ):
+                out = CalcExecutor(
+                    out_atoms,
+                    method="custom",
+                    calculator=calc,
+                    relax=False,
+                    debug=debug,
+                )
                 if out.successful:
                     simple_rmsds.append(s_rmsd)
                     aligned_rmsds.append(align_rmsd)
@@ -364,8 +420,11 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
                     displaced_structures.append(tmpmol)
                     total_out += 1
                     pbar.update(1)
-            elif (tmpmol.dists_sane) and (s_rmsd > min_rmsd) and (
-                  s_rmsd < max_rmsd):
+            elif (
+                (tmpmol.dists_sane)
+                and (s_rmsd > min_rmsd)
+                and (s_rmsd < max_rmsd)
+            ):
                 simple_rmsds.append(s_rmsd)
                 aligned_rmsds.append(align_rmsd)
                 displaced_structures.append(tmpmol)
@@ -374,8 +433,13 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
     if count == max_attempts:
         good = False
     if good and return_energies:
-        return (displaced_structures, energies, full_results,
-                simple_rmsds, aligned_rmsds)
+        return (
+            displaced_structures,
+            energies,
+            full_results,
+            simple_rmsds,
+            aligned_rmsds,
+        )
     elif return_energies:
         return ([], energies, full_results, simple_rmsds, aligned_rmsds)
     elif good:
@@ -384,21 +448,23 @@ def random_sampler(relaxed_mol, n=10, seed=42, min_rmsd=0.1, max_rmsd=0.5,
         return []
 
 
-def normal_mode_sampler(relaxed_mol,
-                        hess=None,
-                        temp=298.15,
-                        n=10,
-                        seed=42,
-                        distance_factor=1.0,
-                        freq_cutoff=150,
-                        mode_type='mass_weighted_unnormalized',
-                        linear=False,
-                        n_modes_to_sample=None,
-                        per_mode_temp=False,
-                        min_dist_cutoff=3,
-                        smallest_dist_cutoff=0.55,
-                        return_energies=False,
-                        debug=False):
+def normal_mode_sampler(
+    relaxed_mol,
+    hess=None,
+    temp=298.15,
+    n=10,
+    seed=42,
+    distance_factor=1.0,
+    freq_cutoff=150,
+    mode_type="mass_weighted_unnormalized",
+    linear=False,
+    n_modes_to_sample=None,
+    per_mode_temp=False,
+    min_dist_cutoff=3,
+    smallest_dist_cutoff=0.55,
+    return_energies=False,
+    debug=False,
+):
     """normal_mode_sampler
     https://www.nature.com/articles/sdata2017193#Sec12
 
@@ -409,7 +475,7 @@ def normal_mode_sampler(relaxed_mol,
         relaxed molecule with ASE calculator attached to mol.ase_atoms
     hess : np.ndarray/None, optional
         2D Hessian in eV/Angstroms^2 either generated by ase.vibrations.Vibrations or from an external program.
-        e.g.: 
+        e.g.:
             hess = np.array([[at1x_at1x, at1x_at1y, at1x_at1z, at1x_at2x, ...],
                             [at1y_at1x, at1y_at1y, at1y_at1z, at1y_at2x, ...],
                             [at1z_at1x, at1z_at1y, at1z_at1z, at1z_at2x, ...],
@@ -430,7 +496,7 @@ def normal_mode_sampler(relaxed_mol,
         without the cutoff the low-frequency (low-energy) modes can dominate displacements resulting in VERY artificially high "temperature" samples.
         By defualt 150 cm^-1 from tests on Ni/Fe aqua complexes with XTB. Cutoff imposed did not affect energies of organic molecules sampled.
     mode_type : str, optional
-        What type of modes do you want to apply the sampling to. By default 'mass_weight_unnormalized' since this gives most accurate temperatures 
+        What type of modes do you want to apply the sampling to. By default 'mass_weight_unnormalized' since this gives most accurate temperatures
         across molecule types.
     linear : bool, optional
         Is this a linear molecule?, default False
@@ -438,13 +504,13 @@ def normal_mode_sampler(relaxed_mol,
         Number of modes to sample across starting from lowest-energy modes if specified as int. by default None (aka Across all "good" modes)
     per_mode_temp : bool, optional
         Whether to normalize the temperature/energy per-mode. default False.
-    return_energies and rmsds: bool, optional, 
+    return_energies and rmsds: bool, optional,
         return energies. default False
     smallest_dist_cutoff : float
         distance cutoff-make sure sum of cov radii larger than dist*smallest_dist_cutoff, default 0.55.
     min_dist_cutoff : int/float
         make sure all atoms are at least min_dist_cutoff from ANY other atom, default 3 angstroms
-    return_energies : bool, optional, 
+    return_energies : bool, optional,
         return energies and rmsds. default False
     debug : bool, optional
         print debugging statements, by default False
@@ -459,7 +525,7 @@ def normal_mode_sampler(relaxed_mol,
     Warning - If the imaginary modes are quite strong
     """
     good = True
-    mol2 = relaxed_mol.write_mol2('init.mol2', writestring=True)
+    mol2 = relaxed_mol.write_mol2("init.mol2", writestring=True)
     relaxed_atoms = relaxed_mol.ase_atoms
     displaced_structures = []
     energies = []
@@ -467,18 +533,17 @@ def normal_mode_sampler(relaxed_mol,
     # estimated_energies = [] # Used for debugging sampling method.
     simple_rmsds = []
     aligned_rmsds = []
-    try: # Catch Vibrations TB convergence Errors.
+    try:  # Catch Vibrations TB convergence Errors.
         with arch_context_manage.make_temp_directory() as _:
-            if (hess is None):
+            if hess is None:
                 vib_analysis = Vibrations(relaxed_atoms)
                 vib_analysis.run()
                 data = vib_analysis.get_vibrations()
                 hess = data.get_hessian_2d()
-            vib_energies, modes, fconstants, _, frequencies = \
-                vibration_analysis(relaxed_atoms,
-                                   hess,
-                                   mode_type=mode_type)
-        
+            vib_energies, modes, fconstants, _, frequencies = (
+                vibration_analysis(relaxed_atoms, hess, mode_type=mode_type)
+            )
+
             # _ is rmasses matrix in case it is needed later.
             if linear:  # 3N-5
                 vib_energies = np.real(vib_energies[5:])
@@ -496,13 +561,13 @@ def normal_mode_sampler(relaxed_mol,
                 fconstants = fconstants[:n_modes_to_sample]
                 frequencies = frequencies[:n_modes_to_sample]
             if np.any(np.imag(vib_energies) > 0.1):
-                print('Warning: There are some highly imaginary modes!')
+                print("Warning: There are some highly imaginary modes!")
                 good = False
             if debug:
-                print('Vib Energies', vib_energies)
+                print("Vib Energies", vib_energies)
             non_zero_inds = np.where(frequencies > freq_cutoff)[0]
             nmodes = len(non_zero_inds)
-            kbT = ase.units.kB*temp
+            kbT = ase.units.kB * temp
             if seed:
                 np.random.seed(seed)
             calc = relaxed_atoms.get_calculator()
@@ -515,39 +580,57 @@ def normal_mode_sampler(relaxed_mol,
                 signs[np.where(signs == 0)] = -1
                 # Average energy contribution per-mode
                 if per_mode_temp:
-                    per_mode_e = 2*kbT/nmodes
+                    per_mode_e = 2 * kbT / nmodes
                 else:
-                    per_mode_e = 2*kbT
-                Rs = signs*np.sqrt(per_mode_e/fconstants[non_zero_inds]*np.log(1/(1-cs))) 
+                    per_mode_e = 2 * kbT
+                Rs = signs * np.sqrt(
+                    per_mode_e
+                    / fconstants[non_zero_inds]
+                    * np.log(1 / (1 - cs))
+                )
                 # estimated_energy_vect = [1/2*f*Rs[i]**2 for i,f in enumerate(fconstants[non_zero_inds])]
-                Rs = Rs*distance_factor  # Fudge factor for specific methods based on experience for GFn2-xTB - 1 works well.
+                Rs = (
+                    Rs * distance_factor
+                )  # Fudge factor for specific methods based on experience for GFn2-xTB - 1 works well.
                 displaced_posits = relaxed_atoms.get_positions()
-                for j,r in enumerate(Rs):
+                for j, r in enumerate(Rs):
                     norm_mode = modes[non_zero_inds[j]]
-                    displacement = norm_mode*r
+                    displacement = norm_mode * r
                     displaced_posits += displacement
                 out_atoms.set_positions(displaced_posits)
                 try:
                     out_atoms.calc = calc
-                    if return_energies: # Only perform energy evaluation if requested.
+                    if (
+                        return_energies
+                    ):  # Only perform energy evaluation if requested.
                         energy = out_atoms.get_total_energy()
                         energies.append(energy)
                         full_results.append(out_atoms.calc.results)
                     tmpmol = convert_io_molecule(mol2)
                     s_rmsd = simple_rmsd(relaxed_atoms, out_atoms)
-                    _,aligned_rmsd = reorder_align_rmsd(relaxed_atoms, out_atoms, return_rmsd=True)
+                    _, aligned_rmsd = mirror_permute_align_rmsd(
+                        relaxed_atoms, out_atoms, return_rmsd=True
+                    )
                     tmpmol.ase_atoms = out_atoms
-                    tmpmol.dist_sanity_checks(min_dist_cutoff=min_dist_cutoff,
-                                            smallest_dist_cutoff=smallest_dist_cutoff,
-                                            debug=debug)
+                    tmpmol.dist_sanity_checks(
+                        min_dist_cutoff=min_dist_cutoff,
+                        smallest_dist_cutoff=smallest_dist_cutoff,
+                        debug=debug,
+                    )
                     simple_rmsds.append(s_rmsd)
                     aligned_rmsds.append(aligned_rmsd)
                     displaced_structures.append(tmpmol)
                 except:
                     continue
         if good and return_energies:
-            return (displaced_structures, energies, full_results,
-                    simple_rmsds, aligned_rmsds, hess)
+            return (
+                displaced_structures,
+                energies,
+                full_results,
+                simple_rmsds,
+                aligned_rmsds,
+                hess,
+            )
         elif return_energies:
             return [], energies, full_results
         elif good:
@@ -556,8 +639,14 @@ def normal_mode_sampler(relaxed_mol,
             return []
     except:
         if good and return_energies:
-            return (displaced_structures, energies, full_results,
-                    simple_rmsds, aligned_rmsds, hess)
+            return (
+                displaced_structures,
+                energies,
+                full_results,
+                simple_rmsds,
+                aligned_rmsds,
+                hess,
+            )
         elif return_energies:
             return [], energies, full_results
         elif good:

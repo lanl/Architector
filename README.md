@@ -164,10 +164,17 @@ inputDict = {
     ####### Conformer parameters ########
     "n_conformers": 1, # Number of metal-core symmetries at each core to save / relax
     "n_symmetries": 10, # Total metal-center symmetrys to build, NSymmetries should be >= n_conformers
+    "n_lig_conformers": 1, # Number of ligand conformers to generate for each symmetry.
+    "n_complex_relax":1 , # Number of full complexes to relax for each symmetry.
     # Brief explanation: 
     # n_symmetries: will specify how many metal-center symmetries for architector to generate
     # INITIAL (un-relaxed) (UFF/MMFF level structures) to generate for each core geometry (e.g. give me 10 different octahedral metal-ligand structures)
     # n_conformers: will specify how many of the generated n_symmetries to relax with tight binding and return to the user. Architector will decide which ones to try by relative energy of the INITIAL (un-relaxed) structures.
+    # n_lig_conformers : specifies how many ligand conformers aligned to specific binding sites are generated.
+    # By default this is 1, which will generate between 1-8 conformers depending on symmetry.
+    # n_complex_relax : number of different tilings of ligands to relax for each symmetry
+    # primarily for use with multidentate ligands and higher n_lig_conformers
+    # will make runs much slower due to multiplicative scaling with complex symmetry.
     "crest_sampling": False, # Perform CREST sampling on lowest-energy conformer(s)?
     "crest_sampling_n_conformers": 1, # Number of lowest-energy Architector conformers on which to perform crest sampling.
     "crest_options": "--gfn2//gfnff --noreftopo --nocross --quick", # Crest Additional commandline options 

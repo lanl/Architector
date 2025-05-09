@@ -29,7 +29,7 @@ def isint(str):
 
 # Functions
 def read_conformers(fileName):
-    '''
+    """
     Read conformers from file.
 
     Parameters
@@ -43,7 +43,7 @@ def read_conformers(fileName):
         Conformers read from crest as ASE atoms
     xtb_energies : list (float)
         Sorted xtb energies from the output
-    '''
+    """
     # Read conformers to ASE Atoms objects
     molList = ase_io.read(fileName, index=":")
 
@@ -51,7 +51,7 @@ def read_conformers(fileName):
     for mol in molList:
         mol.translate(-mol.get_center_of_mass())
 
-    with open(fileName, 'r') as file1:
+    with open(fileName, "r") as file1:
         lines = file1.readlines()
     xtb_energies = []
     read = False
@@ -63,20 +63,21 @@ def read_conformers(fileName):
                 if int(sline[0]) == len(mol):
                     read = True
             elif read:
-                xtb_energies.append(float(sline[0])*27.2114)  # Hartee to eV
+                xtb_energies.append(float(sline[0]) * 27.2114)  # Hartee to eV
                 read = False
             else:
-                print('Warning - messed up!')
+                print("Warning - messed up!")
     return molList, xtb_energies
 
 
 def crest_conformers(
-        structure,
-        charge=None,
-        uhf=None,
-        solvent='none',
-        crest_options="--gfn2//gfnff --noreftopo --nocross --quick"):
-    '''
+    structure,
+    charge=None,
+    uhf=None,
+    solvent="none",
+    crest_options="--gfn2//gfnff --noreftopo --nocross --quick",
+):
+    """
     Find conformers of a given structure with CREST.
 
     Parameters
@@ -98,11 +99,11 @@ def crest_conformers(
         Conformers generated via crest as ASE atoms
     xtb_energies : list (float)
         List of xtb energies output from CREST
-    '''
+    """
 
     # Convert smiles to xyz string
 
-    crestPath = shutil.which('crest')
+    crestPath = shutil.which("crest")
 
     mol = io_molecule.convert_io_molecule(structure)
     if charge is not None:
@@ -115,8 +116,10 @@ def crest_conformers(
     actinides = copy.deepcopy(mol.actinides)
     actinides_swapped = copy.deepcopy(mol.actinides_swapped)
 
-    even_odd_electrons = (np.sum([atom.number for atom in mol.ase_atoms])-mol_charge) % 2
-    if (uhf is not None):
+    even_odd_electrons = (
+        np.sum([atom.number for atom in mol.ase_atoms]) - mol_charge
+    ) % 2
+    if uhf is not None:
         if (even_odd_electrons == 1) and (uhf == 0):
             uhf = 1
         elif (even_odd_electrons == 1) and (uhf < 7) and (uhf % 2 == 0):
@@ -124,7 +127,7 @@ def crest_conformers(
         elif (even_odd_electrons == 1) and (uhf >= 7) and (uhf % 2 == 0):
             uhf -= 1
         if (even_odd_electrons == 0) and (uhf % 2 == 1):
-            uhf = uhf - 1 
+            uhf = uhf - 1
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
     elif mol.xtb_uhf is not None:
@@ -138,7 +141,7 @@ def crest_conformers(
         elif (even_odd_electrons == 1) and (uhf >= 7) and (uhf % 2 == 0):
             uhf -= 1
         if (even_odd_electrons == 0) and (uhf % 2 == 1):
-            uhf = uhf - 1 
+            uhf = uhf - 1
         elif (even_odd_electrons == 1) and (uhf % 2 == 0):
             uhf = uhf + 1
 
@@ -149,27 +152,35 @@ def crest_conformers(
 
     with arch_context_manage.make_temp_directory() as _:
         # Write xyz file
-        with open("structure.xyz", 'w') as outFile:
+        with open("structure.xyz", "w") as outFile:
             outFile.write(xyzstr)
 
         # Run CREST
-        if (uhf == 0) and (solvent == 'none'):
+        if (uhf == 0) and (solvent == "none"):
             execStr = "{} structure.xyz --chrg {} {} > output.crest".format(
-                        crestPath, int(mol_charge), crest_options)
-        elif (uhf == 0) and (solvent != 'none'):
+                crestPath, int(mol_charge), crest_options
+            )
+        elif (uhf == 0) and (solvent != "none"):
             execStr = "{} structure.xyz --chrg {} --alpb {} {} > output.crest".format(
-                        crestPath, int(mol_charge), solvent, crest_options)
-        elif (solvent == 'none'):
-            execStr = "{} structure.xyz --chrg {} --uhf {} {} > output.crest".format(
-                        crestPath, int(mol_charge), int(uhf), crest_options)
+                crestPath, int(mol_charge), solvent, crest_options
+            )
+        elif solvent == "none":
+            execStr = (
+                "{} structure.xyz --chrg {} --uhf {} {} > output.crest".format(
+                    crestPath, int(mol_charge), int(uhf), crest_options
+                )
+            )
         else:
             execStr = "{} structure.xyz --chrg {} --uhf {} --alpb {} {} > output.crest".format(
-                        crestPath, int(mol_charge), int(uhf), solvent, crest_options)
+                crestPath, int(mol_charge), int(uhf), solvent, crest_options
+            )
 
         sub.run(execStr, shell=True, check=True)
 
         # Read conformers from file
-        conformerList_temp, xtb_energies = read_conformers("crest_conformers.xyz")
+        conformerList_temp, xtb_energies = read_conformers(
+            "crest_conformers.xyz"
+        )
         conformerList = []
         for i, conf in enumerate(conformerList_temp):
             mol.actinides = actinides
@@ -177,28 +188,33 @@ def crest_conformers(
             tmol = io_molecule.convert_io_molecule(conf)
             mol.ase_atoms = tmol.ase_atoms
             mol.swap_actinide()
-            conformerList.append(mol.write_mol2('Crest Conformer {}'.format(i),
-                                                writestring=True))
+            conformerList.append(
+                mol.write_mol2(
+                    "Crest Conformer {}".format(i), writestring=True
+                )
+            )
 
     return conformerList, xtb_energies
 
 
-def obmol_conformers(structure,
-                     charge=None,
-                     uhf=0,
-                     method='GFN2-xTB',
-                     calculator=None,
-                     relax=True,
-                     obmol_total_confs=3000,
-                     obmol_rmsd_cutoff=0.4,
-                     obmol_energy_cutoff=50.0,
-                     xtb_solvent='none',
-                     neutralize=False,
-                     functionalizations=None,
-                     skip_spin_assign=False,
-                     assembly=False,
-                     parameters={}):
-    '''
+def obmol_conformers(
+    structure,
+    charge=None,
+    uhf=0,
+    method="GFN2-xTB",
+    calculator=None,
+    relax=True,
+    obmol_total_confs=3000,
+    obmol_rmsd_cutoff=0.4,
+    obmol_energy_cutoff=50.0,
+    xtb_solvent="none",
+    neutralize=False,
+    functionalizations=None,
+    skip_spin_assign=False,
+    assembly=False,
+    parameters={},
+):
+    """
     Generate openbabel conforms and subsequently
     Relax/evaluate structure with xTB or whatever method requested.
 
@@ -219,7 +235,7 @@ def obmol_conformers(structure,
     obmol_rmsd_cutoff : float, optional
         RMSD cutoff for classifying "new" conformers, default 0.4
     obmol_energy_cutoff : float, optional
-        Energy Cutoff for considering new conformers distinct, default 50 
+        Energy Cutoff for considering new conformers distinct, default 50
     xtb_solvent : str, optional
         whether to use a solvent for conformer evalulation, default 'none'
     neutralize: bool, optional
@@ -236,8 +252,8 @@ def obmol_conformers(structure,
     conformerList : list (ase.atoms.Atoms)
         Conformers generated via openbabel as ASE atoms
     xtb_energies : list (float)
-        List of xtb energies output 
-    '''
+        List of xtb energies output
+    """
 
     conf_list = io_obabel.generate_obmol_conformers(
         structure,
@@ -245,7 +261,8 @@ def obmol_conformers(structure,
         functionalizations=functionalizations,
         rmsd_cutoff=obmol_rmsd_cutoff,
         energy_cutoff=obmol_energy_cutoff,
-        conf_cutoff=obmol_total_confs)
+        conf_cutoff=obmol_total_confs,
+    )
 
     mol = io_molecule.convert_io_molecule(structure)
 
@@ -265,7 +282,7 @@ def obmol_conformers(structure,
 
     mol.charge = mol_charge
     mol.uhf = mol_uhf
-    if (mol.xtb_uhf is None):
+    if mol.xtb_uhf is None:
         mol.detect_charge_spin()
 
     conformerList_temp = []
@@ -275,22 +292,26 @@ def obmol_conformers(structure,
         tmol = io_molecule.convert_io_molecule(conf)
         mol.ase_atoms = tmol.ase_atoms
         if len(parameters) == 0:
-            result = CalcExecutor(mol,
-                                  method=method,
-                                  calculator=calculator,
-                                  xtb_solvent=xtb_solvent,
-                                  relax=relax)
+            result = CalcExecutor(
+                mol,
+                method=method,
+                calculator=calculator,
+                xtb_solvent=xtb_solvent,
+                relax=relax,
+            )
         else:
-            result = CalcExecutor(mol,
-                                  final_sanity_check=parameters[
-                                      'full_sanity_checks'],
-                                  assembly=assembly,
-                                  relax=relax,
-                                  skip_spin_assign=skip_spin_assign,
-                                  parameters=parameters)
+            result = CalcExecutor(
+                mol,
+                final_sanity_check=parameters["full_sanity_checks"],
+                assembly=assembly,
+                relax=relax,
+                skip_spin_assign=skip_spin_assign,
+                parameters=parameters,
+            )
         if result.successful:
-            conformerList_temp.append(result.mol.write_mol2('Obmol_conformer',
-                                                            writestring=True))
+            conformerList_temp.append(
+                result.mol.write_mol2("Obmol_conformer", writestring=True)
+            )
             xtb_energies.append(result.energy)
 
     xtb_energies = np.array(xtb_energies)
@@ -302,18 +323,19 @@ def obmol_conformers(structure,
 
     return conformerList, xtb_energies
 
+
 # Main (Unit Tests)
-if (__name__ == '__main__'):
+if __name__ == "__main__":
     # Variables
     smiles = "n1ccccc1-c2ccccn2"
 
-    crestPath=shutil.which('crest')
-    
+    crestPath = shutil.which("crest")
+
     # Check conformers
     with arch_context_manage.make_temp_directory() as _:
-        conformerList,energies = obmol_conformers(smiles,method='GFN2-xTB')
+        conformerList, energies = obmol_conformers(smiles, method="GFN2-xTB")
 
     print(conformerList)
 
-    for idx,mol in enumerate(conformerList):
+    for idx, mol in enumerate(conformerList):
         mol.write("con_{}.xyz".format(energies[idx]))

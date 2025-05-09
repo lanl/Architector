@@ -7,7 +7,7 @@ Developed by Michael Taylor
 
 from ase.neb import NEB
 from ase.constraints import Hookean
-from architector.io_align_mol import reorder_align_rmsd
+from architector.io_align_mol import mirror_permute_align_rmsd
 from architector.io_calc import CalcExecutor
 from architector.io_molecule import convert_io_molecule
 import architector.io_ptable as io_ptable
@@ -16,12 +16,15 @@ import numpy as np
 import copy
 
 
-def permutation_cost_mat_neb(atoms1, atoms2,
-                             nimages=8,
-                             neb_method='UFF',
-                             interpolation='idpp',
-                             skin=0.2,
-                             cost_type='default_min_emax'):
+def permutation_cost_mat_neb(
+    atoms1,
+    atoms2,
+    nimages=8,
+    neb_method="UFF",
+    interpolation="idpp",
+    skin=0.2,
+    cost_type="default_min_emax",
+):
     """permutation_cost_mat_neb
     return the cost matrix required by Hungarian method
     Only permutation with same label is allowed
@@ -40,7 +43,7 @@ def permutation_cost_mat_neb(atoms1, atoms2,
     """
     npt = len(atoms1)
     images = [atoms1]
-    images += [atoms1.copy() for _ in range(nimages-2)]
+    images += [atoms1.copy() for _ in range(nimages - 2)]
     images += [atoms2]
     neb = NEB(images=images)
     neb.interpolate(method=interpolation)
@@ -56,7 +59,7 @@ def permutation_cost_mat_neb(atoms1, atoms2,
     cost_mat = np.zeros([npt, npt])
     label1_t = atoms1.get_atomic_numbers()
     for x, i in enumerate(bond_change_inds[:-1]):
-        for j in bond_change_inds[x+1:]:
+        for j in bond_change_inds[x + 1 :]:
             if label1_t[i] != label1_t[j]:
                 # permutation between different element is not allowed
                 cost_mat[i, j] = np.inf
@@ -69,7 +72,7 @@ def permutation_cost_mat_neb(atoms1, atoms2,
                 reorder[j] = i
                 tmp1 = tmp1[reorder]
                 images = [tmp1]
-                images += [tmp1.copy() for _ in range(nimages-2)]
+                images += [tmp1.copy() for _ in range(nimages - 2)]
                 images += [tmp2]
                 neb = NEB(images=images)
                 neb.interpolate(method=interpolation)
@@ -85,23 +88,25 @@ def permutation_cost_mat_neb(atoms1, atoms2,
     return cost_mat
 
 
-def check_bonds(mol,
-                bonds_breaking,
-                bonds_forming,
-                breaking_cutoff,
-                forming_cutoff):
+def check_bonds(
+    mol, bonds_breaking, bonds_forming, breaking_cutoff, forming_cutoff
+):
     dists = mol.ase_atoms.get_all_distances()
     anums = mol.ase_atoms.get_atomic_numbers()
     goods = []
     for inds in bonds_breaking:
-        cutoff_dist = (io_ptable.rcov1[anums[inds[0]]] + io_ptable.rcov1[anums[inds[1]]])*breaking_cutoff
+        cutoff_dist = (
+            io_ptable.rcov1[anums[inds[0]]] + io_ptable.rcov1[anums[inds[1]]]
+        ) * breaking_cutoff
         actual_dist = dists[inds[0]][inds[1]]
         if actual_dist > cutoff_dist:
             goods.append(True)
         else:
             goods.append(False)
     for inds in bonds_forming:
-        cutoff_dist = (io_ptable.rcov1[anums[inds[0]]] + io_ptable.rcov1[anums[inds[1]]])*forming_cutoff
+        cutoff_dist = (
+            io_ptable.rcov1[anums[inds[0]]] + io_ptable.rcov1[anums[inds[1]]]
+        ) * forming_cutoff
         actual_dist = dists[inds[0]][inds[1]]
         if actual_dist < cutoff_dist:
             goods.append(True)
@@ -110,18 +115,19 @@ def check_bonds(mol,
     return np.all(goods)
 
 
-def qm_neb(initial,
-           final,
-        # nimages=8, # Prune/expand trajectory - possibly implement if needed.
-           breaking_cutoff=1.5,
-           forming_cutoff=1.2,
-           start_force_constant=0.05,
-           force_increment=0.1,
-           structure_match_fconst=0.001,
-           method='GFN2-xTB',
-           max_steps=4,
-           fmax_opt=0.1,
-           ):
+def qm_neb(
+    initial,
+    final,
+    # nimages=8, # Prune/expand trajectory - possibly implement if needed.
+    breaking_cutoff=1.5,
+    forming_cutoff=1.2,
+    start_force_constant=0.05,
+    force_increment=0.1,
+    structure_match_fconst=0.001,
+    method="GFN2-xTB",
+    max_steps=4,
+    fmax_opt=0.1,
+):
     """_summary_
 
     Parameters
@@ -155,13 +161,21 @@ def qm_neb(initial,
     mol2 = convert_io_molecule(final)
     mol1.create_mol_graph()
     mol2.create_mol_graph()
-    bonds_forming = [(int(x[0]), int(x[1])) for x in zip(*np.where((mol2.graph - mol1.graph) == 1)) if x[0] < x[1]]
-    bonds_breaking = [(int(x[0]), int(x[1])) for x in zip(*np.where((mol2.graph - mol1.graph) == -1)) if x[0] < x[1]]
+    bonds_forming = [
+        (int(x[0]), int(x[1]))
+        for x in zip(*np.where((mol2.graph - mol1.graph) == 1))
+        if x[0] < x[1]
+    ]
+    bonds_breaking = [
+        (int(x[0]), int(x[1]))
+        for x in zip(*np.where((mol2.graph - mol1.graph) == -1))
+        if x[0] < x[1]
+    ]
     fconst = start_force_constant
     save_trajectory = []
     opt_mol = copy.deepcopy(mol1)
     while keep_going:
-        print('Running Fconst = {}'.format(fconst))
+        print("Running Fconst = {}".format(fconst))
         opt_mol.ase_atoms.set_constraint()
         constraints = []
         for inds in bonds_forming:
@@ -171,22 +185,32 @@ def qm_neb(initial,
             constraint = Hookean(inds[0], inds[1], k=-fconst, rt=1)
             constraints.append(constraint)
         for ind in range(mol1.graph.shape[0]):
-            constraint = Hookean(ind, mol2.ase_atoms.positions[ind],
-                                 k=structure_match_fconst,
-                                 rt=0.1)
+            constraint = Hookean(
+                ind,
+                mol2.ase_atoms.positions[ind],
+                k=structure_match_fconst,
+                rt=0.1,
+            )
             constraints.append(constraint)
         opt_mol.ase_atoms.set_constraint(constraints)
-        tmpopt = CalcExecutor(opt_mol,
-                              method=method,
-                              relax=True,
-                              fmax=fmax_opt,
-                              maxsteps=max_steps,
-                              use_constraints=True)
+        tmpopt = CalcExecutor(
+            opt_mol,
+            method=method,
+            relax=True,
+            fmax=fmax_opt,
+            maxsteps=max_steps,
+            use_constraints=True,
+        )
         tmpopt.mol.ase_atoms.calc = None
         save_trajectory.append(copy.deepcopy(tmpopt.mol))
         opt_mol = tmpopt.mol
-        good = check_bonds(opt_mol, bonds_breaking, bonds_forming,
-                           breaking_cutoff, forming_cutoff)
+        good = check_bonds(
+            opt_mol,
+            bonds_breaking,
+            bonds_forming,
+            breaking_cutoff,
+            forming_cutoff,
+        )
         if good:
             keep_going = False
         else:
@@ -194,47 +218,50 @@ def qm_neb(initial,
     return save_trajectory
 
 
-def NEB_setup(initial,
-              final,
-              nimages=8,
-              neb_method='GFN2-xTB',
-              interpolation='idpp',
-              reorder_fancy=False,
-              climb=True):
+def NEB_setup(
+    initial,
+    final,
+    nimages=8,
+    neb_method="GFN2-xTB",
+    interpolation="idpp",
+    reorder_fancy=False,
+    climb=True,
+):
     initial_mol = convert_io_molecule(initial)
     charges = initial_mol.ase_atoms.get_initial_charges()
     magmoms = initial_mol.ase_atoms.get_initial_magnetic_moments()
-    if 'xtb' in neb_method.lower():
+    if "xtb" in neb_method.lower():
         charges[0] = initial_mol.xtb_charge
         magmoms[0] = initial_mol.xtb_uhf
     else:
         charges[0] = initial_mol.charge
         magmoms[0] = initial_mol.uhf
     final_mol = convert_io_molecule(final)
-    final_mol_ase = reorder_align_rmsd(initial_mol.ase_atoms,
-                                       final_mol.ase_atoms)
+    final_mol_ase = mirror_permute_align_rmsd(
+        initial_mol.ase_atoms, final_mol.ase_atoms
+    )
     final_mol.ase_atoms = final_mol_ase
     if reorder_fancy:
-        costmat = permutation_cost_mat_neb(initial_mol.ase_atoms, 
-                                           final_mol.ase_atoms,
-                                           nimages=nimages,
-                                           neb_method=neb_method,
-                                           interpolation=interpolation,
-                                           cost_type='default_min_emax')
+        costmat = permutation_cost_mat_neb(
+            initial_mol.ase_atoms,
+            final_mol.ase_atoms,
+            nimages=nimages,
+            neb_method=neb_method,
+            interpolation=interpolation,
+            cost_type="default_min_emax",
+        )
         permute = linear_sum_assignment(costmat)[1]
         initial_mol.ase_atoms = initial_mol.ase_atoms[permute]
     images = [initial_mol.ase_atoms]
-    images += [initial_mol.ase_atoms.copy() for _ in range(nimages-2)]
+    images += [initial_mol.ase_atoms.copy() for _ in range(nimages - 2)]
     images += [final_mol.ase_atoms]
-    neb = NEB(images=images,
-              climb=climb)
+    neb = NEB(images=images, climb=climb)
     neb.interpolate(method=interpolation)
     neb_images = []
     for image in neb.images:
         image.set_initial_magnetic_moments(magmoms)
         image.set_initial_charges(charges)
-        out = CalcExecutor(image,
-                           method=neb_method)
+        out = CalcExecutor(image, method=neb_method)
         neb_images.append(out.mol.ase_atoms)
     neb.images = neb_images
     return neb

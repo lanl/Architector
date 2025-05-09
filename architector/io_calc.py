@@ -26,15 +26,12 @@ from ase.constraints import FixAtoms, FixBondLengths, FixInternals
 has_xtb_python = False
 try:
     from xtb.ase.calculator import XTB
-
     has_xtb_python = True
 except ImportError:
     pass
 
 from architector.arch_xtb_text_ase_calc import XTB_Calculator
 from tblite.ase import TBLite
-
-# No GFN-FF nor solvent support yet in TBLite
 
 has_sella = True
 try:
@@ -92,7 +89,7 @@ params = {
     "species_run": False,
     "debug": False,
     # "Secondary Solvation Shell" parameters
-    "freeze_molecule_add_species": False,  # Whether to free the original moleucule during all secondary
+    "freeze_molecule_add_species": False,  # Whether to free the original molecule during all secondary
     "species_method": "GFN2-xTB",  # Method to use on full species - right now only GFN2-xTB really works
     "species_relax": True,  # Whether or not to relax the generated secondary solvation structures.
     "species_intermediate_method": "GFN-FF",  # Method to use for intermediate species screening - Suggested GFN-FF
@@ -137,7 +134,7 @@ default_kwargs = {
 class CalcExecutor:
     def __init__(
         self,
-        structure,
+        structure=None,
         parameters={},
         **kwargs,
     ):
@@ -212,7 +209,9 @@ class CalcExecutor:
         if kwargs.get("use_constraints", False):
             if isinstance(self.in_struct, ase.atoms.Atoms):
                 if len(self.in_struct.constraints) > 0:
-                    self.mol.ase_atoms.set_constraint(self.in_struct.constraints)
+                    self.mol.ase_atoms.set_constraint(
+                        self.in_struct.constraints
+                    )
             elif isinstance(self.in_struct, architector.io_molecule.Molecule):
                 if len(self.in_struct.ase_atoms.constraints) > 0:
                     self.mol.ase_atoms.set_constraint(
@@ -327,8 +326,12 @@ class CalcExecutor:
 
     def calculate(self):
         if self.init_sanity_check and self.assemble_sanity_checks:
-            self.mol.dist_sanity_checks(params=self.parameters, assembly=self.assembly)
-            self.mol.graph_sanity_checks(params=self.parameters, assembly=self.assembly)
+            self.mol.dist_sanity_checks(
+                params=self.parameters, assembly=self.assembly
+            )
+            self.mol.graph_sanity_checks(
+                params=self.parameters, assembly=self.assembly
+            )
         if self.mol.dists_sane:
             if (not self.species_run) and (not self.skip_spin_assign):
                 self.mol.calc_suggested_spin(params=self.parameters)
@@ -405,10 +408,14 @@ class CalcExecutor:
                     charge_vect[0] = self.mol.xtb_charge
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
-            elif ("uff" in self.method.lower()) or ("mmff" in self.method.lower()):
+            elif ("uff" in self.method.lower()) or (
+                "mmff" in self.method.lower()
+            ):
                 obabel_ff_requested = True
             else:
-                raise ValueError("Warning - no known method or calculator requested.")
+                raise ValueError(
+                    "Warning - no known method or calculator requested."
+                )
             if not obabel_ff_requested:
                 self.mol.ase_atoms.calc = calc
                 if (self.relax) and (not self.xtb_relax):
@@ -423,7 +430,9 @@ class CalcExecutor:
                         c = FixAtoms(indices=self.fix_indices)
                         cs.append(c)
                     if len(self.mol.ase_constraints) > 0:
-                        fix_list = [[x[0], x[1]] for x in self.mol.ase_constraints]
+                        fix_list = [
+                            [x[0], x[1]] for x in self.mol.ase_constraints
+                        ]
                         c = FixBondLengths(fix_list)
                         cs.append(c)
                     if len(self.trans_oxo_triples) > 0:
@@ -434,7 +443,9 @@ class CalcExecutor:
                                 tlist = []
                             else:
                                 tlist = self.fix_indices
-                            if (triple[0] not in tlist) or (triple[1] not in tlist):
+                            if (triple[0] not in tlist) or (
+                                triple[1] not in tlist
+                            ):
                                 bonds.append(
                                     [
                                         self.mol.ase_atoms.get_distance(
@@ -463,7 +474,9 @@ class CalcExecutor:
                         ):
                             if self.debug:
                                 print("Adding Internals....")
-                            ints = Internals(self.mol.ase_atoms, allow_fragments=True)
+                            ints = Internals(
+                                self.mol.ase_atoms, allow_fragments=True
+                            )
                             del self.ase_opt_kwargs["sella_internal_trics"]
                             self.replace_trics = True
                             ints.find_all_bonds()
@@ -499,14 +512,17 @@ class CalcExecutor:
                                     )
                                 else:
                                     dyn = self.opt_method(
-                                        self.mol.ase_atoms, **self.ase_opt_kwargs
+                                        self.mol.ase_atoms,
+                                        **self.ase_opt_kwargs,
                                     )
                             dyn.run(fmax=self.fmax, steps=self.maxsteps)
                             if self.save_trajectories:
                                 self.read_traj()
                             self.energy = self.mol.ase_atoms.get_total_energy()
                             if self.store_results:
-                                self.results = self.mol.ase_atoms.calc.results.copy()
+                                self.results = (
+                                    self.mol.ase_atoms.calc.results.copy()
+                                )
                             self.rmsd = simple_rmsd(
                                 self.mol.ase_atoms,
                                 io_molecule.convert_io_molecule(
@@ -558,7 +574,9 @@ class CalcExecutor:
                                 ).ase_atoms,
                             )
                             if self.store_results:
-                                self.results = self.mol.ase_atoms.calc.results.copy()
+                                self.results = (
+                                    self.mol.ase_atoms.calc.results.copy()
+                                )
                         except Exception as e:
                             self.errors.append(e)
                             if self.debug:
@@ -586,7 +604,9 @@ class CalcExecutor:
                             self.init_energy = copy.deepcopy(self.energy)
                             self.successful = True
                             if self.store_results:
-                                self.results = self.mol.ase_atoms.calc.results.copy()
+                                self.results = (
+                                    self.mol.ase_atoms.calc.results.copy()
+                                )
                         except Exception as e:
                             self.errors.append(e)
                             if self.debug:
@@ -620,10 +640,14 @@ class CalcExecutor:
                         )
                         self.successful = True
                         self.energy = energy
-                        self.mol.ase_atoms.set_positions(out_atoms.get_positions())
+                        self.mol.ase_atoms.set_positions(
+                            out_atoms.get_positions()
+                        )
                         self.rmsd = simple_rmsd(
                             self.mol.ase_atoms,
-                            io_molecule.convert_io_molecule(self.in_struct).ase_atoms,
+                            io_molecule.convert_io_molecule(
+                                self.in_struct
+                            ).ase_atoms,
                         )
                     except Exception as e:
                         self.errors.append(e)
@@ -656,8 +680,12 @@ class CalcExecutor:
             self.mol.swap_actinide(debug=self.debug)
 
         if self.final_sanity_check:
-            self.mol.dist_sanity_checks(params=self.parameters, assembly=self.assembly)
-            self.mol.graph_sanity_checks(params=self.parameters, assembly=self.assembly)
+            self.mol.dist_sanity_checks(
+                params=self.parameters, assembly=self.assembly
+            )
+            self.mol.graph_sanity_checks(
+                params=self.parameters, assembly=self.assembly
+            )
 
         # Reset structure to inital state to avoid nans in output structures.
         if np.any(np.isnan(self.mol.ase_atoms.get_positions())):
@@ -713,6 +741,74 @@ class CalcExecutor:
                         ats,
                         architector_run_label=self.architector_run_label,
                         geo_step=i,
-                        mol2string=self.mol.write_mol2("final", writestring=True),
+                        mol2string=self.mol.write_mol2(
+                            "final", writestring=True
+                        ),
                         relaxed=True,
                     )
+
+def remove_unpicklable(d):
+    "Strip unpicklable objects from a dictionary."
+    clean_dict = {}
+    for k, v in d.items():
+        try:
+            pickle.dumps(v)
+            clean_dict[k] = v
+        except Exception:
+            # Skip unpicklable value
+            pass
+    return clean_dict
+
+###########################################
+## In development -> Not production yet. ##
+###########################################
+
+def pCalcExecutor(structure=None, parameters={}, **kwargs):
+    """pCalcExecutor
+    parallelizable version of CalcExecutor
+    Takes the same arguments, passes them,
+    and returns only dictionaries of the results.
+    """
+    import os
+    os.environ["OMP_NUM_THREADS"] = "1"
+    os.environ["OPENBLAS_NUM_THREADS"] = "1"
+    os.environ["MKL_NUM_THREADS"] = "1"
+    os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+    os.environ["NUMEXPR_NUM_THREADS"] = "1"
+    from architector.io_calc import (
+        CalcExecutor,remove_unpicklable)
+    from architector import convert_io_molecule
+    out_temp = CalcExecutor(structure=structure,
+                            parameters=parameters,
+                            **kwargs)
+    mol2 = out_temp.mol.write_mol2('relaxed', writestring=True)
+    out = dict()
+    out['mol2string'] = mol2
+    out['dists_sane'] = out_temp.mol.dists_sane
+    out.update(out_temp.__dict__)
+    out = remove_unpicklable(out)
+    return out
+
+
+# Empty Dataclass.
+class pCalcExec:
+    pass
+
+
+def pCalcInvert_callback(future):
+    """pCalcInvert
+
+    Parameters
+    ----------
+    future : future
+        finished future of pCalcExecutor object
+    """
+    outdict = future.result()
+    temp_class = pCalcExec()
+    for key, val in outdict.items():
+        temp_class.__setattr__(key, val)
+    temp_class.mol = io_molecule.convert_io_molecule(
+        temp_class.mol2string
+        )
+    temp_class.mol.dists_sane = temp_class.dists_sane
+    future.result_class = temp_class

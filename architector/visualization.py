@@ -32,11 +32,11 @@ import py3Dmol
 import architector
 from architector.io_molecule import convert_io_molecule
 import architector.io_ptable as io_ptable
-from architector.io_align_mol import reorder_align_rmsd
+from architector.io_align_mol import mirror_permute_align_rmsd
 from ase.io import read
 
 
-def type_convert(structures):
+def type_convert(structures, hydrogens=True):
     """Handle multiple types of structures passed. List of xyz, mol2 files,
     or list of xyz, mol2strings.
 
@@ -45,6 +45,8 @@ def type_convert(structures):
     structures : list
         Structures you want visualized: can either be a list or individual:
         mol2 strings, mol2 files, xyz strings, xyz files, or mol3D objects
+    hydrogens : bool, optional
+        Have hydrogens present?, default True
     """
     outlist = []
     if isinstance(structures, str):
@@ -72,13 +74,17 @@ def type_convert(structures):
                 structures = out
             else:
                 structures = [out]
-    elif isinstance(structures, (ase.atoms.Atoms, architector.io_molecule.Molecule)):
+    elif isinstance(
+        structures, (ase.atoms.Atoms, architector.io_molecule.Molecule)
+    ):
         structures = [convert_io_molecule(structures)]
     elif isinstance(structures, dict):
         try:
             structures = [val["mol2string"] for key, val in structures.items()]
         except:
-            raise ValueError("Not recognized type for this dictionary to visualize!")
+            raise ValueError(
+                "Not recognized type for this dictionary to visualize!"
+            )
     else:  # Convert other array-like arguments to a list.
         structures = list(structures)
     if isinstance(structures, list):
@@ -87,7 +93,12 @@ def type_convert(structures):
                 mol = convert_io_molecule(x)
                 outlist.append(mol)
             except:
-                raise ValueError("Not Recognized Structure Type for index: " + str(i))
+                raise ValueError(
+                    "Not Recognized Structure Type for index: " + str(i)
+                )
+    if not hydrogens:
+        for mol in outlist:
+            mol.remove_hydrogens()
     return outlist
 
 
@@ -268,11 +279,13 @@ def view_structures(
     pymol_shiny_other=40,
     pymol_reflect_metal=0.2,
     pymol_reflect_other=0.1,
+    pymol_transparency_metal=0.0,
+    pymol_transparency_other=0.0,
     pymol_molecule_buffer=2.0,
     pymol_stick_option="set stick_color, grey20",
     pymol_tag_indices=[],
     pymol_tag_radii=0.6,
-    pymol_tag_color='yellow',
+    pymol_tag_color="yellow",
     pymol_tag_transparency=0.55,
     pymol_dont_render=False,
 ):
@@ -398,6 +411,10 @@ def view_structures(
         reflectivity of the metals, default 0.2
     pymol_reflect_other : float, optional
         reflectivity of non-metals, default 0.1
+    pymol_transparency_metal : float, optional
+        transparency of the metal, default 0.0
+    pymoL_transparency_other : float, optional
+        transparency of other atoms, default 0.0
     pymol_molecule_buffer : float, optional
         how much space to add around molecules from the edge of the frame
         increase if molecules are going off of the frame, by default 2.0
@@ -414,7 +431,7 @@ def view_structures(
     pymol_dont_render : bool, optional
         run pymol for rendering?, default False
     """
-    mols = type_convert(structures)
+    mols = type_convert(structures,hydrogens=hydrogens)
     if render_pymol:
         # Check for labels and populate
         if isinstance(labels, bool):
@@ -427,7 +444,9 @@ def view_structures(
                 labels = [str(i) for i in range(len(mols))]
         elif isinstance(labels, list) or isinstance(labels, np.ndarray):
             if len(labels) != len(mols):
-                print("Wrong amount of labels passed, defaulting to chemical formulas.")
+                print(
+                    "Wrong amount of labels passed, defaulting to chemical formulas."
+                )
                 labels = [
                     x.ase_atoms.get_chemical_formula() + str(i)
                     for i, x in enumerate(mols)
@@ -435,7 +454,9 @@ def view_structures(
             else:  # Force them all to be strings.
                 labels = [str(x) for x in labels]
         else:
-            raise ValueError("What sort of labels are wanting? Not recognized.")
+            raise ValueError(
+                "What sort of labels are wanting? Not recognized."
+            )
         if len(pymol_tag_indices) > 0:
             if len(mols) == 1:  # Only 1 molecule.
                 # Test if array. If it is, keep the same. Otherwise make sublist.
@@ -446,37 +467,39 @@ def view_structures(
                 if isinstance(pymol_tag_indices[0], (list, np.ndarray)):
                     # If there's fewer lists than indices.
                     if len(pymol_tag_indices) < len(mols):
-                        pymol_tag_indices = pymol_tag_indices + \
-                            [[]] * (len(mols) - len(pymol_tag_indices))
+                        pymol_tag_indices = pymol_tag_indices + [[]] * (
+                            len(mols) - len(pymol_tag_indices)
+                        )
                         print(
-                            '⚠️ Warning: Multiple molecules being rendered, but fewer tag indices flagged.\n'
-                            'I am filling out the rest of the indices with empty lists.\n'
-                            'If you want tags to apply to all use the format: \n'
+                            "⚠️ Warning: Multiple molecules being rendered, but fewer tag indices flagged.\n"
+                            "I am filling out the rest of the indices with empty lists.\n"
+                            "If you want tags to apply to all use the format: \n"
                             'view_structures(["CC","C"], render_pymol=True, \n'
-                            '                 pymol_tag_indices=[[0],[0]]\n'
-                            'As an example tagging the first carbon in each molecule.'
-                            )
+                            "                 pymol_tag_indices=[[0],[0]]\n"
+                            "As an example tagging the first carbon in each molecule."
+                        )
                     elif len(pymol_tag_indices) != len(mols):
                         print(
-                            '⚠️ Warning: Multiple molecules being rendered, but more tag indices than molecules flagged.\n'
-                            'I am ignoring extra indices passed.\n'
-                            'If you want tags to apply to all use the format: \n'
+                            "⚠️ Warning: Multiple molecules being rendered, but more tag indices than molecules flagged.\n"
+                            "I am ignoring extra indices passed.\n"
+                            "If you want tags to apply to all use the format: \n"
                             'view_structures(["CC","C"], render_pymol=True, \n'
-                            '                 pymol_tag_indices=[[0],[0]]\n'
-                            'As an example tagging the first carbon in each molecule.'
-                            )
+                            "                 pymol_tag_indices=[[0],[0]]\n"
+                            "As an example tagging the first carbon in each molecule."
+                        )
                 else:  # Assume first element is a number.
                     pymol_tag_indices = [pymol_tag_indices]
-                    pymol_tag_indices = pymol_tag_indices + \
-                        [[]] * (len(mols) - len(pymol_tag_indices))
+                    pymol_tag_indices = pymol_tag_indices + [[]] * (
+                        len(mols) - len(pymol_tag_indices)
+                    )
                     print(
-                        '⚠️ Warning: Multiple molecules being rendered, but nested list of tag_indices not passed.\n'
-                        'I am assuming the list should be passed to only the first molecule.\n'
-                        'I am filling out the rest of the indices with empty lists.\n'
-                        'If you want tags to apply to all use the format: \n'
+                        "⚠️ Warning: Multiple molecules being rendered, but nested list of tag_indices not passed.\n"
+                        "I am assuming the list should be passed to only the first molecule.\n"
+                        "I am filling out the rest of the indices with empty lists.\n"
+                        "If you want tags to apply to all use the format: \n"
                         'view_structures(["CC","C"], render_pymol=True, \n'
-                        '                 pymol_tag_indices=[[0],[0]]\n'
-                        'As an example tagging the first carbon in each molecule.'
+                        "                 pymol_tag_indices=[[0],[0]]\n"
+                        "As an example tagging the first carbon in each molecule."
                     )
         else:
             pymol_tag_indices = [[]] * len(mols)
@@ -499,6 +522,8 @@ def view_structures(
                 reflect_metal=pymol_reflect_metal,
                 reflect_other=pymol_reflect_other,
                 stick_option=pymol_stick_option,
+                transparency_other=pymol_transparency_other,
+                transparency_metal=pymol_transparency_metal,
                 tag_indices=pymol_tag_indices[i],
                 tag_color=pymol_tag_color,
                 tag_radii=pymol_tag_radii,
@@ -519,7 +544,9 @@ def view_structures(
             else:
                 label = False
         metal_ind = [
-            i for i, x in enumerate(mol.ase_atoms) if (x.symbol in io_ptable.all_metals)
+            i
+            for i, x in enumerate(mol.ase_atoms)
+            if (x.symbol in io_ptable.all_metals)
         ]
         syms = mol.ase_atoms.get_chemical_symbols()
         if len(metal_ind) > 0:  # Take advantage of empty list
@@ -541,7 +568,10 @@ def view_structures(
                 view_ats.addModel(
                     xyz,
                     "xyz",
-                    {"keepH": hydrogens, "vibrate": {"frames": 10, "amplitude": 1}},
+                    {
+                        "keepH": hydrogens,
+                        "vibrate": {"frames": 10, "amplitude": 1},
+                    },
                 )
                 view_ats.animate({"loop": "backAndForth"})
             else:
@@ -551,13 +581,17 @@ def view_structures(
             view_ats.addStyle(
                 {"sphere": {"colorscheme": "Jmol", "scale": sphere_scale}}
             )
-            msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_ind]
+            msyms = [
+                mol.ase_atoms.get_chemical_symbols()[x] for x in metal_ind
+            ]
             for ms in set(msyms):
                 view_ats.setStyle(
                     {"elem": ms},
                     {"sphere": {"colorscheme": "Jmol", "scale": metal_scale}},
                 )
-            view_ats.addStyle({"stick": {"colorscheme": "Jmol", "radius": stick_scale}})
+            view_ats.addStyle(
+                {"stick": {"colorscheme": "Jmol", "radius": stick_scale}}
+            )
             if label:
                 view_ats.addLabel(
                     "{}".format(label),
@@ -580,7 +614,13 @@ def view_structures(
                 view_ats.addModel(
                     xyz,
                     "xyz",
-                    {"vibrate": {"keepH": hydrogens, "frames": 10, "amplitude": 1}},
+                    {
+                        "vibrate": {
+                            "keepH": hydrogens,
+                            "frames": 10,
+                            "amplitude": 1,
+                        }
+                    },
                 )
                 view_ats.animate({"loop": "backAndForth"})
             else:
@@ -589,11 +629,21 @@ def view_structures(
                 )  # Add the molecule
             if representation == "stick":
                 view_ats.setStyle(
-                    {representation: {"colorscheme": "Jmol", "radius": stick_scale}}
+                    {
+                        representation: {
+                            "colorscheme": "Jmol",
+                            "radius": stick_scale,
+                        }
+                    }
                 )
             elif representation == "sphere":
                 view_ats.setStyle(
-                    {representation: {"colorscheme": "Jmol", "scale": sphere_scale}}
+                    {
+                        representation: {
+                            "colorscheme": "Jmol",
+                            "scale": sphere_scale,
+                        }
+                    }
                 )
             else:
                 view_ats.setStyle({representation: {"colorscheme": "Jmol"}})
@@ -694,12 +744,16 @@ def view_structures(
                 label = []
         elif isinstance(labels, list) or isinstance(labels, np.ndarray):
             if len(labels) != len(mols):
-                print("Wrong amount of labels passed, defaulting to chemical formulas.")
+                print(
+                    "Wrong amount of labels passed, defaulting to chemical formulas."
+                )
                 label = [x.ase_atoms.get_chemical_formula() for x in mols]
             else:  # Force them all to be strings.
                 label = [str(x) for x in labels]
         else:
-            raise ValueError("What sort of labels are wanting? Not recognized.")
+            raise ValueError(
+                "What sort of labels are wanting? Not recognized."
+            )
         x, y = 0, 0  # Subframe position
         for k, mol in enumerate(mols):
             syms = mol.ase_atoms.get_chemical_symbols()
@@ -727,7 +781,10 @@ def view_structures(
                     view_ats.addModel(
                         xyz,
                         "xyz",
-                        {"vibrate": {"frames": 10, "amplitude": 1}, "keepH": hydrogens},
+                        {
+                            "vibrate": {"frames": 10, "amplitude": 1},
+                            "keepH": hydrogens,
+                        },
                         viewer=(x, y),
                     )
                     view_ats.animate({"loop": "backAndForth"}, viewer=(x, y))
@@ -742,11 +799,18 @@ def view_structures(
                     {"sphere": {"colorscheme": "Jmol", "scale": sphere_scale}},
                     viewer=(x, y),
                 )
-                msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
+                msyms = [
+                    mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds
+                ]
                 for ms in set(msyms):
                     view_ats.setStyle(
                         {"elem": ms},
-                        {"sphere": {"colorscheme": "Jmol", "scale": metal_scale}},
+                        {
+                            "sphere": {
+                                "colorscheme": "Jmol",
+                                "scale": metal_scale,
+                            }
+                        },
                         viewer=(x, y),
                     )
                 view_ats.addStyle(
@@ -823,7 +887,10 @@ def view_structures(
                     view_ats.addModel(
                         xyz,
                         "xyz",
-                        {"keepH": hydrogens, "vibrate": {"frames": 10, "amplitude": 1}},
+                        {
+                            "keepH": hydrogens,
+                            "vibrate": {"frames": 10, "amplitude": 1},
+                        },
                         viewer=(x, y),
                     )
                     view_ats.animate({"loop": "backAndForth"}, viewer=(x, y))
@@ -856,7 +923,8 @@ def view_structures(
                     )
                 else:
                     view_ats.setStyle(
-                        {representation: {"colorscheme": "Jmol"}}, viewer=(x, y)
+                        {representation: {"colorscheme": "Jmol"}},
+                        viewer=(x, y),
                     )
                 if len(label) > 0:
                     view_ats.addLabel(
@@ -966,21 +1034,35 @@ def view_structures(
             view_ats.addStyle(
                 {"sphere": {"colorscheme": "Jmol", "scale": sphere_scale}}
             )
-            msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
+            msyms = [
+                mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds
+            ]
             for ms in set(msyms):
                 view_ats.setStyle(
                     {"elem": ms},
                     {"sphere": {"colorscheme": "Jmol", "scale": metal_scale}},
                 )
-            view_ats.addStyle({"stick": {"colorscheme": "Jmol", "radius": stick_scale}})
+            view_ats.addStyle(
+                {"stick": {"colorscheme": "Jmol", "radius": stick_scale}}
+            )
         else:
             if representation == "stick":
                 view_ats.setStyle(
-                    {representation: {"colorscheme": "Jmol", "radius": stick_scale}}
+                    {
+                        representation: {
+                            "colorscheme": "Jmol",
+                            "radius": stick_scale,
+                        }
+                    }
                 )
             elif representation == "sphere":
                 view_ats.setStyle(
-                    {representation: {"colorscheme": "Jmol", "scale": sphere_scale}}
+                    {
+                        representation: {
+                            "colorscheme": "Jmol",
+                            "scale": sphere_scale,
+                        }
+                    }
                 )
             else:
                 view_ats.setStyle({representation: {"colorscheme": "Jmol"}})
@@ -1017,7 +1099,7 @@ def view_structures(
         mol0 = mols[0]
         for k, mol in enumerate(mols):
             if stack_align:
-                aligned = reorder_align_rmsd(mol0.ase_atoms, mol.ase_atoms)
+                aligned = mirror_permute_align_rmsd(mol0.ase_atoms, mol.ase_atoms)
                 newmol = convert_io_molecule(aligned)
                 newmol.create_mol_graph()
                 mol = newmol
@@ -1030,21 +1112,35 @@ def view_structures(
             view_ats.addStyle(
                 {"sphere": {"colorscheme": "Jmol", "scale": sphere_scale}}
             )
-            msyms = [mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds]
+            msyms = [
+                mol.ase_atoms.get_chemical_symbols()[x] for x in metal_inds
+            ]
             for ms in set(msyms):
                 view_ats.setStyle(
                     {"elem": ms},
                     {"sphere": {"colorscheme": "Jmol", "scale": metal_scale}},
                 )
-            view_ats.addStyle({"stick": {"colorscheme": "Jmol", "radius": stick_scale}})
+            view_ats.addStyle(
+                {"stick": {"colorscheme": "Jmol", "radius": stick_scale}}
+            )
         else:
             if representation == "stick":
                 view_ats.setStyle(
-                    {representation: {"colorscheme": "Jmol", "radius": stick_scale}}
+                    {
+                        representation: {
+                            "colorscheme": "Jmol",
+                            "radius": stick_scale,
+                        }
+                    }
                 )
             elif representation == "sphere":
                 view_ats.setStyle(
-                    {representation: {"colorscheme": "Jmol", "scale": sphere_scale}}
+                    {
+                        representation: {
+                            "colorscheme": "Jmol",
+                            "scale": sphere_scale,
+                        }
+                    }
                 )
             else:
                 view_ats.setStyle({representation: {"colorscheme": "Jmol"}})
@@ -1099,6 +1195,7 @@ set shininess, {shiny_other}
 set specular, 1
 set reflect, {reflect_other}
 set stick_radius, {stick_scale}
+set transparency, {transparency_others}
 set dash_gap, 0.01
 set light_count, {light_count}
 set dash_radius, 0.035
@@ -1109,34 +1206,42 @@ set sphere_scale, {h_scale}, elem H
 set sphere_scale, {metal_scale}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
 set shininess, {shiny_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
 set reflect, {reflect_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
+set transparency, {transparency_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
 # Actinides
 set sphere_scale, {metal_scale}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 set shininess, {shiny_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 set reflect, {reflect_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
+set transparency, {transparency_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 # First row
 set sphere_scale, {metal_scale}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 set shininess, {shiny_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 set reflect, {reflect_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
+set transparency, {transparency_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 # Second row
 set sphere_scale, {metal_scale}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
 set shininess, {shiny_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
 set reflect, {reflect_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
+set transparency, {transparency_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
 # Third row +
 set sphere_scale, {metal_scale}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
 set shininess, {shiny_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
 set reflect, {reflect_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
+set transparency, {transparency_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
 # Alakai
 set sphere_scale, {metal_scale}, elem Li+Na+K+Rb+Cs+Fr
 set shininess, {shiny_metal}, elem Li+Na+K+Rb+Cs+Fr
 set reflect, {reflect_metal}, elem Li+Na+K+Rb+Cs+Fr
+set transparency, {transparency_metal}, elem Li+Na+K+Rb+Cs+Fr
 # Alakai Earth
 set sphere_scale, {metal_scale}, elem Be+Mg+Ca+Sr+Ba+Ra
 set shininess, {shiny_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
 set reflect, {reflect_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
+set transparency, {transparency_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
 # Post transition
 set sphere_scale, {metal_scale}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 set shininess, {shiny_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 set reflect, {reflect_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
+set transparency, {transparency_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 
 {tag_section}
 
@@ -1292,7 +1397,9 @@ def display_image_smart(path):
             from IPython import get_ipython
 
             shell = get_ipython().__class__.__name__
-            return shell == "ZMQInteractiveShell"  # typical Jupyter notebook kernel
+            return (
+                shell == "ZMQInteractiveShell"
+            )  # typical Jupyter notebook kernel
         except Exception:
             return False
 
@@ -1344,11 +1451,12 @@ set sphere_transparency, {tag_transparency}, {tag_label}
 
 
 def make_tag_section(
-                     molecule,
-                     tag_indices=[],
-                     tag_radii=0.6,
-                     tag_color='yellow',
-                     tag_transparency=0.55):
+    molecule,
+    tag_indices=[],
+    tag_radii=0.6,
+    tag_color="yellow",
+    tag_transparency=0.55,
+):
     """create the tag section
 
     molecule : architector molecule
@@ -1362,22 +1470,26 @@ def make_tag_section(
     tag_transparency : float, optional
         transparency of the tag, default 0.55
     """
-    out = ''
+    out = ""
     if len(tag_indices) > 0:
         for i, ind in enumerate(tag_indices):
-            tag_label = 'tag_at' + str(i)
-            tag_posit = '[' + '{}, {}, {}'.format(
-                molecule.ase_atoms.positions[ind][0],
-                molecule.ase_atoms.positions[ind][1],
-                molecule.ase_atoms.positions[ind][2]
-            ) + ']'
+            tag_label = "tag_at" + str(i)
+            tag_posit = (
+                "["
+                + "{}, {}, {}".format(
+                    molecule.ase_atoms.positions[ind][0],
+                    molecule.ase_atoms.positions[ind][1],
+                    molecule.ase_atoms.positions[ind][2],
+                )
+                + "]"
+            )
             out += tag_template.format(
                 tag_label=tag_label,
                 tag_posit=tag_posit,
                 tag_radii=tag_radii,
                 tag_color=tag_color,
-                tag_transparency=tag_transparency
-                )
+                tag_transparency=tag_transparency,
+            )
     return out
 
 
@@ -1398,9 +1510,11 @@ def make_pml(
     shiny_metal=50,
     reflect_other=0.1,
     reflect_metal=0.2,
+    transparency_other=0,
+    transparency_metal=0,
     tag_indices=[],
     tag_radii=0.6,
-    tag_color='yellow',
+    tag_color="yellow",
     tag_transparency=0.55,
     stick_option="set stick_color, grey20",
     render=True,
@@ -1443,6 +1557,10 @@ def make_pml(
         reflectivity of the metals, default 0.2
     reflect_other : float, optional
         reflectivity of non-metals, default 0.1
+    transparency_metal : float, optional
+        transparency of the metal, default 0.0
+    transparency_other : float, optional
+        transparency of other atoms, default 0.0
     stick_option : str, optional
         stick options passed to pymol, by default 'set stick_color, grey20'
     render : bool, optional
@@ -1462,7 +1580,7 @@ def make_pml(
         tag_indices=tag_indices,
         tag_color=tag_color,
         tag_radii=tag_radii,
-        tag_transparency=tag_transparency
+        tag_transparency=tag_transparency,
     )
     render_str = pymol_python_template.format(
         render_name=render_name,
@@ -1477,6 +1595,8 @@ def make_pml(
         shiny_other=shiny_other,
         reflect_metal=reflect_metal,
         reflect_other=reflect_other,
+        transparency_metal=transparency_metal,
+        transparency_other=transparency_other,
         tag_section=tag_section,
         size_x=w,
         size_y=h,

@@ -1,17 +1,18 @@
-""" 
+"""
 Code for aligning molecules with arbitrary order. (Allowing permutations)
 Applies by default to core of graoh depth 3 from the metal to align molecules.
 
 Relies on a couple algorithms:
-https://en.wikipedia.org/wiki/Hungarian_algorithm 
+https://en.wikipedia.org/wiki/Hungarian_algorithm
 https://en.wikipedia.org/wiki/Root-mean-square_deviation_of_atomic_positions
-https://en.wikipedia.org/wiki/Kabsch_algorithm 
+https://en.wikipedia.org/wiki/Kabsch_algorithm
 A lot of shared ideas from:
-https://pypi.org/project/rmsd/ 
+https://pypi.org/project/rmsd/
 
 
 Developed by Michael Taylor
 """
+
 import numpy as np
 import scipy
 import copy
@@ -20,11 +21,11 @@ from scipy.optimize import linear_sum_assignment
 from scipy.spatial.transform import Rotation as Rot
 from architector import io_ptable
 
-from architector.io_molecule import (convert_io_molecule, convert_ase_xyz)
+from architector.io_molecule import convert_io_molecule, convert_ase_xyz
 
 
 def get_graph_depths(graph):
-    """get_graph_depths 
+    """get_graph_depths
     calculate all graph depths from molecular graph
 
     Returns
@@ -32,13 +33,14 @@ def get_graph_depths(graph):
     depths : np.ndarray
         NXN matrix containing the graph depths of each atom to the others.
     """
-    depths = scipy.sparse.csgraph.dijkstra(scipy.sparse.csgraph.csgraph_from_dense(graph))
+    depths = scipy.sparse.csgraph.dijkstra(
+        scipy.sparse.csgraph.csgraph_from_dense(graph)
+    )
     return depths
 
 
-
 # Permutation ordering and rmsd loss assignment adapted LANL code developed by Chang Liu
-def permutation_cost_mat(pt_list1, pt_list2, label1, label2, costtype='xyz'):
+def permutation_cost_mat(pt_list1, pt_list2, label1, label2, costtype="xyz"):
     """permutation_cost_mat
     return the cost matrix required by Hungarian method
 
@@ -74,15 +76,15 @@ def permutation_cost_mat(pt_list1, pt_list2, label1, label2, costtype='xyz'):
                 # permutation between different element is not allowed
                 cost_mat[i, j] = np.inf
             else:
-                if costtype == 'xyz':
+                if costtype == "xyz":
                     diffvec = xyz1 - xyz2
-                elif costtype == 'COM':
-                    diffvec = (xyz1-pt_list1_com) - (xyz2-pt_list2_com)
+                elif costtype == "COM":
+                    diffvec = (xyz1 - pt_list1_com) - (xyz2 - pt_list2_com)
                 cost_mat[i, j] = np.dot(diffvec, diffvec)
     return cost_mat
 
 
-def simple_rmsd(tarmol, insrcmol):
+def simple_rmsd(tarmol, insrcmol, only_rmsd=True):
     """simple_rmsd
 
     Parameters
@@ -91,12 +93,16 @@ def simple_rmsd(tarmol, insrcmol):
         reference/target molecule to match the generated molecule to.
     insrcmol : ase.atoms.Atoms
         generated/predicted molecule to match to reference/target molecule.
+    only_rmsd : bool
+        return only rmsd value, default True
     """
-    rmsd = np.sqrt(np.sum((insrcmol.positions-tarmol.positions)**2)/len(tarmol))
+    rmsd = np.sqrt(
+        np.sum((insrcmol.positions - tarmol.positions) ** 2) / len(tarmol)
+    )
     return rmsd
 
 
-def align_rmsd(tarmol, insrcmol, in_place=False):
+def align_rmsd(tarmol, insrcmol, in_place=False, only_rmsd=False):
     """align_rmsd
     Perform alignment between two ase Atoms assuming indices match or are ideally permuted
     Return the rmsd_loss for the rotation.
@@ -109,6 +115,8 @@ def align_rmsd(tarmol, insrcmol, in_place=False):
         generated/predicted molecule to match to reference/target molecule.
     in_place : bool, optional
         [description], by default False
+    only_rmsd : bool
+        return only rmsd value, default False
 
     Returns
     -------
@@ -124,14 +132,58 @@ def align_rmsd(tarmol, insrcmol, in_place=False):
         r = Rot.align_vectors(tarmol.positions, insrcmol.positions)
         newposits = r[0].apply(insrcmol.positions)
         insrcmol.set_positions(newposits)
-    else: 
+    else:
         r = None
     rmsd_loss = simple_rmsd(tarmol, insrcmol)
-    return rmsd_loss, r, insrcmol
+    if only_rmsd:
+        return rmsd_loss
+    else:
+        return rmsd_loss, r, insrcmol
 
 
-def permute_align(tarmol, srcmol, maxiter=1, tol=1e-6, in_place=False):
-    """permute_align
+def permute_rmsd(tarmol, srcmol,
+                 only_rmsd=False):
+    """permute_rmsd
+    permute the atom order in mol to minimize the rmsd, in place
+
+    Parameters
+    ----------
+    tarmol : ase.atoms.Atoms
+        reference/target molecule to match the generated molecule to.
+    srcmol : ase.atoms.Atoms
+        generated/predicted molecule to match to reference/target molecule.
+    only_rmsd : bool
+        only return rmsd, default False
+
+    Returns
+    -------
+    rmsd : float
+        rmsd of the permutation/rotation
+    srcmol_1 : ase.atoms.Atoms
+        re-indexed source molecule. Optional
+    """
+    tarmol_1 = tarmol.copy()
+    srcmol_1 = srcmol.copy()
+    cost_mat = permutation_cost_mat(
+        tarmol_1.positions,
+        srcmol_1.positions,
+        tarmol_1.get_atomic_numbers(),
+        srcmol_1.get_atomic_numbers(),
+        costtype="xyz",
+    )
+    permute = linear_sum_assignment(cost_mat)[1]
+    srcmol_1 = srcmol_1[permute]
+    rmsd = simple_rmsd(tarmol_1,srcmol_1)
+    if only_rmsd:
+        return rmsd
+    else:
+        return srcmol_1, rmsd
+    
+
+def permute_align_rmsd(tarmol, srcmol, maxiter=1,
+                  tol=1e-6, in_place=False,
+                  only_rmsd=False):
+    """permute_align_rmsd
     permute the atom order in mol to minimize the rmsd, in place
 
     A follow-up rmsd alignment will be applied to the new molecule to
@@ -165,30 +217,34 @@ def permute_align(tarmol, srcmol, maxiter=1, tol=1e-6, in_place=False):
     outr = None
     count = 0
     for _ in range(maxiter):
-        cost_mat = permutation_cost_mat(tarmol_1.positions, srcmol_1.positions,
-                                        tarmol_1.get_atomic_numbers(), 
-                                        srcmol_1.get_atomic_numbers(),
-                                        costtype='xyz')
+        cost_mat = permutation_cost_mat(
+            tarmol_1.positions,
+            srcmol_1.positions,
+            tarmol_1.get_atomic_numbers(),
+            srcmol_1.get_atomic_numbers(),
+            costtype="xyz",
+        )
         permute = linear_sum_assignment(cost_mat)[1]
         srcmol_1 = srcmol_1[permute]
-        rms, r, srcmol_1 = align_rmsd(tarmol_1,
-                                      srcmol_1,
-                                      in_place=in_place)
+        rms, r, srcmol_1 = align_rmsd(tarmol_1, srcmol_1, in_place=in_place)
         if (count == 0) and (not in_place):
-            outr = r[0] 
-        elif (not in_place):
+            outr = r[0]
+        elif not in_place:
             outr = outr * r[0]  # Composite rotation.
         else:
             outr = r
-        if abs(rms-last_rms) < tol:
+        if abs(rms - last_rms) < tol:
             break
         last_rms = rms
         count += 1
-    return rms, outr, srcmol_1
+    if only_rmsd:
+        return rms
+    else:
+        return rms, outr, srcmol_1
 
 
 def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
-    """mirror_align 
+    """mirror_align
     try mirror image alignment of molecule.
 
     Parameters
@@ -215,16 +271,23 @@ def mirror_align(tarmol, srcmol, maxiter=1, tol=1e-6):
     newposits = srcmol_tmp.positions
     newposits[:, 0] = -newposits[:, 0]
     srcmol_tmp.set_positions(newposits)
-    rmsd, outr, msrcmol = permute_align(tarmol,
-                                        srcmol_tmp,
-                                        maxiter=maxiter,
-                                        tol=tol)
+    rmsd, outr, msrcmol = permute_align_rmsd(
+        tarmol, srcmol_tmp, maxiter=maxiter, tol=tol
+    )
     return rmsd, outr, msrcmol
 
 
-def reorder_align_rmsd(tarmol, srcmol, sample=300,
-                       maxiter=1, tol=1e-6, return_rmsd=False, center=True):
-    """reorder_align_rmsd
+def mirror_permute_align_rmsd(
+    tarmol,
+    srcmol,
+    sample=300,
+    maxiter=1,
+    tol=1e-6,
+    return_rmsd=False,
+    only_rmsd=False,
+    center=True,
+):
+    """mirror_permute_align_rmsd
     Align including re-ordering and mirroring, and calc RMSD
 
     Parameters
@@ -241,6 +304,8 @@ def reorder_align_rmsd(tarmol, srcmol, sample=300,
         tolerance for convergence, by default 1e-2
     return_rmsd: bool, optional
         return the rmsd value?, by default False
+    only_rmsd : bool, optional
+        return only the rmsd, default False
     center : bool, optional
         center the molecules to their center of masses, by defualt True
 
@@ -255,33 +320,47 @@ def reorder_align_rmsd(tarmol, srcmol, sample=300,
     final_out = None
 
     if center:
-        tmp1.set_positions(tmp1.get_positions() - tmp1.get_positions().mean(axis=0)) # Center 
-        tmp2.set_positions(tmp2.get_positions() - tmp2.get_positions().mean(axis=0)) # Center 
+        tmp1.set_positions(
+            tmp1.get_positions() - tmp1.get_positions().mean(axis=0)
+        )  # Center
+        tmp2.set_positions(
+            tmp2.get_positions() - tmp2.get_positions().mean(axis=0)
+        )  # Center
 
     for _ in range(sample):
         r = Rot.random()
         tmp2.set_positions(r.apply(tmp2.get_positions()))
-        normal, _, out = permute_align(tmp1, tmp2, maxiter=maxiter,
-                                       tol=tol, in_place=False)
+        normal, _, out = permute_align_rmsd(
+            tmp1, tmp2, maxiter=maxiter, tol=tol, in_place=False
+        )
         rmsd = normal
-        mirror, _, out2 = mirror_align(tmp1, tmp2, maxiter=maxiter,
-                                       tol=tol)
+        mirror, _, out2 = mirror_align(tmp1, tmp2, maxiter=maxiter, tol=tol)
         if mirror < normal:
             out = out2
             rmsd = mirror
         if rmsd < min_rmsd:
             min_rmsd = rmsd
             final_out = out
-    if not return_rmsd:
+    if only_rmsd:
+        return min_rmsd
+    elif not return_rmsd:
         return final_out
     else:
         return final_out, min_rmsd
 
 
-def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
-              return_structures=False, rmsd_type='simple',
-              override=False, debug=False):
-    """calc_rmsd 
+def calc_rmsd(
+    genMol,
+    compareMol,
+    coresize=2,
+    maxiter=1,
+    sample=300,
+    return_structures=False,
+    rmsd_type="simple",
+    override=False,
+    debug=False,
+):
+    """calc_rmsd
     Calculate the rmsd by different methods for this molecule compared to another.
 
     Parameters
@@ -324,9 +403,14 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
         compareMol.create_mol_graph()
 
     # Check that these are stoichiometrically identical molecules.
-    if np.any(sorted(genMol.ase_atoms.get_atomic_numbers()) != sorted(compareMol.ase_atoms.get_atomic_numbers())):
+    if np.any(
+        sorted(genMol.ase_atoms.get_atomic_numbers())
+        != sorted(compareMol.ase_atoms.get_atomic_numbers())
+    ):
         if debug:
-            print('Warning - comparison not possible between molecules of different sizes/stoichiometries.')
+            print(
+                "Warning - comparison not possible between molecules of different sizes/stoichiometries."
+            )
         flag_struct = True
         # Set ordering to be identical based on canonical labels.
         genMol_metalind = genMol.find_metal(debug=debug)
@@ -335,32 +419,52 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
         compareMol_metalind = compareMol.find_metal(debug=debug)
         compareMol_graph_depths = get_graph_depths(compareMol.graph)
 
-        if ((genMol_metalind is None) or (compareMol_metalind is None)) and override:
+        if (
+            (genMol_metalind is None) or (compareMol_metalind is None)
+        ) and override:
             genMol_metalind = 0
             compareMol_metalind = 0
 
         # Pull out center of molecule up to depth coresize graph hops for matching to reference.
-        genMol_subset_component_inds = np.where(genMol_graph_depths[genMol_metalind] <= coresize)[0]
-        compareMol_subset_component_inds = np.where(compareMol_graph_depths[compareMol_metalind] <= coresize)[0]
+        genMol_subset_component_inds = np.where(
+            genMol_graph_depths[genMol_metalind] <= coresize
+        )[0]
+        compareMol_subset_component_inds = np.where(
+            compareMol_graph_depths[compareMol_metalind] <= coresize
+        )[0]
 
-        tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy() 
-        tmp_ref_comp = compareMol.ase_atoms[compareMol_subset_component_inds].copy() 
+        tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy()
+        tmp_ref_comp = compareMol.ase_atoms[
+            compareMol_subset_component_inds
+        ].copy()
         outcore = tmp_self_comp
         rmsd_loss_core = 1000
         rmsd_loss_full = 1000
         coreinds = None
-    elif coresize is None: # Perform alignment based on centroid instead.
+    elif coresize is None:  # Perform alignment based on centroid instead.
         # Pull out center of molecule up to depth coresize graph hops for matching to reference.
         genMol_subset_component_inds = np.arange(len(genMol.ase_atoms))
         compareMol_subset_component_inds = np.arange(len(genMol.ase_atoms))
-        tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy() 
-        tmp_ref_comp = compareMol.ase_atoms[compareMol_subset_component_inds].copy() 
+        tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy()
+        tmp_ref_comp = compareMol.ase_atoms[
+            compareMol_subset_component_inds
+        ].copy()
         coreinds = compareMol_subset_component_inds
         # Center on centroid.
-        tmp_self_comp.set_positions(tmp_self_comp.positions - tmp_self_comp.positions.mean(axis=0))
-        tmp_ref_comp.set_positions(tmp_ref_comp.positions - tmp_ref_comp.positions.mean(axis=0))
-        genMol.ase_atoms.set_positions(genMol.ase_atoms.positions - genMol.ase_atoms.positions.mean(axis=0))
-        compareMol.ase_atoms.set_positions(compareMol.ase_atoms.positions - compareMol.ase_atoms.positions.mean(axis=0))
+        tmp_self_comp.set_positions(
+            tmp_self_comp.positions - tmp_self_comp.positions.mean(axis=0)
+        )
+        tmp_ref_comp.set_positions(
+            tmp_ref_comp.positions - tmp_ref_comp.positions.mean(axis=0)
+        )
+        genMol.ase_atoms.set_positions(
+            genMol.ase_atoms.positions
+            - genMol.ase_atoms.positions.mean(axis=0)
+        )
+        compareMol.ase_atoms.set_positions(
+            compareMol.ase_atoms.positions
+            - compareMol.ase_atoms.positions.mean(axis=0)
+        )
 
         # Sample random rotations to find best starting assignment point.
         best = np.inf
@@ -368,8 +472,12 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
             q = Rot.random()
             calc_test_comp = copy.deepcopy(tmp_self_comp)
             calc_test_comp.set_positions(q.apply(calc_test_comp.positions))
-            rmsd_core, _, _ = permute_align(tmp_ref_comp, calc_test_comp, maxiter=maxiter)
-            rmsd_mirror, _, _ = mirror_align(tmp_ref_comp, calc_test_comp, maxiter=maxiter)
+            rmsd_core, _, _ = permute_align_rmsd(
+                tmp_ref_comp, calc_test_comp, maxiter=maxiter
+            )
+            rmsd_mirror, _, _ = mirror_align(
+                tmp_ref_comp, calc_test_comp, maxiter=maxiter
+            )
             if rmsd_mirror < rmsd_core:
                 rmsd_core = rmsd_mirror
             if rmsd_core < best:
@@ -379,15 +487,21 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
         tmp_self_comp.set_positions(saveq.apply(tmp_self_comp.positions))
         genMol.ase_atoms.set_positions(saveq.apply(genMol.ase_atoms.positions))
 
-        rmsd_core, r, outcore = permute_align(tmp_ref_comp, tmp_self_comp, maxiter=maxiter)
-        rmsd_mirror, r_mirror, moutcore = mirror_align(tmp_ref_comp, tmp_self_comp, maxiter=maxiter)
+        rmsd_core, r, outcore = permute_align_rmsd(
+            tmp_ref_comp, tmp_self_comp, maxiter=maxiter
+        )
+        rmsd_mirror, r_mirror, moutcore = mirror_align(
+            tmp_ref_comp, tmp_self_comp, maxiter=maxiter
+        )
 
         if rmsd_mirror < rmsd_core:  # Pick the better one!
             rmsd_core = rmsd_mirror
             outcore = moutcore
             r = r_mirror
             newposits = genMol.ase_atoms.positions
-            newposits[:, 0] = -newposits[:, 0] # Mirror across x axis to replicate mirror in permute
+            newposits[:, 0] = -newposits[
+                :, 0
+            ]  # Mirror across x axis to replicate mirror in permute
             genMol.ase_atoms.set_positions(newposits)
 
         rmsd_loss_core = rmsd_core
@@ -395,10 +509,13 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
         tmp_posits = r.apply(tmp_posits)
         genMol.ase_atoms.set_positions(tmp_posits)
         # Do permutation mapping to estimate full loss given the rotation to match the core.
-        rmsd_loss_full, _, _ = permute_align(copy.deepcopy(compareMol.ase_atoms),
-                                                copy.deepcopy(genMol.ase_atoms),
-                                                maxiter=1, tol=1e-6,
-                                                in_place=True)
+        rmsd_loss_full, _, _ = permute_align_rmsd(
+            copy.deepcopy(compareMol.ase_atoms),
+            copy.deepcopy(genMol.ase_atoms),
+            maxiter=1,
+            tol=1e-6,
+            in_place=True,
+        )
         flag_struct = False
     else:
         # Set ordering to be identical based on canonical labels.
@@ -408,24 +525,35 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
         compareMol_metalind = compareMol.find_metal(debug=debug)
         compareMol_graph_depths = get_graph_depths(compareMol.graph)
 
-        if ((genMol_metalind is None) or (compareMol_metalind is None)) and override:
+        if (
+            (genMol_metalind is None) or (compareMol_metalind is None)
+        ) and override:
             genMol_metalind = 0
             compareMol_metalind = 0
 
         # Pull out center of molecule up to depth coresize graph hops for matching to reference.
-        genMol_subset_component_inds = np.where(genMol_graph_depths[genMol_metalind] <= coresize)[0]
-        compareMol_subset_component_inds = np.where(compareMol_graph_depths[compareMol_metalind] <= coresize)[0]
+        genMol_subset_component_inds = np.where(
+            genMol_graph_depths[genMol_metalind] <= coresize
+        )[0]
+        compareMol_subset_component_inds = np.where(
+            compareMol_graph_depths[compareMol_metalind] <= coresize
+        )[0]
 
-        tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy() 
-        tmp_ref_comp = compareMol.ase_atoms[compareMol_subset_component_inds].copy() 
+        tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy()
+        tmp_ref_comp = compareMol.ase_atoms[
+            compareMol_subset_component_inds
+        ].copy()
         coreinds = compareMol_subset_component_inds
 
         flag_struct = False
 
-        if np.any(sorted(tmp_self_comp.get_atomic_numbers()) != sorted(tmp_ref_comp.get_atomic_numbers())):
+        if np.any(
+            sorted(tmp_self_comp.get_atomic_numbers())
+            != sorted(tmp_ref_comp.get_atomic_numbers())
+        ):
             if debug:
-                print('Warning cores not matched at graph depth!')
-                print('Can re-attempt. Not doing that now.')
+                print("Warning cores not matched at graph depth!")
+                print("Can re-attempt. Not doing that now.")
                 print(tmp_self_comp.get_chemical_formula())
                 print(tmp_ref_comp.get_chemical_formula())
             outcore = tmp_self_comp
@@ -434,10 +562,22 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
             flag_struct = True
         else:
             # Center on metal atom
-            tmp_self_comp.set_positions(tmp_self_comp.positions - genMol.ase_atoms[genMol_metalind].position)
-            tmp_ref_comp.set_positions(tmp_ref_comp.positions - compareMol.ase_atoms[compareMol_metalind].position)
-            genMol.ase_atoms.set_positions(genMol.ase_atoms.positions - genMol.ase_atoms[genMol_metalind].position)
-            compareMol.ase_atoms.set_positions(compareMol.ase_atoms.positions - compareMol.ase_atoms[compareMol_metalind].position)
+            tmp_self_comp.set_positions(
+                tmp_self_comp.positions
+                - genMol.ase_atoms[genMol_metalind].position
+            )
+            tmp_ref_comp.set_positions(
+                tmp_ref_comp.positions
+                - compareMol.ase_atoms[compareMol_metalind].position
+            )
+            genMol.ase_atoms.set_positions(
+                genMol.ase_atoms.positions
+                - genMol.ase_atoms[genMol_metalind].position
+            )
+            compareMol.ase_atoms.set_positions(
+                compareMol.ase_atoms.positions
+                - compareMol.ase_atoms[compareMol_metalind].position
+            )
 
             # Sample random rotations to find best starting assignment point.
             best = np.inf
@@ -445,8 +585,12 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
                 q = Rot.random()
                 calc_test_comp = copy.deepcopy(tmp_self_comp)
                 calc_test_comp.set_positions(q.apply(calc_test_comp.positions))
-                rmsd_core, _, _ = permute_align(tmp_ref_comp, calc_test_comp, maxiter=maxiter)
-                rmsd_mirror, _, _ = mirror_align(tmp_ref_comp, calc_test_comp, maxiter=maxiter)
+                rmsd_core, _, _ = permute_align_rmsd(
+                    tmp_ref_comp, calc_test_comp, maxiter=maxiter
+                )
+                rmsd_mirror, _, _ = mirror_align(
+                    tmp_ref_comp, calc_test_comp, maxiter=maxiter
+                )
                 if rmsd_mirror < rmsd_core:
                     rmsd_core = rmsd_mirror
                 if rmsd_core < best:
@@ -454,17 +598,25 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
                     best = rmsd_core
 
             tmp_self_comp.set_positions(saveq.apply(tmp_self_comp.positions))
-            genMol.ase_atoms.set_positions(saveq.apply(genMol.ase_atoms.positions))
+            genMol.ase_atoms.set_positions(
+                saveq.apply(genMol.ase_atoms.positions)
+            )
 
-            rmsd_core, r, outcore = permute_align(tmp_ref_comp, tmp_self_comp, maxiter=maxiter)
-            rmsd_mirror, r_mirror, moutcore = mirror_align(tmp_ref_comp, tmp_self_comp, maxiter=maxiter)
+            rmsd_core, r, outcore = permute_align_rmsd(
+                tmp_ref_comp, tmp_self_comp, maxiter=maxiter
+            )
+            rmsd_mirror, r_mirror, moutcore = mirror_align(
+                tmp_ref_comp, tmp_self_comp, maxiter=maxiter
+            )
 
             if rmsd_mirror < rmsd_core:  # Pick the better one!
                 rmsd_core = rmsd_mirror
                 outcore = moutcore
                 r = r_mirror
                 newposits = genMol.ase_atoms.positions
-                newposits[:, 0] = -newposits[:, 0] # Mirror across x axis to replicate mirror in permute
+                newposits[:, 0] = -newposits[
+                    :, 0
+                ]  # Mirror across x axis to replicate mirror in permute
                 genMol.ase_atoms.set_positions(newposits)
 
             rmsd_loss_core = rmsd_core
@@ -472,32 +624,37 @@ def calc_rmsd(genMol, compareMol, coresize=2, maxiter=1, sample=300,
             tmp_posits = r.apply(tmp_posits)
             genMol.ase_atoms.set_positions(tmp_posits)
             # Do permutation mapping to estimate full loss given the rotation to match the core.
-            rmsd_loss_full, _, _ = permute_align(copy.deepcopy(compareMol.ase_atoms),
-                                                 copy.deepcopy(genMol.ase_atoms),
-                                                 maxiter=1, tol=1e-6,
-                                                 in_place=True)
+            rmsd_loss_full, _, _ = permute_align_rmsd(
+                copy.deepcopy(compareMol.ase_atoms),
+                copy.deepcopy(genMol.ase_atoms),
+                maxiter=1,
+                tol=1e-6,
+                in_place=True,
+            )
 
-    if rmsd_type == 'simple':
+    if rmsd_type == "simple":
         # Returns per-atom RMSD for ideal/rotation/translation overlap.
         if return_structures:
-            return (rmsd_loss_core,
-                    rmsd_loss_full,
-                    compareMol.write_mol2('refmol.mol2', writestring=True), 
-                    genMol.write_mol2('aligned.mol2', writestring=True),
-                    convert_ase_xyz(tmp_ref_comp),
-                    convert_ase_xyz(outcore),
-                    flag_struct,
-                    coreinds)
+            return (
+                rmsd_loss_core,
+                rmsd_loss_full,
+                compareMol.write_mol2("refmol.mol2", writestring=True),
+                genMol.write_mol2("aligned.mol2", writestring=True),
+                convert_ase_xyz(tmp_ref_comp),
+                convert_ase_xyz(outcore),
+                flag_struct,
+                coreinds,
+            )
         else:
             return (rmsd_loss_core, rmsd_loss_full, flag_struct)
     else:
-        print('Not yet implemented.')
+        print("Not yet implemented.")
         return None
 
 
-def calc_rmsd_atypes(genMol, compareMol,
-                     sample=300, atom_types=None,
-                     rmsd_type='simple'):
+def calc_rmsd_atypes(
+    genMol, compareMol, sample=300, atom_types=None, rmsd_type="simple"
+):
     """calc_rmsd
     Calculate the rmsd by different methods for this molecule compared to another.
 
@@ -526,33 +683,113 @@ def calc_rmsd_atypes(genMol, compareMol,
     # Check that these are stoichiometrically identical molecules.
     # Set ordering to be identical based on canonical labels.
     if atom_types is None:
-        compareMol_subset_component_inds = np.array([i for i,x in enumerate(compareMol.ase_atoms.get_chemical_symbols())])
-        genMol_subset_component_inds = np.array([i for i,x in enumerate(genMol.ase_atoms.get_chemical_symbols())])
+        compareMol_subset_component_inds = np.array(
+            [
+                i
+                for i, x in enumerate(
+                    compareMol.ase_atoms.get_chemical_symbols()
+                )
+            ]
+        )
+        genMol_subset_component_inds = np.array(
+            [i for i, x in enumerate(genMol.ase_atoms.get_chemical_symbols())]
+        )
     elif isinstance(atom_types, str):
-        if atom_types == 'metals':
-            compareMol_subset_component_inds = np.array([i for i,x in enumerate(compareMol.ase_atoms.get_chemical_symbols()) if x in io_ptable.all_metals])
-            genMol_subset_component_inds = np.array([i for i,x in enumerate(genMol.ase_atoms.get_chemical_symbols()) if x in io_ptable.all_metals])
-        elif atom_types == 'heavy_atoms':
-            compareMol_subset_component_inds = np.array([i for i,x in enumerate(compareMol.ase_atoms.get_chemical_symbols()) if x != "H"])
-            genMol_subset_component_inds = np.array([i for i,x in enumerate(genMol.ase_atoms.get_chemical_symbols()) if x != "H"])
-        elif atom_types == 'heavy_metals':
-            compareMol_subset_component_inds = np.array([i for i,x in enumerate(compareMol.ase_atoms.get_chemical_symbols()) if x in io_ptable.heavy_metals])
-            genMol_subset_component_inds = np.array([i for i,x in enumerate(genMol.ase_atoms.get_chemical_symbols()) if x in io_ptable.heavy_metals])
+        if atom_types == "metals":
+            compareMol_subset_component_inds = np.array(
+                [
+                    i
+                    for i, x in enumerate(
+                        compareMol.ase_atoms.get_chemical_symbols()
+                    )
+                    if x in io_ptable.all_metals
+                ]
+            )
+            genMol_subset_component_inds = np.array(
+                [
+                    i
+                    for i, x in enumerate(
+                        genMol.ase_atoms.get_chemical_symbols()
+                    )
+                    if x in io_ptable.all_metals
+                ]
+            )
+        elif atom_types == "heavy_atoms":
+            compareMol_subset_component_inds = np.array(
+                [
+                    i
+                    for i, x in enumerate(
+                        compareMol.ase_atoms.get_chemical_symbols()
+                    )
+                    if x != "H"
+                ]
+            )
+            genMol_subset_component_inds = np.array(
+                [
+                    i
+                    for i, x in enumerate(
+                        genMol.ase_atoms.get_chemical_symbols()
+                    )
+                    if x != "H"
+                ]
+            )
+        elif atom_types == "heavy_metals":
+            compareMol_subset_component_inds = np.array(
+                [
+                    i
+                    for i, x in enumerate(
+                        compareMol.ase_atoms.get_chemical_symbols()
+                    )
+                    if x in io_ptable.heavy_metals
+                ]
+            )
+            genMol_subset_component_inds = np.array(
+                [
+                    i
+                    for i, x in enumerate(
+                        genMol.ase_atoms.get_chemical_symbols()
+                    )
+                    if x in io_ptable.heavy_metals
+                ]
+            )
         else:
-            raise ValueError('I do not recognize this keyword "{}", please choose from "metals" or "heavy_atoms" or "heavy_metals"'.format(atom_types))
+            raise ValueError(
+                'I do not recognize this keyword "{}", please choose from "metals" or "heavy_atoms" or "heavy_metals"'.format(
+                    atom_types
+                )
+            )
     else:
-        compareMol_subset_component_inds = np.array([i for i,x in enumerate(compareMol.ase_atoms.get_chemical_symbols()) if x in atom_types])
-        genMol_subset_component_inds = np.array([i for i,x in enumerate(genMol.ase_atoms.get_chemical_symbols()) if x in atom_types])
+        compareMol_subset_component_inds = np.array(
+            [
+                i
+                for i, x in enumerate(
+                    compareMol.ase_atoms.get_chemical_symbols()
+                )
+                if x in atom_types
+            ]
+        )
+        genMol_subset_component_inds = np.array(
+            [
+                i
+                for i, x in enumerate(genMol.ase_atoms.get_chemical_symbols())
+                if x in atom_types
+            ]
+        )
 
     # Pull out selected atoms from molecule up to depth coresize graph hops for matching to reference.
-    tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy() 
-    tmp_ref_comp = compareMol.ase_atoms[compareMol_subset_component_inds].copy() 
+    tmp_self_comp = genMol.ase_atoms[genMol_subset_component_inds].copy()
+    tmp_ref_comp = compareMol.ase_atoms[
+        compareMol_subset_component_inds
+    ].copy()
 
     flag_struct = False
 
-    if np.any(sorted(tmp_self_comp.get_atomic_numbers()) != sorted(tmp_ref_comp.get_atomic_numbers())):
-        print('Warning subset stoichiometry not matched!')
-        print('Can re-attempt. Not doing that now.')
+    if np.any(
+        sorted(tmp_self_comp.get_atomic_numbers())
+        != sorted(tmp_ref_comp.get_atomic_numbers())
+    ):
+        print("Warning subset stoichiometry not matched!")
+        print("Can re-attempt. Not doing that now.")
         print(tmp_self_comp.get_chemical_formula())
         print(tmp_ref_comp.get_chemical_formula())
         outcore = tmp_self_comp
@@ -561,10 +798,21 @@ def calc_rmsd_atypes(genMol, compareMol,
         flag_struct = True
     else:
         # Center on metal atom
-        tmp_self_comp.set_positions(tmp_self_comp.positions - tmp_self_comp.get_positions().mean(axis=0))
-        tmp_ref_comp.set_positions(tmp_ref_comp.positions - tmp_ref_comp.get_positions().mean(axis=0))
-        genMol.ase_atoms.set_positions(genMol.ase_atoms.positions - tmp_self_comp.get_positions().mean(axis=0))
-        compareMol.ase_atoms.set_positions(compareMol.ase_atoms.positions - tmp_ref_comp.get_positions().mean(axis=0))
+        tmp_self_comp.set_positions(
+            tmp_self_comp.positions
+            - tmp_self_comp.get_positions().mean(axis=0)
+        )
+        tmp_ref_comp.set_positions(
+            tmp_ref_comp.positions - tmp_ref_comp.get_positions().mean(axis=0)
+        )
+        genMol.ase_atoms.set_positions(
+            genMol.ase_atoms.positions
+            - tmp_self_comp.get_positions().mean(axis=0)
+        )
+        compareMol.ase_atoms.set_positions(
+            compareMol.ase_atoms.positions
+            - tmp_ref_comp.get_positions().mean(axis=0)
+        )
 
         # Sample random rotations to find best starting assignment point.
         best = np.inf
@@ -572,7 +820,7 @@ def calc_rmsd_atypes(genMol, compareMol,
             q = Rot.random()
             calc_test_comp = copy.deepcopy(tmp_self_comp)
             calc_test_comp.set_positions(q.apply(calc_test_comp.positions))
-            rmsd_core, _, _ = permute_align(tmp_ref_comp, calc_test_comp)
+            rmsd_core, _, _ = permute_align_rmsd(tmp_ref_comp, calc_test_comp)
             rmsd_mirror, _, _ = mirror_align(tmp_ref_comp, calc_test_comp)
             if rmsd_mirror < rmsd_core:
                 rmsd_core = rmsd_mirror
@@ -583,17 +831,17 @@ def calc_rmsd_atypes(genMol, compareMol,
         tmp_self_comp.set_positions(saveq.apply(tmp_self_comp.positions))
         genMol.ase_atoms.set_positions(saveq.apply(genMol.ase_atoms.positions))
 
-        rmsd_core, r, outcore = permute_align(tmp_ref_comp,
-                                              tmp_self_comp)
-        rmsd_mirror, r_mirror, moutcore = mirror_align(tmp_ref_comp,
-                                                       tmp_self_comp)
+        rmsd_core, r, outcore = permute_align_rmsd(tmp_ref_comp, tmp_self_comp)
+        rmsd_mirror, r_mirror, moutcore = mirror_align(
+            tmp_ref_comp, tmp_self_comp
+        )
 
         if rmsd_mirror < rmsd_core:  # Pick the better one!
             rmsd_core = rmsd_mirror
             outcore = moutcore
             r = r_mirror
             newposits = genMol.ase_atoms.positions
-            newposits[:, 0] = -newposits[:, 0] 
+            newposits[:, 0] = -newposits[:, 0]
             # Mirror across x axis to replicate mirror in permute
             genMol.ase_atoms.set_positions(newposits)
 
@@ -601,24 +849,142 @@ def calc_rmsd_atypes(genMol, compareMol,
         tmp_posits = genMol.ase_atoms.positions
         tmp_posits = r.apply(tmp_posits)
         genMol.ase_atoms.set_positions(tmp_posits)
-    # Do permutation mapping to estimate full loss given the rotation to match the core.
-        if compareMol.ase_atoms.get_chemical_formula() == genMol.ase_atoms.get_chemical_formula():
-            rmsd_loss_full, _, _ = permute_align(copy.deepcopy(compareMol.ase_atoms),
-                                                 copy.deepcopy(genMol.ase_atoms),
-                                                 maxiter=1, tol=1e-6,
-                                                 in_place=True)
+        # Do permutation mapping to estimate full loss given the rotation to match the core.
+        if (
+            compareMol.ase_atoms.get_chemical_formula()
+            == genMol.ase_atoms.get_chemical_formula()
+        ):
+            rmsd_loss_full, _, _ = permute_align_rmsd(
+                copy.deepcopy(compareMol.ase_atoms),
+                copy.deepcopy(genMol.ase_atoms),
+                maxiter=1,
+                tol=1e-6,
+                in_place=True,
+            )
         else:
             rmsd_loss_full = None
 
-    if rmsd_type == 'simple':
+    if rmsd_type == "simple":
         # Returns per-atom RMSD for ideal/rotation/translation overlap.
-        return (rmsd_loss_core,
-                rmsd_loss_full,
-                compareMol.write_mol2('refmol.mol2', writestring=True),
-                genMol.write_mol2('aligned.mol2', writestring=True),
-                convert_ase_xyz(tmp_ref_comp),
-                convert_ase_xyz(outcore),
-                flag_struct)
+        return (
+            rmsd_loss_core,
+            rmsd_loss_full,
+            compareMol.write_mol2("refmol.mol2", writestring=True),
+            genMol.write_mol2("aligned.mol2", writestring=True),
+            convert_ase_xyz(tmp_ref_comp),
+            convert_ase_xyz(outcore),
+            flag_struct,
+        )
     else:
-        print('Not yet implemented.')
+        print("Not yet implemented.")
         return None
+
+def find_sets(insetlist=[]):
+    """find grouped sets of conformers by indices
+
+    Parameters
+    ----------
+    insetlist : list, optional
+        list of sets, by default []
+
+    Returns
+    -------
+    comb_setlist: list, optional
+        combined list of sets where each group has shared neighbors.
+    """
+    comb_setlist = []
+    if len(insetlist) < 2:
+        return insetlist
+    combined_inds = []
+    for i, s in enumerate(insetlist[:-1]):
+        for j, s1 in enumerate(insetlist[i+1:]):
+            if (i not in combined_inds) and (j not in combined_inds) and (
+                 len(s & s1) > 0):
+                s.update(s1)
+                combined_inds.append(j+i+1)
+                combined_inds.append(i)
+                comb_setlist.append(s)
+    for j in [x for x in range(len(insetlist)) if x not in combined_inds]:
+        comb_setlist.append(insetlist[j])
+    if len(combined_inds) == 0:
+        return comb_setlist
+    else:
+        return find_sets(comb_setlist)
+
+
+def rmsd_group(conf_list, 
+               rmsd_cutoff=0.2, 
+               rmsd_type='simple',
+               value_list=[],
+               return_new_conf_list=False):
+    """rmsd_group
+
+    Will group the molecules by sets where rmsds bewteen conformers 
+    are less than the rmsd_cutoff threshold.
+
+    Parameters
+    ----------
+    conf_list : list(str/molecules)
+        configurations list
+    rmsd_cutoff : float, optional
+        cutoff for rmsd groupings, by default 0.2
+    rmsd_type : str, optional
+        what type of rmsd comparison to do
+        'simple': simple rmsd, no alignment or index permutation
+        'align': align the molecules and calculate rmsd, no index permutation
+        'permute': permute indices and calculate simple rmsd, no alignment
+        'permute_align': permute indices and align molecules
+        'permute_mirror_align': try all the combinations to achieve alignment.
+        , by default 'simple'
+    value_list : list(float), optional
+        list of values to downselect, will select minimum value from each group.
+    return_newlist : bool, optional
+        return a down-selected list of conformers, default False
+
+    Returns
+    -------
+    out_setlist : list(sets)
+        Sets grouped by which structures are very similar in terms of rmsd.
+    """
+    ats_list = [convert_io_molecule(x).ase_atoms for x in conf_list]
+    if rmsd_type == 'simple':
+        rmsd_func = simple_rmsd
+    elif rmsd_type == 'align':
+        rmsd_func = align_rmsd
+    elif rmsd_type == 'permute':
+        rmsd_func = permute_rmsd
+    elif rmsd_type == 'permute_align':
+        rmsd_func = permute_align_rmsd
+    elif rmsd_type == 'mirror_permute_align':
+        rmsd_func = mirror_permute_align_rmsd
+    rmsd_mat = np.ones((len(conf_list), len(conf_list)))
+    for i, conf in enumerate(ats_list[:-1]):
+        for j, conf2 in enumerate(ats_list[i+1:]):
+            rmsd = rmsd_func(conf, conf2, only_rmsd=True)
+            rmsd_mat[i, j] = rmsd
+    if len(value_list) > 0:
+        value_list = np.array(value_list)
+    if np.any(rmsd_mat < rmsd_cutoff):
+        setlist = []
+        for i, j in zip(*np.where(rmsd_mat < rmsd_cutoff)):
+            setlist.append({i, j})
+        out_setlist = find_sets(setlist)
+        if return_new_conf_list:
+            out_conf_list = []
+            for s in out_setlist:
+                inds = np.array(list(s))
+                if len(value_list) > 0:
+                    saveind = inds[np.argmin(value_list[inds])]
+                else:
+                    saveind = inds[0]
+                out_conf_list.append(conf_list[saveind])
+            return out_setlist,out_conf_list
+        else:
+            return out_setlist
+    else: # All different conformers
+        out_setlist = [{x} for x in range(len(conf_list))]
+        if return_new_conf_list:
+            return out_setlist, conf_list
+        else:
+            return out_setlist
+

@@ -532,9 +532,11 @@ ligands_dict = {
 'pentamethylcyclopentadienyl':{'smiles':'C[C-]1C(=C(C(=C1C)C)C)C','coordList':[1,2,3,4,5],'ligType':'sandwich'},
 'dien':{'smiles':'NCCNCCN','coordList':[0,3,6],'ligType':'tri_fac'},
 'diethylenetriamine':{'smiles':'NCCNCCN','coordList':[0,3,6],'ligType':'tri_fac'},
-'dmgh-':{'smiles':'C\C(=N\O)\C(\C)=N\[O-]','coordList':[2,6],'ligType':'bi_cis'},
+'dmgh-':{'smiles':r'C\C(=N\O)\C(\C)=N\[O-]','coordList':[2,6],'ligType':'bi_cis'},
 'dota':{'smiles':'O=C(O)CN(CC1)CCN(CC(=O)O)CCN(CC(=O)O)CCN1CC(=O)O','coordList':[0,4,9,12,16,23,19,26],
-        'ligType':'octa_square_antiprismatic'}, 
+        'ligType':'octa_square_antiprismatic'},
+'dota-':{'smiles':'O=C([O-])CN(CC1)CCN(CC(=O)[O-])CCN(CC(=O)[O-])CCN1CC(=O)[O-]','coordList':[2,4,9,13,16,23,20,27],
+        'ligType':'octa_square_antiprismatic'},
 'tetraxetan':{'smiles':'O=C(O)CN(CC1)CCN(CC(=O)O)CCN(CC(=O)O)CCN1CC(=O)O','coordList':[0,4,9,12,16,23,19,26],
         'ligType':'octa_square_antiprismatic'},
 'dtpa':{'smiles':'C(CN(CC(=O)O)CC(=O)O)N(CCN(CC(=O)O)CC(=O)O)CC(=O)O', 
@@ -628,7 +630,8 @@ ligands_dict = {
 'bisdimethylphosphineteluridemethane':{'smiles':'CP(C)(=[Te])CP(C)(C)=[Te]','coordList':[3,8],'ligType':'bi_cis'},
 'macropa':{
     'smiles':'O=C([O-])C1=NC(CN2CCOCCOCCN(CC3=NC(C([O-])=O)=CC=C3)CCOCCOCC2)=CC(N)=C1',
-    'coordList':[7,10,13,16,29,32,4,19,2,22]
+    'coordList':[7,10,13,16,29,32,4,19,2,22],
+    'ligType':'10'
     }
 }
 

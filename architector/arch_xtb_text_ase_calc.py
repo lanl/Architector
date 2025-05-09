@@ -9,7 +9,11 @@ import pathlib
 from ase import units
 from ase.calculators.calculator import Calculator
 
-methods_dict = {"GFN-FF": "--gfnff", "GFN2-xTB": "-gfn 2", "GFN1-xTB": "--gfn 1"}
+methods_dict = {
+    "GFN-FF": "--gfnff",
+    "GFN2-xTB": "-gfn 2",
+    "GFN1-xTB": "--gfn 1",
+}
 
 
 class XTB_Calculator(Calculator):
@@ -29,12 +33,7 @@ class XTB_Calculator(Calculator):
         **kwargs
     ):
 
-        super().__init__(
-            restart=restart,
-            atoms=atoms,
-            label=label,
-            **kwargs
-        )
+        super().__init__(restart=restart, atoms=atoms, label=label, **kwargs)
 
         self.parameters = {
             "xtb_method": xtb_method,
@@ -42,7 +41,7 @@ class XTB_Calculator(Calculator):
             "xtb_accuracy": xtb_accuracy,
             "xtb_electronic_temperature": xtb_electronic_temperature,
             "xtb_max_iterations": xtb_max_iterations,
-            "opt": kwargs.get('xtb_relax', False),
+            "opt": kwargs.get("xtb_relax", False),
         }
 
     def calculate(self, atoms=None, *args, **kwargs):
@@ -80,35 +79,35 @@ class XTB_Calculator(Calculator):
             with open("structure.xyz", "w") as outFile:
                 outFile.write(xyzstr)
 
-            method = methods_dict[self.parameters.get("xtb_method",
-                                    "GFN2-xTB")].split()
+            method = methods_dict[
+                self.parameters.get("xtb_method", "GFN2-xTB")
+            ].split()
 
-            exec_lst = ['{}'.format(xtbPath),
-                        'structure.xyz']
+            exec_lst = ["{}".format(xtbPath), "structure.xyz"]
             exec_lst += method
 
             read_coords = False
-            if self.parameters.get('opt', False):
+            if self.parameters.get("opt", False):
                 read_coords = True
                 exec_lst += ["--opt"]
 
             exec_lst += [
-                        '--chrg',
-                        '{}'.format(int(charge)),
-                        '--uhf',
-                        '{}'.format(int(uhf)),
-                        '-P',
-                        '1',
-                        '-a',
-                        '{}'.format(self.parameters['xtb_accuracy']),
-                        '--etemp',
-                        '{}'.format(self.parameters['xtb_electronic_temperature']),
-                        '--iterations',
-                        '{}'.format(self.parameters['xtb_max_iterations']),
-                        '--grad',
-                        '--dipole',
-                        '--ceasefiles',
-                        ]
+                "--chrg",
+                "{}".format(int(charge)),
+                "--uhf",
+                "{}".format(int(uhf)),
+                "-P",
+                "1",
+                "-a",
+                "{}".format(self.parameters["xtb_accuracy"]),
+                "--etemp",
+                "{}".format(self.parameters["xtb_electronic_temperature"]),
+                "--iterations",
+                "{}".format(self.parameters["xtb_max_iterations"]),
+                "--grad",
+                "--dipole",
+                "--ceasefiles",
+            ]
 
             if self.parameters.get("xtb_solvent", None) is not None:
 
@@ -116,23 +115,20 @@ class XTB_Calculator(Calculator):
                     file1.write("$write\n")
                     file1.write("    gbsa=true\n")
 
-                exec_lst.append('--alpb')
-                exec_lst.append('{}'.format(
-                    self.parameters['xtb_solvent']))
-                exec_lst.append('-I')
-                exec_lst.append('solv_options.txt')
-
+                exec_lst.append("--alpb")
+                exec_lst.append("{}".format(self.parameters["xtb_solvent"]))
+                exec_lst.append("-I")
+                exec_lst.append("solv_options.txt")
 
             with open("output.xtb", "w") as file1:
 
-                sub.run(exec_lst, check=True,
-                        stderr=sub.DEVNULL,
-                        stdout=file1)
+                sub.run(exec_lst, check=True, stderr=sub.DEVNULL, stdout=file1)
 
             outpath = pathlib.Path(".")
 
-            self.results = self.read_results(outpath=outpath,
-                                             read_coords=read_coords)
+            self.results = self.read_results(
+                outpath=outpath, read_coords=read_coords
+            )
 
     def read_solv_params(self, outfilelines):
         """XTB output parser for solvent parameters
@@ -148,7 +144,9 @@ class XTB_Calculator(Calculator):
         dictionary of output
         """
         lines = outfilelines
-        solvent_area_start_key = "generalized Born model for continuum solvation"
+        solvent_area_start_key = (
+            "generalized Born model for continuum solvation"
+        )
         sovlent_area_end_key = "total SASA"
         start = False
         sas = []
@@ -240,7 +238,7 @@ class XTB_Calculator(Calculator):
                 if "TOTAL ENERGY" in line:
                     energy = float(sline[3]) * units.Ha
                 elif len(sline) == 6:
-                    if sline[3] == 'q':
+                    if sline[3] == "q":
                         read_charges = True
                         charges = []
                         covCNs = []
@@ -252,14 +250,12 @@ class XTB_Calculator(Calculator):
                         read_charges = False
                         charges = np.array(charges)
                         covCNs = np.array(covCNs)
-                elif 'molecular dipole:' in line:
+                elif "molecular dipole:" in line:
                     read_dipole = True
                     dipole = []
                 elif read_dipole:
-                    if 'full:' in line:
-                        dipole = np.array(
-                            [float(x) for x in sline[1:4]]
-                            )
+                    if "full:" in line:
+                        dipole = np.array([float(x) for x in sline[1:4]])
                         read_dipole = False
 
             if read_coords:
@@ -277,11 +273,15 @@ class XTB_Calculator(Calculator):
 
         results = self.read_solv_params(lines)
 
-        results.update({"energy": energy,
-                        "forces": forces,
-                        "charges": charges,
-                        "coveCNs": covCNs,
-                        "dipole": dipole})
+        results.update(
+            {
+                "energy": energy,
+                "forces": forces,
+                "charges": charges,
+                "coveCNs": covCNs,
+                "dipole": dipole,
+            }
+        )
 
         if coords is not None:
             results.update({"positions": coords})

@@ -9,7 +9,16 @@ import copy
 import time
 import numpy as np
 import shutil
+import itertools
+import os
 from collections import OrderedDict
+from tqdm import tqdm
+from concurrent.futures import as_completed
+import pickle
+try:
+    from executorlib import SingleNodeExecutor as Executor
+except ImportError:
+    from concurrent.futures import ProcessPoolExecutor as Executor
 
 import architector.io_process_input as io_process_input
 import architector.io_obabel as io_obabel
@@ -20,8 +29,9 @@ import architector.io_align_mol as io_align_mol
 import architector.io_conformers as io_conformers
 import architector.io_symmetry as io_symmetry
 import architector.io_arch_dock as io_arch_dock
-from architector.io_calc import CalcExecutor
+import architector.io_calc as io_calc
 
+ncpus = os.cpu_count()
 
 class Ligand:
     """Class to contain all information about a ligand including conformers."""
@@ -35,6 +45,7 @@ class Ligand:
         ligGeo,
         ligcharge,
         ca_metal_dist_constraints,
+        n_lig_conformers=1,
         covrad_metal=None,
         vdwrad_metal=None,
         enforce_symmetry=False,
@@ -58,6 +69,10 @@ class Ligand:
             Ligand charge if determined
         ca_metal_dist_constraints : dict/None
             Coordinating atom-metal distance constraint.
+        n_lig_conformers : int,
+            number of ligand conformers to attempt.
+            Will mostly impact multidentate ligand sampling.
+            default: 1
         covrad_metal : float, optional
             Covalent radii of the metal, default values from io_ptable.rcov1
         vdwrad_metal : float, optional
@@ -79,23 +94,50 @@ class Ligand:
         self.out_ligcoordLists = None
         self.charge = ligcharge
         self.enforce_symmetry = enforce_symmetry
-        self.liggen_start_time = time.time()
+        self.covrad_metal = covrad_metal
+        self.liggen_start_time = None
+        self.vdwrad_metal = vdwrad_metal
+        self.n_lig_conformers = n_lig_conformers
+        self.debug = debug
         # Generate conformations
         if debug:
             print("GENERATING CONFORMATIONS for {}".format(smiles))
-        conformers, rotscores, tligcoordList, relax, bo_dict, atypes, rotlist = (
-            io_lig.find_conformers(
-                self.smiles,
-                self.ligcoordList,
-                self.corecoordList,
-                metal=self.metal,
-                ligtype=self.geo,
-                ca_metal_dist_constraints=self.ca_metal_dist_constraints,
-                covrad_metal=covrad_metal,
-                vdwrad_metal=vdwrad_metal,
-                enforce_symmetry=self.enforce_symmetry,
-                debug=debug,
-            )
+        self.get_confs()
+
+    def get_confs(self, n_lig_conformers=None, debug=None):
+        """generate conformers for the ligand
+
+        Parameters
+        ----------
+        n_lig_conformers : int, optional
+           number of conformers to generate for the symmetry, by default None
+           -> keeps it at 5.
+        """
+        self.liggen_start_time = time.time()
+        if n_lig_conformers is not None:
+            self.n_lig_conformers = n_lig_conformers
+        if debug is not None:
+            self.debug = debug
+        (
+            conformers,
+            rotscores,
+            tligcoordList,
+            relax,
+            bo_dict,
+            atypes,
+            rotlist,
+        ) = io_lig.find_conformers(
+            self.smiles,
+            self.ligcoordList,
+            self.corecoordList,
+            metal=self.metal,
+            nconformers=self.n_lig_conformers,
+            ligtype=self.geo,
+            ca_metal_dist_constraints=self.ca_metal_dist_constraints,
+            covrad_metal=self.covrad_metal,
+            vdwrad_metal=self.vdwrad_metal,
+            enforce_symmetry=self.enforce_symmetry,
+            debug=self.debug,
         )
         if len(conformers) > 0:
             self.conformerList = conformers
@@ -108,11 +150,13 @@ class Ligand:
             self.BO_dict = bo_dict
             self.atom_types = atypes
             self.liggen_end_time = time.time()
-            if debug:
-                print("CONFORMERS GENERATED for {}".format(smiles))
+            if self.debug:
+                print("CONFORMERS GENERATED for {}".format(self.smiles))
         else:
-            if debug:
-                print("No Valid Conformers Generated for {}!".format(smiles))
+            if self.debug:
+                print(
+                    "No Valid Conformers Generated for {}!".format(self.smiles)
+                )
             self.exists = False
             self.relax = False
             self.conformerList = []
@@ -128,7 +172,8 @@ class Ligand:
 class Complex:
     """Class that contains all information and functions regarding a complex."""
 
-    def __init__(self, coreSmiles, coordList, ligandList, parameters):
+    def __init__(self, coreSmiles, coordList, ligandList, parameters,
+                 assemble=True):
         """Initialize complex and call assemble functions.
 
         Parameters
@@ -141,6 +186,8 @@ class Complex:
             List of generated Ligand classes
         parameters : dict
             All input parameters dictionary
+        assemble : bool, optional
+            assemble the complex? default True
         """
         # Set variables
         self.coreSmiles = coreSmiles
@@ -148,31 +195,34 @@ class Complex:
         self.ligandList = ligandList
         self.parameters = parameters
         self.calculator = None
-        self.save = (
-            True  # Save corresponds to whether calculations completed or failed.
-        )
+        self.save = True  # Save corresponds to whether calculations completed or failed.
         self.index = 0  # Index keeps track of which index conformer this is.
         self.initMol = None
         self.initEnergy = None
         self.finalEvalTotalTime = None
         self.allLigandsGood = True
         self.assembled = False
-
-        # Initialize Atoms object for complex
-        init_atoms = io_obabel.smiles2Atoms(self.coreSmiles, addHydrogens=False)
-        init_atoms.set_initial_charges([parameters["metal_ox"]])
-        init_atoms.set_initial_magnetic_moments([parameters["metal_spin"]])
-
-        self.complexMol = io_molecule.convert_io_molecule(init_atoms)
-        self.assembleMol = None
+        self.all_complexes = []
+        self.relaxed_all_complexes = []
 
         # Assemble complex
         if self.parameters["debug"]:
             print("ASSEMBLING COMPLEX")
-        self.assemble_start_time = time.time()
-        self.assemble_complex()
-        self.assemble_end_time = time.time()
-        self.assemble_total_time = self.assemble_end_time - self.assemble_start_time
+        if assemble:
+            # Initialize Atoms object for complex
+            init_atoms = io_obabel.smiles2Atoms(
+                self.coreSmiles, addHydrogens=False
+            )
+            init_atoms.set_initial_charges([parameters["metal_ox"]])
+            init_atoms.set_initial_magnetic_moments([parameters["metal_spin"]])
+
+            self.complexMol = io_molecule.convert_io_molecule(init_atoms)
+            self.assemble_start_time = time.time()
+            self.assemble_complex()
+            self.assemble_end_time = time.time()
+            self.assemble_total_time = (
+                self.assemble_end_time - self.assemble_start_time
+            )
 
     def assemble_complex(self):
         """Assemble the complex one ligand at a time.
@@ -228,6 +278,118 @@ class Complex:
         ):  # Only perform total energy if all ligands sane and no overlaps
             self.assembled = True
 
+    def assemble_all_complexes(self, max_combos=1000):
+        """assemble all possible complexes.
+        """
+        complex_list = []
+        init_energies = []
+        nligs = len(self.ligandList)
+        lig_inds = [list(range(len(x.conformerList))) for x in self.ligandList]
+        combinations = list(itertools.product(*lig_inds))
+        if len(combinations) > max_combos:
+            step = len(combinations) / float(max_combos)
+            combinations = [combinations[int(i * step)] for i in range(max_combos)]
+        for combo in combinations:
+            for i, ind in enumerate(combo):
+                # Initialize Atoms object for complex
+                lig = self.ligandList[i]
+                conf = lig.conformerList[ind]
+                if i == 0:
+                    init_atoms = io_obabel.smiles2Atoms(
+                        self.coreSmiles, addHydrogens=False
+                    )
+                    init_atoms.set_initial_charges(
+                        [self.parameters["metal_ox"]])
+                    init_atoms.set_initial_magnetic_moments(
+                        [self.parameters["metal_spin"]])
+                    complexMol = io_molecule.convert_io_molecule(init_atoms)
+                complexMol.append_ligand(
+                        {
+                            "ase_atoms": conf,
+                            "bo_dict": lig.BO_dict,
+                            "atom_types": lig.atom_types,
+                            "ca_metal_dist_constraints": lig.ca_metal_dist_constraints,
+                        }
+                    )
+                complexMol.graph_sanity_checks(params=self.parameters,
+                                               assembly=True)
+                complexMol.dist_sanity_checks(params=self.parameters,
+                                              assembly=True)
+                if (complexMol.dists_sane) and (nligs == i+1):
+                    out = io_calc.CalcExecutor(complexMol,
+                                               method=self.parameters.get(
+                                                   'assemble_method','GFN-FF'),
+                                               relax=False)
+                    if out.successful:
+                        complex_list.append(complexMol)
+                        init_energies.append(out.energy)
+                    break
+                elif complexMol.dists_sane:
+                    continue
+                else:
+                    break
+        if len(init_energies) > 0: # Check if energies there.
+            order = np.argsort(init_energies)
+            self.all_init_energies = np.array(init_energies)[order].tolist()
+            # Reorder complex list by energy
+            sorted_complexes = [complex_list[i] for i in order]
+            self.all_complexes = sorted_complexes
+
+    def relax_all_complexes(self, 
+                            method=None,
+                            n_complex_relax=None,
+                            debug=None):
+        """relax_all_complexes
+
+        Sets the relaxed complexes if they pass the final optimization
+        to self.relaxed_all_complexes.
+
+        Parameters
+        ----------
+        method : str, optional
+            what method to use?
+            default to 'full_method' from parameters dict.
+        n_complex_relax : int, optional
+            number of complexes to relax,
+            default to 'n_complex_relax' from parameters dict or 10.
+        debug : bool, optional
+            do debug?, by default None
+        """
+        if len(self.all_complexes) == 0:
+            self.assemble_all_complexes()
+        if debug is not None:
+            self.debug = debug
+        if n_complex_relax is not None:
+            self.parameters["n_complex_relax"] = n_complex_relax
+        if method is not None:
+            self.parameters["full_method"] = method
+        self.relaxed_all_complexes = []
+        for i, mol in enumerate(
+            self.all_complexes[0:self.parameters.get(
+                "n_complex_relax",10)]):
+            out = io_calc.CalcExecutor(
+                structure=mol.write_mol2(
+                    'in', writestring=True),
+                parameters=self.parameters,
+                final_sanity_check=self.parameters.get(
+                    "full_sanity_checks", True),
+                relax=True,
+                assembly=False
+                )
+            if out.successful and out.mol.dists_sane:
+                tmpC = Complex(self.coreSmiles,self.coordList,
+                               self.ligandList,self.parameters,
+                               assemble=False)
+                tmpC.calculator = out
+                tmpC.assemble_total_time = out.calc_time
+                tmpC.final_eval_total_time = out.calc_time
+                tmpC.complexMol = out.mol
+                tmpC.assembled = True
+                tmpC.initMol = mol
+                tmpC.index = i
+                tmpC.total_possible_n_symmetries = self.total_possible_n_symmetries
+                self.relaxed_all_complexes.append(tmpC)
+
     def compute_conformer_efficacy(self, conformerList, rot_vals, ligand):
         """Conformer efficiency currently calculated by GFN-FF in XTB for acceleration
 
@@ -264,9 +426,11 @@ class Complex:
             )
             if self.parameters["debug"]:
                 print(
-                    tmp_molecule.write_mol2("cool{}.mol2".format(i), writestring=True)
+                    tmp_molecule.write_mol2(
+                        "cool{}.mol2".format(i), writestring=True
+                    )
                 )
-            out_eval = CalcExecutor(
+            out_eval = io_calc.CalcExecutor(
                 tmp_molecule,
                 assembly=True,
                 parameters=self.parameters,
@@ -294,18 +458,24 @@ class Complex:
             Perform only a singlepoint calculation?, by default False
         """
         trelax = False
-        if (single_point is not None):
-            trelax = (not single_point)
+        if single_point is not None:
+            trelax = not single_point
         else:
-            trelax = self.parameters['relax']
+            trelax = self.parameters["relax"]
         self.final_start_time = time.time()
-        self.initMol.dist_sanity_checks(params=self.parameters, assembly=single_point)
-        self.initMol.graph_sanity_checks(params=self.parameters, assembly=single_point)
+        self.initMol.dist_sanity_checks(
+            params=self.parameters, assembly=single_point
+        )
+        self.initMol.graph_sanity_checks(
+            params=self.parameters, assembly=single_point
+        )
         if self.assembled:
             if self.parameters["ff_preopt"]:
                 if self.parameters["debug"]:
-                    print("Doing UFF - pre-optimization before final evaluation.")
-                calculator = CalcExecutor(
+                    print(
+                        "Doing UFF - pre-optimization before final evaluation."
+                    )
+                calculator = io_calc.CalcExecutor(
                     self.complexMol,
                     parameters=self.parameters,
                     final_sanity_check=False,
@@ -327,7 +497,7 @@ class Complex:
                     )
                 )
 
-            self.calculator = CalcExecutor(
+            self.calculator = io_calc.CalcExecutor(
                 self.complexMol,
                 parameters=self.parameters,
                 final_sanity_check=self.parameters["full_sanity_checks"],
@@ -345,7 +515,7 @@ class Complex:
                 print(self.initMol.write_mol2("cool.mol2", writestring=True))
             # Retry with 2 step optimization -> first do UFF -> then do the requested method.
             if not self.calculator.successful:
-                tmp_relax = CalcExecutor(
+                tmp_relax = io_calc.CalcExecutor(
                     self.complexMol,
                     method="UFF",
                     relax=True,
@@ -353,19 +523,24 @@ class Complex:
                     fix_m_neighbors=True,
                     ff_preopt_run=True,
                 )
-                self.calculator = CalcExecutor(
+                self.calculator = io_calc.CalcExecutor(
                     tmp_relax.mol,
                     parameters=self.parameters,
                     final_sanity_check=self.parameters["full_sanity_checks"],
                     relax=trelax,
                 )
         else:  # Ensure calculation object at least exists
-            self.calculator = CalcExecutor(
-                self.complexMol, method="UFF", fix_m_neighbors=False, relax=False
+            self.calculator = io_calc.CalcExecutor(
+                self.complexMol,
+                method="UFF",
+                fix_m_neighbors=False,
+                relax=False,
             )
             self.calculator.successful = False
         self.final_end_time = time.time()
-        self.final_eval_total_time = self.final_end_time - self.final_start_time
+        self.final_eval_total_time = (
+            self.final_end_time - self.final_start_time
+        )
         if self.calculator:
             self.complexMol = self.calculator.mol
 
@@ -403,7 +578,9 @@ def gen_aligned_complex(
         ligandSmiles = ligand["smiles"]
         ligGeo = ligand["ligType"]
         ligCharge = ligand["ligCharge"]
-        lig_ca_metal_dist_constraints = ligand.get("ca_metal_dist_constraints", None)
+        lig_ca_metal_dist_constraints = ligand.get(
+            "ca_metal_dist_constraints", None
+        )
         ligcons = "_".join(sorted([str(x[0]) for x in ligLists[i]]))
         ligid = ligandSmiles + ligcons + str(lig_ca_metal_dist_constraints)
 
@@ -418,6 +595,9 @@ def gen_aligned_complex(
                 ligGeo,
                 ligCharge,
                 lig_ca_metal_dist_constraints,
+                n_lig_conformers=inputDict["parameters"].get(
+                    "n_lig_conformers", 1
+                    ),
                 covrad_metal=inputDict["parameters"]["covrad_metal"],
                 vdwrad_metal=inputDict["parameters"]["vdwrad_metal"],
                 enforce_symmetry=inputDict["parameters"].get(
@@ -477,7 +657,9 @@ def gen_aligned_complex(
         # Key here - have singlepoints during assembly be defined by assembly params.
         complexClass.final_eval(single_point=True)
         if inputDict["parameters"]["debug"]:
-            print("Complex class generated: ", complexClass.calculator.successful)
+            print(
+                "Complex class generated: ", complexClass.calculator.successful
+            )
         if (
             (not complexClass.assembled)
             or (not complexClass.calculator.successful)
@@ -571,7 +753,9 @@ def complex_driver(inputDict1):
                 out_complexlist = []
                 out_energies = []
                 for i, ligLists in enumerate(all_liglists):
-                    if i == 0:  # Generate and save ligandDict from first conformer
+                    if (
+                        i == 0
+                    ):  # Generate and save ligandDict from first conformer
                         complexClass, ligandDict = gen_aligned_complex(
                             newLigInputDicts,
                             ligandDict,
@@ -619,7 +803,9 @@ def complex_driver(inputDict1):
                             "total_possible_n_symmetries",
                             total_unique_symmetries,
                         )
-                        if any([(not x.relax) for x in tmp_conformer.ligandList]):
+                        if any(
+                            [(not x.relax) for x in tmp_conformer.ligandList]
+                        ):
                             if inputDict["parameters"]["debug"]:
                                 print(
                                     "Warning This complex is likely strange because of failures of MMFF94 or distance geometry!"
@@ -632,8 +818,12 @@ def complex_driver(inputDict1):
                                 "Complex Distances Sane: ",
                                 tmp_conformer.complexMol.dists_sane,
                             )
-                        spin_n_unpaired = np.sum(tmp_conformer.complexMol.xtb_uhf)
-                        tot_charge = np.sum(tmp_conformer.complexMol.xtb_charge)
+                        spin_n_unpaired = np.sum(
+                            tmp_conformer.complexMol.xtb_uhf
+                        )
+                        tot_charge = np.sum(
+                            tmp_conformer.complexMol.xtb_charge
+                        )
                         if tmp_conformer.calculator is not None:
                             if (
                                 tmp_conformer.complexMol.dists_sane
@@ -724,9 +914,13 @@ def build_complex_driver(inputDict1):
     ordered_conf_dict : dict
         Conformer dictionary with stored values if generation successful.
     """
-    conf_dict, inputDict, core_preprocess_time, symmetry_preprocess_time, int_time1 = (
-        complex_driver(inputDict1=inputDict1)
-    )
+    (
+        conf_dict,
+        inputDict,
+        core_preprocess_time,
+        symmetry_preprocess_time,
+        int_time1,
+    ) = complex_driver(inputDict1=inputDict1)
     if len(conf_dict) == 0:
         if inputDict["parameters"]["debug"]:
             print(
@@ -741,13 +935,30 @@ def build_complex_driver(inputDict1):
         structs = []
         mol2strings = []
         init_mol2strings = []
+        if inputDict1['parameters'].get(
+            "n_complex_relax", 1) > 1:
+            if inputDict1['parameters'].get('debug',False):
+                print('Starting Full Complex relaxations.')
+            tdict = dict()
+            for key, conf in conf_dict.items():
+                tdict[key] = conf
+                conf.relax_all_complexes()
+                for j, conf1 in enumerate(
+                    conf.relaxed_all_complexes):
+                    tdict[key+'_'+str(j)] = conf1
+            conf_dict = tdict
         for key, val in conf_dict.items():
             xtb_energies.append(val.calculator.energy)
             keys.append(key)
             structs.append(val)
             if inputDict["parameters"]["save_init_geos"]:
-                if inputDict["parameters"].get("full_spin_nonxtb", None) is not None:
-                    val.initMol.uhf = inputDict["parameters"]["full_spin_nonxtb"]
+                if (
+                    inputDict["parameters"].get("full_spin_nonxtb", None)
+                    is not None
+                ):
+                    val.initMol.uhf = inputDict["parameters"][
+                        "full_spin_nonxtb"
+                    ]
                 init_mol2strings.append(
                     val.initMol.write_mol2("{}".format(key), writestring=True)
                 )
@@ -756,8 +967,13 @@ def build_complex_driver(inputDict1):
             energy_sorted_inds.append(
                 val.index
             )  # Save energy sorted index for reference.
-            if inputDict["parameters"].get("full_spin_nonxtb", None) is not None:
-                val.complexMol.uhf = inputDict["parameters"]["full_spin_nonxtb"]
+            if (
+                inputDict["parameters"].get("full_spin_nonxtb", None)
+                is not None
+            ):
+                val.complexMol.uhf = inputDict["parameters"][
+                    "full_spin_nonxtb"
+                ]
             mol2strings.append(
                 val.complexMol.write_mol2("{}".format(key), writestring=True)
             )
@@ -772,9 +988,6 @@ def build_complex_driver(inputDict1):
                 not inputDict["parameters"]["skip_duplicate_tests"]
             ):  # Check for copies
                 for key, val in ordered_conf_dict.items():
-                    # if ('_init_only' in key) or ('_init_only' in keys[i]): # Do not do duplicate test on init_only structures.
-                    #     continue
-                    # else:
                     _, rmsd_full, _ = io_align_mol.calc_rmsd(
                         mol2strings[i],
                         val["mol2string"],
@@ -801,8 +1014,12 @@ def build_complex_driver(inputDict1):
                     ordered_conf_dict[keys[i]] = {
                         "ase_atoms": structs[i].complexMol.ase_atoms,
                         "total_charge": int(structs[i].complexMol.charge),
-                        "xtb_n_unpaired_electrons": structs[i].complexMol.xtb_uhf,
-                        "xtb_total_charge": int(structs[i].complexMol.xtb_charge),
+                        "xtb_n_unpaired_electrons": structs[
+                            i
+                        ].complexMol.xtb_uhf,
+                        "xtb_total_charge": int(
+                            structs[i].complexMol.xtb_charge
+                        ),
                         "calc_n_unpaired_electrons": structs[i].complexMol.uhf,
                         "metal_ox": inputDict["parameters"]["metal_ox"],
                         "init_energy": structs[i].calculator.init_energy,
@@ -832,12 +1049,12 @@ def build_complex_driver(inputDict1):
                     "metal_ox": inputDict["parameters"]["metal_ox"],
                     "init_energy": structs[i].calculator.init_energy,
                     "energy": xtb_energies[i],
-                    "metal_center_symmetry": structs[i].complexMol.metal_center_geos[0][
-                        "metal_geo_type"
-                    ],
-                    "metal_center_confidence": structs[i].complexMol.metal_center_geos[
-                        0
-                    ].get("confidence",1),
+                    "metal_center_symmetry": structs[
+                        i
+                    ].complexMol.metal_center_geos[0]["metal_geo_type"],
+                    "metal_center_confidence": structs[i]
+                    .complexMol.metal_center_geos[0]
+                    .get("confidence", 1),
                     "mol2string": mol2strings[i],
                     "init_mol2string": init_mol2strings[i],
                     "energy_sorted_index": energy_sorted_inds[i],
@@ -854,11 +1071,19 @@ def build_complex_driver(inputDict1):
                         "core_preprocess_time": core_preprocess_time,
                         "symmetry_preprocess_time": symmetry_preprocess_time,
                         "total_liggen_time": np.sum(
-                            [x.total_liggen_time for x in structs[i].ligandList]
+                            [
+                                x.total_liggen_time
+                                for x in structs[i].ligandList
+                            ]
                         ),
-                        "total_complex_assembly_time": structs[i].assemble_total_time,
-                        "final_relaxation_time": structs[i].final_eval_total_time,
-                        "sum_total_conformer_time_spent": fin_time2 - int_time1,
+                        "total_complex_assembly_time": structs[
+                            i
+                        ].assemble_total_time,
+                        "final_relaxation_time": structs[
+                            i
+                        ].final_eval_total_time,
+                        "sum_total_conformer_time_spent": fin_time2
+                        - int_time1,
                     }
                 )
                 ordered_conf_dict[keys[i]] = tdict
@@ -892,19 +1117,31 @@ def build_complex(inputDict):
     # Try larger radii generation for multidentate complexes if no complexes generated in an attempt to get at high-spin
     # > Covalent radii typically understimated for higher spin conformations
     if (
-        len([x for x in ordered_conf_dict.keys() if ("_init_only" not in x)]) == 0
+        len([x for x in ordered_conf_dict.keys() if ("_init_only" not in x)])
+        == 0
     ) and (max([len(x["coordList"]) for x in tmp_inputDict["ligands"]]) > 2):
         newinpdict = io_ptable.map_metal_radii(
             tmp_inputDict, larger=True
         )  # Run with larger radii
         if tmp_inputDict["parameters"]["debug"]:
             print("Trying with larger scaled metal radii.")
-        temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(newinpdict)
+        temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(
+            newinpdict
+        )
         newdict_append = dict()
         for key, val in temp_ordered_conf_dict.items():
             newdict_append[key + "_larger_scaled"] = val
         ordered_conf_dict.update(newdict_append)
-        if len([x for x in ordered_conf_dict.keys() if ("_init_only" not in x)]) > 0:
+        if (
+            len(
+                [
+                    x
+                    for x in ordered_conf_dict.keys()
+                    if ("_init_only" not in x)
+                ]
+            )
+            > 0
+        ):
             try_smaller = False
             if tmp_inputDict["parameters"]["debug"]:
                 print("Succeeded with larger scaled metal radii!")
@@ -918,13 +1155,21 @@ def build_complex(inputDict):
             if tmp_inputDict["parameters"]["debug"]:
                 print("Trying with smaller scaled metal radii.")
             newinpdict = io_ptable.map_metal_radii(tmp_inputDict, larger=False)
-            temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(newinpdict)
+            temp_ordered_conf_dict, tmp_inputDict = build_complex_driver(
+                newinpdict
+            )
             newdict_append = dict()
             for key, val in temp_ordered_conf_dict.items():
                 newdict_append[key + "_smaller_scaled"] = val
             ordered_conf_dict.update(newdict_append)
             if (
-                len([x for x in ordered_conf_dict.keys() if ("_init_only" not in x)])
+                len(
+                    [
+                        x
+                        for x in ordered_conf_dict.keys()
+                        if ("_init_only" not in x)
+                    ]
+                )
                 > 0
             ):
                 if tmp_inputDict["parameters"]["debug"]:
@@ -957,11 +1202,14 @@ def build_complex(inputDict):
                     )
                     print("Normally adds a chunk of time to generation.")
                 # Use the docking function to add species specified in inputDict/parameters
-                mol_plus_species, species_list = io_arch_dock.add_non_covbound_species(
-                    vals[i]["mol2string"], parameters=tmp_inputDict["parameters"]
+                mol_plus_species, species_list = (
+                    io_arch_dock.add_non_covbound_species(
+                        vals[i]["mol2string"],
+                        parameters=tmp_inputDict["parameters"],
+                    )
                 )
                 # Do a final relaxation again with molecule + species. Ensures matching level
-                calculator = CalcExecutor(
+                calculator = io_calc.CalcExecutor(
                     mol_plus_species,
                     parameters=tmp_inputDict["parameters"],
                     final_sanity_check=tmp_inputDict["parameters"][
@@ -989,12 +1237,16 @@ def build_complex(inputDict):
                         "sampled_solvation_shells": species_list,
                         "ase_atoms": mol_plus_species.ase_atoms,
                         "total_charge": int(mol_plus_species.charge),
-                        "metal_center_symmetry": mol_plus_species.metal_center_geos[0][
+                        "metal_center_symmetry": mol_plus_species.metal_center_geos[
+                            0
+                        ][
                             "metal_geo_type"
                         ],
                         "metal_center_confidence": mol_plus_species.metal_center_geos[
                             0
-                        ]["confidence"],
+                        ][
+                            "confidence"
+                        ],
                         "xtb_n_unpaired_electrons": mol_plus_species.xtb_uhf,
                         "calc_n_unpaired_electrons": mol_plus_species.uhf,
                         "xtb_total_charge": int(mol_plus_species.xtb_charge),
@@ -1006,7 +1258,9 @@ def build_complex(inputDict):
             ):
                 if tmp_inputDict["parameters"]["debug"]:
                     print(
-                        "Starting CREST sampling on {} of {}!".format(j + 1, len(order))
+                        "Starting CREST sampling on {} of {}!".format(
+                            j + 1, len(order)
+                        )
                     )
                 samples, energies = io_conformers.crest_conformers(
                     vals[i]["mol2string"],
@@ -1015,7 +1269,9 @@ def build_complex(inputDict):
                 )
                 if tmp_inputDict["parameters"]["debug"]:
                     print(
-                        "Finished CREST sampling on {} of {}!".format(j + 1, len(order))
+                        "Finished CREST sampling on {} of {}!".format(
+                            j + 1, len(order)
+                        )
                     )
                 vals[i].update({"conformers": samples, "energies": energies})
                 vals[i].update({"energy": min(energies)})
@@ -1043,12 +1299,18 @@ def build_complex(inputDict):
             ):
                 if tmp_inputDict["parameters"]["debug"]:
                     print(
-                        "Starting OBMol sampling on {} of {}!".format(j + 1, len(order))
+                        "Starting OBMol sampling on {} of {}!".format(
+                            j + 1, len(order)
+                        )
                     )
                 samples, energies = io_conformers.obmol_conformers(
                     vals[i]["mol2string"],
-                    obmol_total_confs=tmp_inputDict["parameters"]["obmol_total_confs"],
-                    obmol_rmsd_cutoff=tmp_inputDict["parameters"]["obmol_rmsd_cutoff"],
+                    obmol_total_confs=tmp_inputDict["parameters"][
+                        "obmol_total_confs"
+                    ],
+                    obmol_rmsd_cutoff=tmp_inputDict["parameters"][
+                        "obmol_rmsd_cutoff"
+                    ],
                     obmol_energy_cutoff=tmp_inputDict["parameters"][
                         "obmol_energy_cutoff"
                     ],
@@ -1059,7 +1321,9 @@ def build_complex(inputDict):
                 )
                 if tmp_inputDict["parameters"]["debug"]:
                     print(
-                        "Finished OBMol sampling on {} of {}!".format(j + 1, len(order))
+                        "Finished OBMol sampling on {} of {}!".format(
+                            j + 1, len(order)
+                        )
                     )
                 vals[i].update({"conformers": samples, "energies": energies})
                 vals[i].update({"energy": min(energies)})
@@ -1109,7 +1373,9 @@ def build_complex_2D(inputDict):
     inputDict = io_process_input.inparse_2D(inputDict)
 
     # Initialize Atoms object for complex
-    complexMol = io_obabel.smiles2Atoms(inputDict["core"]["smiles"], addHydrogens=False)
+    complexMol = io_obabel.smiles2Atoms(
+        inputDict["core"]["smiles"], addHydrogens=False
+    )
     charge = inputDict["parameters"]["metal_ox"]
 
     mol = io_molecule.Molecule()  # Initialize molecule.
@@ -1197,7 +1463,10 @@ def build_complex_2D(inputDict):
         xtb_charge = charge + (3 - inputDict["parameters"]["metal_ox"])
         even_odd_electrons = np.sum([atom.number for atom in mol.ase_atoms])
         even_odd_electrons = (
-            even_odd_electrons - io_ptable.elements.index(metals[0]) + 11 - xtb_charge
+            even_odd_electrons
+            - io_ptable.elements.index(metals[0])
+            + 11
+            - xtb_charge
         )
         even_odd_electrons = even_odd_electrons % 2
         if even_odd_electrons == 0:
@@ -1225,7 +1494,11 @@ if __name__ == "__main__":
             "coreType": "octahedral",
         },
         "ligands": [
-            {"smiles": "n1ccccc1-c2ccccn2", "coordList": [0, 1], "ligType": "bi_cis"},
+            {
+                "smiles": "n1ccccc1-c2ccccn2",
+                "coordList": [0, 1],
+                "ligType": "bi_cis",
+            },
         ],  # If core CN specified and ligand locations remaining -> populate with water
         "parameters": {},
     }

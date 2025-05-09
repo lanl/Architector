@@ -82,7 +82,9 @@ def convert_io_molecule(
                     mols.append(mol)
                 return mols
             else:
-                obmol = io_obabel.convert_sdf_obmol(structure, readstring=False)
+                obmol = io_obabel.convert_sdf_obmol(
+                    structure, readstring=False
+                )
                 mol2 = io_obabel.convert_obmol_mol2(obmol)
                 mol.read_mol2(mol2, readstring=True)
         elif structure[-5:] == ".traj":  # Read in trajectory file.
@@ -136,7 +138,9 @@ def convert_io_molecule(
             except:
                 raise ValueError("Not Recognized Structure Type (str)!")
         elif isinstance(structure, ase.atoms.Atoms):
-            mol.load_ase(structure, atom_types=structure.get_chemical_symbols())
+            mol.load_ase(
+                structure, atom_types=structure.get_chemical_symbols()
+            )
         else:
             raise ValueError("Not Recognized Structure Type!")
         if detect_charge_spin:
@@ -722,7 +726,9 @@ class Molecule:
             natoms, int(csg.nnz / 2), disjoint_components[0], 0, 0
         )
         ss += "SMALL\n"
-        ss += charge_string + "\n" + "****\n" + "Generated from Architector\n\n"
+        ss += (
+            charge_string + "\n" + "****\n" + "Generated from Architector\n\n"
+        )
         ss += "@<TRIPOS>ATOM\n"
         atom_default_dict = {"C": "3", "N": "3", "O": "2", "S": "3", "P": "3"}
         atom_types = self.ase_atoms.get_chemical_symbols()
@@ -1009,7 +1015,9 @@ class Molecule:
             index of the metal or first metal if present.
         """
         syms = self.ase_atoms.get_chemical_symbols()
-        metalinds = [i for i, x in enumerate(syms) if x in io_ptable.all_metals]
+        metalinds = [
+            i for i, x in enumerate(syms) if x in io_ptable.all_metals
+        ]
         if len(metalinds) == 1:
             metalind = metalinds[0]
         elif len(metalinds) > 1:
@@ -1281,7 +1289,9 @@ class Molecule:
                 posits = self.ase_atoms.get_positions()
                 m_inds = [
                     i
-                    for i, x in enumerate(self.ase_atoms.get_chemical_symbols())
+                    for i, x in enumerate(
+                        self.ase_atoms.get_chemical_symbols()
+                    )
                     if x in io_ptable.all_metals
                 ]
                 m_ind = None
@@ -1448,7 +1458,10 @@ class Molecule:
                 else:
                     all_dists = atoms.get_all_distances()
                     cov_radii = np.array(
-                        [io_ptable.rcov1[x] for x in atoms.get_atomic_numbers()]
+                        [
+                            io_ptable.rcov1[x]
+                            for x in atoms.get_atomic_numbers()
+                        ]
                     )
                     if (
                         (not (m_ind is None))
@@ -1466,12 +1479,16 @@ class Molecule:
                             if isinstance(pair_cutoffs, dict):
                                 if new_pair_dict["type"] == "scale_covrad":
                                     cutoff = new_pair_dict.get(
-                                        tuple(sorted((symbols[i], symbols[j]))),
+                                        tuple(
+                                            sorted((symbols[i], symbols[j]))
+                                        ),
                                         smallest_dist_cutoff,
                                     ) * (cov_radii[i] + cov_radii[j])
                                 elif new_pair_dict["type"] == "dist":
                                     cutoff = new_pair_dict.get(
-                                        tuple(sorted((symbols[i], symbols[j]))),
+                                        tuple(
+                                            sorted((symbols[i], symbols[j]))
+                                        ),
                                         smallest_dist_cutoff
                                         * (cov_radii[i] + cov_radii[j]),
                                     )
@@ -2012,7 +2029,9 @@ class Molecule:
                                             )
                                         ]
                                         + io_ptable.rcov1[
-                                            io_ptable.elements.index(symbols[c])
+                                            io_ptable.elements.index(
+                                                symbols[c]
+                                            )
                                         ],
                                         "atom_symbols": "{}-{}".format(
                                             symbols[met], symbols[c]
@@ -2021,7 +2040,9 @@ class Molecule:
                                 )
                                 index += 1
                             elif (
-                                (c in metals) and (c != met) and (not m_visited)
+                                (c in metals)
+                                and (c != met)
+                                and (not m_visited)
                             ):
                                 m_visited = True
                                 ml_dist_dicts.append(
@@ -2037,7 +2058,9 @@ class Molecule:
                                             )
                                         ]
                                         + io_ptable.rcov1[
-                                            io_ptable.elements.index(symbols[c])
+                                            io_ptable.elements.index(
+                                                symbols[c]
+                                            )
                                         ],
                                         "atom_symbols": "{}-{}".format(
                                             symbols[met], symbols[c]
@@ -2789,7 +2812,9 @@ class Molecule:
                         ].tolist()
 
                         if (
-                            len([x for x in fg_del_inds if x in fg_delete_inds])
+                            len(
+                                [x for x in fg_del_inds if x in fg_delete_inds]
+                            )
                             > 0
                         ):  # Repeated deleted hydrogen
                             fg_del_inds = [
@@ -2868,7 +2893,9 @@ class Molecule:
             else:
                 raise ValueError("Unknown index {}.".format(idx))
 
-        freeze_indices = [x for x in range(init_n_atoms - len(removed_indices))]
+        freeze_indices = [
+            x for x in range(init_n_atoms - len(removed_indices))
+        ]
         if not core_frozen:
             freeze_indices = None
         if uff_opt:
