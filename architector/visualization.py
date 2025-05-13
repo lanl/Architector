@@ -1195,7 +1195,8 @@ set shininess, {shiny_other}
 set specular, 1
 set reflect, {reflect_other}
 set stick_radius, {stick_scale}
-set transparency, {transparency_others}
+set transparency, {transparency_other}
+set sphere_transparency, {transparency_other}
 set dash_gap, 0.01
 set light_count, {light_count}
 set dash_radius, 0.035
@@ -1207,41 +1208,49 @@ set sphere_scale, {metal_scale}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+
 set shininess, {shiny_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
 set reflect, {reflect_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
 set transparency, {transparency_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
+set sphere_transparency, {transparency_metal}, elem La+Ce+Pr+Nd+Pm+Sm+Eu+Gd+Tb+Dy+Ho+Er+Tm+Yb+Lu
 # Actinides
 set sphere_scale, {metal_scale}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 set shininess, {shiny_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 set reflect, {reflect_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 set transparency, {transparency_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
+set sphere_transparency, {transparency_metal}, elem Ac+Th+Pa+U+Np+Pu+Am+Cm+Bk+Cf+Es+Fm+Md+No+Lr
 # First row
 set sphere_scale, {metal_scale}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 set shininess, {shiny_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 set reflect, {reflect_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 set transparency, {transparency_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
+set sphere_transparency, {transparency_metal}, elem Sc+Ti+V+Cr+Mn+Fe+Co+Ni+Cu+Zn
 # Second row
 set sphere_scale, {metal_scale}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
 set shininess, {shiny_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
 set reflect, {reflect_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
 set transparency, {transparency_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
+set sphere_transparency, {transparency_metal}, elem Y+Zr+Nb+Mo+Tc+Ru+Rh+Pd+Ag+Cd
 # Third row +
 set sphere_scale, {metal_scale}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
 set shininess, {shiny_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
 set reflect, {reflect_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
 set transparency, {transparency_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
+set sphere_transparency, {transparency_metal}, elem Hf+Ta+W+Re+Os+Ir+Pt+Au+Hg+Rf+Db+Sg+Bh+Hs
 # Alakai
 set sphere_scale, {metal_scale}, elem Li+Na+K+Rb+Cs+Fr
 set shininess, {shiny_metal}, elem Li+Na+K+Rb+Cs+Fr
 set reflect, {reflect_metal}, elem Li+Na+K+Rb+Cs+Fr
 set transparency, {transparency_metal}, elem Li+Na+K+Rb+Cs+Fr
+set sphere_transparency, {transparency_metal}, elem Li+Na+K+Rb+Cs+Fr
 # Alakai Earth
 set sphere_scale, {metal_scale}, elem Be+Mg+Ca+Sr+Ba+Ra
 set shininess, {shiny_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
 set reflect, {reflect_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
 set transparency, {transparency_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
+set sphere_transparency, {transparency_metal}, elem Be+Mg+Ca+Sr+Ba+Ra
 # Post transition
 set sphere_scale, {metal_scale}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 set shininess, {shiny_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 set reflect, {reflect_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 set transparency, {transparency_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
+set sphere_transparency, {transparency_metal}, elem Al+Ga+In+Sn+Tl+Pb+Bi+Nh+Fl+Mc+Lv
 
 {tag_section}
 
