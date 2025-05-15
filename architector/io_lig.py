@@ -1347,7 +1347,7 @@ def clean_conformation_ff(
                     ff.SteepestDescent(10)
                     ff.ConjugateGradients(10)
                 ff.GetCoordinates(OBMol)
-            coords, _, _ = io_obabel.get_OBMol_coords_anums_graph(
+            coords, anums1, _ = io_obabel.get_OBMol_coords_anums_graph(
                 OBMol, return_coords=True
             )
             # Reorder the coordinating atom assignment to more closely match unconstrained
@@ -1363,7 +1363,7 @@ def clean_conformation_ff(
             ):
                 if debug:
                     print(
-                        "Finished initial UFF relaxation without angle constraints."
+                        "Finished initial UFF relaxation without angle constraints.\n",
                     )
                 ff = openbabel.OBForceField.FindForceField("UFF")
                 constr = openbabel.OBFFConstraints()
@@ -1596,7 +1596,7 @@ def set_position_align(
         actual = np.array(
             [np.asarray(init_posits[val[0]]) for val in ligcoordList]
         )
-        if len(ideal) > 2:
+        if (len(ideal) > 2) and (len(ideal) < 10):
             # Add reflection planes in case of mirrored molecule generated
             mirrors = [[1, 1, 1], [-1, 1, 1]]  # Add mirror vectors
             actual_mirrors = []
@@ -1658,12 +1658,55 @@ def set_position_align(
             else:
                 for i, val in enumerate(mirrors[minind]):
                     init_posits[:, i] = val * init_posits[:, i]
-        elif len(ideal == 2):  # No possible different symmetries here
+        elif len(ideal) > 9: # Do linear sum assignment for mirror rotations
+            mirrors = [[1, 1, 1], [-1, 1, 1]]  # Add mirror vectors
+            actual_mirrors = []
+            for mirror in mirrors:
+                actual_mirror = actual.copy()
+                for i, val in enumerate(mirror):
+                    actual_mirror[:, i] = val * actual_mirror[:, i]
+                actual_mirrors.append(actual_mirror)
+            cost_mat0 = io_align_mol.permutation_cost_mat(
+                ideal,
+                actual,
+                ['a']*len(ideal), 
+                ['a']*len(actual), 
+                costtype="xyz")
+            cost_mat1 = io_align_mol.permutation_cost_mat(
+                ideal,
+                actual_mirrors[0],
+                ['a']*len(ideal),
+                ['a']*len(actual_mirrors[0]), 
+                costtype="xyz")
+            cost_mat2 = io_align_mol.permutation_cost_mat(
+                ideal,
+                actual_mirrors[1],
+                ['a']*len(ideal),
+                ['a']*len(actual_mirrors[1]),
+                costtype="xyz")
+            permute0 = io_align_mol.linear_sum_assignment(cost_mat0)[1]
+            permute1 = io_align_mol.linear_sum_assignment(cost_mat1)[1]
+            permute2 = io_align_mol.linear_sum_assignment(cost_mat2)[1]
+            align_0 = actual[permute0]
+            align_1 = actual_mirrors[0][permute1]
+            align_2 = actual_mirrors[1][permute2]
+            r0 = Rot.align_vectors(ideal, align_0)
+            r1 = Rot.align_vectors(ideal, align_1)
+            r2 = Rot.align_vectors(ideal, align_2)
+            minval = r0[1]
+            r = r0 
+            if r1[1] < minval:
+                r = r1
+                minval = r1[1]
+            if r2[1] < minval:
+                r = r2
+                minval = r2[1]
+        elif len(ideal) == 2:  # No possible different symmetries here
             ideal = ideal
             actual = actual
             r = Rot.align_vectors(ideal, actual)
             minval = r[1]
-        elif len(ideal == 1):  # Just one!
+        elif len(ideal) == 1:  # Just one!
             ideal = ideal.reshape(1, -1)
             actual = actual.reshape(1, -1)
             r = Rot.align_vectors(ideal, actual)
@@ -2193,6 +2236,8 @@ def get_aligned_conformer(
     ############# END FF Relaxation Section ##############
 
     if not fail:  # Catch FF optimization failures
+        if debug:
+            print('Starting Alignment')
         (outatoms, minval, sane) = set_position_align(
             Conf3D_out,
             tligcoordList,
@@ -2202,6 +2247,8 @@ def get_aligned_conformer(
             rot_coord_vect=rot_coord_vect,
             rot_angle=rot_angle,
         )
+        if debug:
+            print('Done Alignment')
         crowding_penalty = 0
         if sane:  # Perform check to see if metal is extra crowded.
             cov1metal = cov1rad[-1]
