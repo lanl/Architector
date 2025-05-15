@@ -354,6 +354,8 @@ class CalcExecutor:
                 if "_xtb" in self.method:
                     tcharge = self.mol.xtb_charge
                 charge_vect[0] = tcharge
+                self.mol.ase_atoms.info['charge'] = int(np.sum(charge_vect))
+                self.mol.ase_atoms.info['spin'] = int(np.sum(uhf_vect) + 1)
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif "gfn" in self.method.lower():
@@ -406,6 +408,8 @@ class CalcExecutor:
                 charge_vect = np.zeros(len(self.mol.ase_atoms))
                 if self.method != "GFN-FF":
                     charge_vect[0] = self.mol.xtb_charge
+                self.mol.ase_atoms.info['charge'] = int(np.sum(charge_vect))
+                self.mol.ase_atoms.info['spin'] = int(np.sum(uhf_vect) + 1)
                 self.mol.ase_atoms.set_initial_charges(charge_vect)
                 self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
             elif ("uff" in self.method.lower()) or (
@@ -418,7 +422,8 @@ class CalcExecutor:
                 )
             if not obabel_ff_requested:
                 self.mol.ase_atoms.calc = calc
-                if (self.relax) and (not self.xtb_relax):
+                if (self.relax) and ((not self.xtb_relax) or
+                                     ('custom' in self.method)):
                     cs = self.mol.ase_atoms.constraints
                     if self.freeze_molecule_add_species and self.species_run:
                         if self.debug:
