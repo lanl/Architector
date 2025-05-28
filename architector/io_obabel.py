@@ -285,6 +285,7 @@ def get_obmol_smiles(
             tOBmol = functionalize(
                 tOBmol,
                 functional_group=fg["functional_group"],
+                fg_inds=fg.get("fg_inds",[0]),
                 smiles_inds=fg["smiles_inds"],
             )
 
@@ -567,7 +568,8 @@ def generate_obmol_conformers(
         return output_strings
 
 
-def functionalize(OBmol, functional_group="C", smiles_inds=[0]):
+def functionalize(OBmol, functional_group="C", fg_inds=[0],
+                  smiles_inds=[0]):
     """functionalize functionalization routine
 
     Parameters
@@ -576,6 +578,8 @@ def functionalize(OBmol, functional_group="C", smiles_inds=[0]):
         Un"built" 3D ligand
     functional_group : str, optional
         smiles string or name of functional_group, by default 'C'
+    fg_inds : list, optional
+        indices of the functional group that should be bound, by default [0]
     smiles_inds : list, optional
         indices where the functional_group should be added, by default [0]
 
@@ -603,11 +607,11 @@ def functionalize(OBmol, functional_group="C", smiles_inds=[0]):
                 obbond.GetEndAtomIdx() + start_index,
                 obbond.GetBondOrder(),
             )
-
-        OBmol.AddBond(start_index + 1, idx + 1, 1)
-        for i, atom in enumerate(ob.OBMolAtomIter(OBmol)):
-            if (i == start_index) or (i == idx):
-                atom.SetImplicitHCount(atom.GetImplicitHCount() - 1)
+        for fci in fg_inds:
+            OBmol.AddBond(start_index + fci + 1, idx + 1, 1)
+            for i, atom in enumerate(ob.OBMolAtomIter(OBmol)):
+                if (i == start_index + fci) or (i == idx):
+                    atom.SetImplicitHCount(atom.GetImplicitHCount() - 1)
 
     return OBmol
 
