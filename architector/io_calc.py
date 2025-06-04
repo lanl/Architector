@@ -18,7 +18,7 @@ import architector.arch_context_manage as arch_context_manage
 import architector.io_molecule as io_molecule
 import ase
 from ase.io import Trajectory
-from ase.optimize import LBFGSLineSearch
+from ase.optimize import LBFGS
 from ase.constraints import FixAtoms, FixBondLengths, FixInternals
 
 # Add any other ASE calculator here.
@@ -38,6 +38,63 @@ try:
     from sella import Internals
 except:
     has_sella = False
+
+# Instantiate UMA/Omol models
+device = 'cpu'
+uma_error = ''
+omol_error = ''
+try:
+    import torch
+    if torch.cuda.is_available():
+        device = 'cuda'
+except ImportError:
+    pass
+if 'UMA_MODEL_PATH' in os.environ:
+    try:
+        from fairchem.core import FAIRChemCalculator
+        from fairchem.core.units.mlip_unit import load_predict_unit
+
+        uma_predict = load_predict_unit(
+            path=os.environ['UMA_MODEL_PATH'],
+            device=device
+        )
+        uma_calc = FAIRChemCalculator(
+            uma_predict,
+            task_name='omol'
+            )
+    except ImportError as e:
+        uma_error = 'No Fairchem or other Import Error' + str(e)
+    except Exception as e:
+        uma_error = str(e)
+else:
+    uma_error = (
+        "No UMA model path set. Set the environmental variable UMA_MODEL_PATH\n"
+        "with `export UMA_MODEL_PATH=/path/to/uma-s-1.pt`\n"
+        "or os.environ['UMA_MODEL_PATH'] = '/path/to/uma-s-1.pt'\n"
+    )
+if 'OMOL_MODEL_PATH' in os.environ:
+    try:
+        from fairchem.core import FAIRChemCalculator
+        from fairchem.core.units.mlip_unit import load_predict_unit
+
+        omol_predict = load_predict_unit(
+            path=os.environ['OMOL_MODEL_PATH'],
+            device=device
+        )
+        omol_calc = FAIRChemCalculator(
+            omol_predict,
+            task_name='omol'
+        )
+    except ImportError as e:
+        omol_error = 'No Fairchem or other Import Error' + str(e)
+    except Exception as e:
+        omol_error = str(e)
+else:
+    omol_error = (
+        "No OMOL model path set. Set the environmental variable OMOL_MODEL_PATH\n"
+        "with `export OMOL_MODEL_PATH=/path/to/esen_sm_conserving_all.pt`\n"
+        "or os.environ['OMOL_MODEL_PATH'] = '/path/to/esen_sm_conserving_all.pt'\n"
+    )
 
 
 params = {
@@ -94,7 +151,7 @@ params = {
     "species_relax": True,  # Whether or not to relax the generated secondary solvation structures.
     "species_intermediate_method": "GFN-FF",  # Method to use for intermediate species screening - Suggested GFN-FF
     "species_intermediate_relax": True,  # Whether to perform the relaxation only after all secondary species are added
-    "ase_opt_method": None,  # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+    "ase_opt_method": None,  # ASE optimizer class used for geometry optimizations. Default will use LBFGS.
     "targeted_indices_close": None,  # Indices of both base molecule and added molecule to add close to one another.
 }
 
@@ -266,8 +323,8 @@ class CalcExecutor:
             if self.ff_preopt_run:
                 self.method = "UFF"
                 self.relax = True
-        if self.ase_opt_method is None:  # Default to LBFGSLineSearch
-            self.opt_method = LBFGSLineSearch
+        if self.ase_opt_method is None:  # Default to LBFGS
+            self.opt_method = LBFGS
         else:
             self.opt_method = self.ase_opt_method
         # Temporary logfile or not for ase optimizer
@@ -304,6 +361,8 @@ class CalcExecutor:
             self.xtb_relax = False
         # Store trajectory info
         elif self.save_trajectories:
+            self.xtb_relax = False
+        elif ('uma' in self.method.lower()) or ('omol' in self.method.lower()):
             self.xtb_relax = False
 
         # Output properties
@@ -353,6 +412,29 @@ class CalcExecutor:
                 tcharge = self.mol.charge
                 if "_xtb" in self.method:
                     tcharge = self.mol.xtb_charge
+                charge_vect[0] = tcharge
+                self.mol.ase_atoms.info['charge'] = int(np.sum(charge_vect))
+                self.mol.ase_atoms.info['spin'] = int(np.sum(uhf_vect) + 1)
+                self.mol.ase_atoms.set_initial_charges(charge_vect)
+                self.mol.ase_atoms.set_initial_magnetic_moments(uhf_vect)
+            elif ("uma" in self.method.lower()) or ('omol' in self.method.lower()):
+                if 'uma' in self.method.lower():
+                    if uma_error == '':
+                        calc = uma_calc
+                    else:
+                        raise ImportError(uma_error)
+                elif 'omol' in self.method.lower():
+                    if omol_error == '':
+                        calc = omol_calc
+                    else:
+                        raise ImportError(omol_error)
+                # Here, if a calculator needs spin/charge information in another way we can assign.
+                # Or handle as a different use case.
+                uhf_vect = np.zeros(len(self.mol.ase_atoms))
+                tuhf = self.mol.uhf
+                uhf_vect[0] = tuhf
+                charge_vect = np.zeros(len(self.mol.ase_atoms))
+                tcharge = self.mol.charge
                 charge_vect[0] = tcharge
                 self.mol.ase_atoms.info['charge'] = int(np.sum(charge_vect))
                 self.mol.ase_atoms.info['spin'] = int(np.sum(uhf_vect) + 1)

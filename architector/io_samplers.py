@@ -194,7 +194,7 @@ def bond_length_sampler(
     return_energies : bool, optional
         return energies and rmsds. default False
     ase_opt_method : None, optional
-        ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+        ASE optimizer class used for geometry optimizations. Default will use LBFGS.
     ase_opt_kwargs : dict(),
         ASE optimizer kwargs. Do not include "trajectory" nor "logfile" kwargs.
     max_attempts : int, optional

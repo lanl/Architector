@@ -110,7 +110,7 @@ inputDict = {
     "calculator":None, # ASE calculator class input for usage during construction or for optimization.
     "calculator_kwargs":dict(), # ASE calculator kwargs.
     "xtb_relax": True, # Use xtb relaxation instead of ASE where possible. (Faster, better optimizer)
-    "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+    "ase_opt_method":None, # ASE optimizer class used for geometry optimizations. Default will use LBFGS.
     "ase_opt_kwargs":dict(), # ASE optimizer kwargs. Do not include "trajectory" nor "logfile" kwargs.
     "fmax":0.1, # eV/Angstrom maximum force to optimize to with ASE optimizer.
     "maxsteps":1000, # Maxmimum number of steps for ASE otpimizer to take.

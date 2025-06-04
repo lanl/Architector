@@ -38,7 +38,7 @@ defaults = {
     "species_intermediate_relax": True,  # Whether to perform the relaxation only after all secondary species are added
     "calculator": None,  # ASE calculator class input for usage during construction or for optimization.
     "calculator_kwargs": dict(),  # ASE calculator kwargs.
-    "ase_opt_method": None,  # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+    "ase_opt_method": None,  # ASE optimizer class used for geometry optimizations. Default will use LBFGS.
     "ase_opt_kwargs": dict(),  # ASE optimizer kwargs.
     "targeted_indices_close": None,  # Indices of both base molecule and added molecule to add close to one another.
     # e.g. [1,0]
@@ -70,7 +70,7 @@ targeted_defaults = {
     "species_intermediate_relax": False,  # Whether to perform the relaxation only after all secondary species are added
     "calculator": None,  # ASE calculator class input for usage during construction or for optimization.
     "calculator_kwargs": dict(),  # ASE calculator kwargs.
-    "ase_opt_method": None,  # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+    "ase_opt_method": None,  # ASE optimizer class used for geometry optimizations. Default will use LBFGS.
     "ase_opt_kwargs": dict(),  # ASE optimizer kwargs.
     "targeted_indices_close": None,  # Indices of both base molecule and added molecule to add close to one another.
     # e.g. [1,0]
@@ -480,7 +480,7 @@ def add_non_covbound_species(mol, parameters={}):
         "species_intermediate_relax": True, # Whether to perform the relaxation only after all secondary species are added
         "calculator": None, # ASE calculator class input for usage during construction or for optimization.
         "calculator_kwargs": dict(), # ASE calculator kwargs.
-        "ase_opt_method": None, # ASE optimizer class used for geometry optimizations. Default will use LBFGSLineSearch.
+        "ase_opt_method": None, # ASE optimizer class used for geometry optimizations. Default will use LBFGS.
         "ase_opt_kwargs": dict(), # ASE optimizer kwargs.
         "ase_opt_kwargs": {}, # ASE optimizer
         "targeted_indices_close": None, # Indices of both base molecule and added species to add close to one another.
