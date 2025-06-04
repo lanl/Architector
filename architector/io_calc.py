@@ -335,6 +335,8 @@ class CalcExecutor:
 
         if ("xtb" in self.method.lower()) or ("uff" in self.method.lower()):
             self.mol.swap_actinide(debug=self.debug)
+        if ('omol' in self.method.lower()) or ('uma' in self.method.lower()):
+            self.mol.swap_actinide(debug=self.debug)
 
         self.calc_instantiated = False
 
