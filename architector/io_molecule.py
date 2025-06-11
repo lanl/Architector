@@ -2985,7 +2985,7 @@ class Molecule:
         )
         return gyration_radii
 
-    def lig_dissociation_sample(self, max_dist=4, steps=10):
+    def lig_dissociation_sample(self, min_shift=0.0, max_dist=4, steps=10, do_all=False):
         """Create N trajectories of ligand dissociation.
         Will move the ligands away in the direction of the coordination atoms.
         Note: will only generate dissociation trajectories
@@ -2993,11 +2993,16 @@ class Molecule:
 
         Parameters
         ----------
+        min_shift : float, optional
+            distance  in angstroms to scale ligands towards (-ve) or away (+ve) 
+            from the metal center when starting the scan.
         max_dist : int, optional
             maximum distance to expand out to,
             by default 4 Angstroms past current distance.
         steps : int, optional
             number of steps to take, by default 10.
+        do_all : bool, optional
+            do all of the ligands at the same time?
 
         Returns
         -------
@@ -3014,24 +3019,40 @@ class Molecule:
         output_scans = []
         if info_dict.get("metal", None) is None:
             raise ValueError("Cannot Split when no metal center.")
-        for i, lig in enumerate(info_dict["original_lig_inds"]):
-            ca_inds = np.array(info_dict["lig_metal_coordatoms"][i])
-            if len(ca_inds) < 4:  # Only up to tridentate.
-                tmp_scan = []
-                ca_direction = np.sum(tcoords[lig[ca_inds]], axis=0)
-                # Normalize
-                ca_direction = ca_direction / np.linalg.norm(ca_direction)
-                for j, step in enumerate(np.linspace(0, max_dist, steps)):
-                    newcoords = copy.deepcopy(tcoords)
-                    newcoords[lig] += step * ca_direction
-                    tmpmol.ase_atoms.set_positions(newcoords)
-                    tmp_scan.append(
-                        tmpmol.write_mol2(
-                            "DiscScan,Lig{},Step{}".format(i, j),
-                            writestring=True,
+        if do_all:
+            for j, step in enumerate(np.linspace(min_shift, max_dist, steps)):
+                newcoords = copy.deepcopy(tcoords)
+                for i, lig in enumerate(info_dict["original_lig_inds"]):
+                    ca_inds = np.array(info_dict["lig_metal_coordatoms"][i])
+                    if len(ca_inds) < 4:  # Only up to tridentate.
+                        ca_direction = np.sum(tcoords[lig[ca_inds]], axis=0)
+                        # Normalize
+                        ca_direction = ca_direction / np.linalg.norm(ca_direction)
+                        newcoords[lig] += step * ca_direction
+                tmpmol.ase_atoms.set_positions(newcoords)
+                output_scans.append(tmpmol.write_mol2(
+                                "DiscScan,AllLigs,Step{}".format(j),
+                                writestring=True,
+                            ))
+        else:
+            for i, lig in enumerate(info_dict["original_lig_inds"]):
+                ca_inds = np.array(info_dict["lig_metal_coordatoms"][i])
+                if len(ca_inds) < 4:  # Only up to tridentate.
+                    tmp_scan = []
+                    ca_direction = np.sum(tcoords[lig[ca_inds]], axis=0)
+                    # Normalize
+                    ca_direction = ca_direction / np.linalg.norm(ca_direction)
+                    for j, step in enumerate(np.linspace(min_shift, max_dist, steps)):
+                        newcoords = copy.deepcopy(tcoords)
+                        newcoords[lig] += step * ca_direction
+                        tmpmol.ase_atoms.set_positions(newcoords)
+                        tmp_scan.append(
+                            tmpmol.write_mol2(
+                                "DiscScan,Lig{},Step{}".format(i, j),
+                                writestring=True,
+                            )
                         )
-                    )
-                output_scans.append(tmp_scan)
+                    output_scans.append(tmp_scan)
         return output_scans
 
     def get_asa(
