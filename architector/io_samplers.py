@@ -25,6 +25,7 @@ def md_sampler(
     timestep=1.0,
     friction=0.02,
     return_energies=False,
+    tqdm=True,
     debug=False,
 ):
     """md_sampler
@@ -63,7 +64,62 @@ def md_sampler(
     full_results = []
     simple_rmsds = []
     try:  # Catch TB convergence failures.
-        with tqdm(total=n + int(warm_up / interval)) as pbar:
+        if tqdm:
+            with tqdm(total=n + int(warm_up / interval)) as pbar:
+                with arch_context_manage.make_temp_directory() as tdir:
+                    dyn = Langevin(
+                        relaxed_atoms,
+                        timestep * ase.units.fs,
+                        temp * ase.units.kB,
+                        friction=friction,
+                    )
+
+                    def printenergy(
+                        a=relaxed_atoms,
+                    ):  # store a reference to atoms in the definition.
+                        """Function to print the potential, kinetic and total energy."""
+                        epot = a.get_potential_energy() / len(a)
+                        ekin = a.get_kinetic_energy() / len(a)
+                        print(
+                            "Energy per atom: Epot = %.3feV  Ekin = %.3feV (T=%3.0fK)  "
+                            "Etot = %.3feV"
+                            % (
+                                epot,
+                                ekin,
+                                ekin / (1.5 * ase.units.kB),
+                                epot + ekin,
+                            )
+                        )
+
+                    def incremental(a=relaxed_atoms):
+                        pbar.update(1)
+
+                    if debug:
+                        dyn.attach(printenergy, interval=interval)
+                    traj = Trajectory("moldyn3.traj", "w", relaxed_atoms)
+                    dyn.attach(traj.write, interval=interval)
+                    dyn.attach(incremental, interval=interval)
+                    # Now run the dynamics
+                    dyn.run(warm_up + n * interval)
+                    traj = Trajectory(osp.join(tdir, "moldyn3.traj"))
+                    trunc_traj = traj[skip_n:]
+                    for image in trunc_traj:
+                        tmpmol = convert_io_molecule(mol2)
+                        if return_energies:
+                            out = CalcExecutor(
+                                image,
+                                method="custom",
+                                calculator=calc,
+                                relax=False,
+                                debug=debug,
+                            )
+                            energies.append(out.energy)
+                            full_results.append(out.mol.ase_atoms.calc.results)
+                        tmpmol.ase_atoms = image
+                        displaced_structures.append(tmpmol)
+                        s_rmsd = simple_rmsd(init_ase, image)
+                        simple_rmsds.append(s_rmsd)
+        else:
             with arch_context_manage.make_temp_directory() as tdir:
                 dyn = Langevin(
                     relaxed_atoms,
@@ -71,7 +127,6 @@ def md_sampler(
                     temp * ase.units.kB,
                     friction=friction,
                 )
-
                 def printenergy(
                     a=relaxed_atoms,
                 ):  # store a reference to atoms in the definition.
@@ -88,15 +143,10 @@ def md_sampler(
                             epot + ekin,
                         )
                     )
-
-                def incremental(a=relaxed_atoms):
-                    pbar.update(1)
-
                 if debug:
                     dyn.attach(printenergy, interval=interval)
                 traj = Trajectory("moldyn3.traj", "w", relaxed_atoms)
                 dyn.attach(traj.write, interval=interval)
-                dyn.attach(incremental, interval=interval)
                 # Now run the dynamics
                 dyn.run(warm_up + n * interval)
                 traj = Trajectory(osp.join(tdir, "moldyn3.traj"))
