@@ -62,7 +62,6 @@ def md_sampler(
     energies = []
     full_results = []
     simple_rmsds = []
-    aligned_rmsds = []
     try:  # Catch TB convergence failures.
         with tqdm(total=n + int(warm_up / interval)) as pbar:
             with arch_context_manage.make_temp_directory() as tdir:
@@ -104,35 +103,31 @@ def md_sampler(
                 trunc_traj = traj[skip_n:]
                 for image in trunc_traj:
                     tmpmol = convert_io_molecule(mol2)
-                    out = CalcExecutor(
-                        image,
-                        method="custom",
-                        calculator=calc,
-                        relax=False,
-                        debug=debug,
-                    )
-                    s_rmsd = simple_rmsd(init_ase, image)
-                    _, align_rmsd = mirror_permute_align_rmsd(
-                        init_ase, image, return_rmsd=True
-                    )
-                    energies.append(out.energy)
-                    full_results.append(out.mol.ase_atoms.calc.results)
+                    if return_energies:
+                        out = CalcExecutor(
+                            image,
+                            method="custom",
+                            calculator=calc,
+                            relax=False,
+                            debug=debug,
+                        )
+                        energies.append(out.energy)
+                        full_results.append(out.mol.ase_atoms.calc.results)
                     tmpmol.ase_atoms = image
                     displaced_structures.append(tmpmol)
+                    s_rmsd = simple_rmsd(init_ase, image)
                     simple_rmsds.append(s_rmsd)
-                    aligned_rmsds.append(align_rmsd)
         if good and return_energies:
             return (
                 displaced_structures,
                 energies,
                 full_results,
-                simple_rmsds,
-                aligned_rmsds,
+                simple_rmsds
             )
         elif return_energies:
-            return ([], energies, full_results, simple_rmsds, aligned_rmsds)
+            return ([], energies, full_results, simple_rmsds)
         elif good:
-            return (displaced_structures, simple_rmsds, aligned_rmsds)
+            return (displaced_structures, simple_rmsds)
         else:
             return []
     except:
@@ -142,12 +137,11 @@ def md_sampler(
                 energies,
                 full_results,
                 simple_rmsds,
-                aligned_rmsds,
             )
         elif return_energies:
-            return ([], energies, full_results, simple_rmsds, aligned_rmsds)
+            return ([], energies, full_results, simple_rmsds)
         elif good:
-            return (displaced_structures, simple_rmsds, aligned_rmsds)
+            return (displaced_structures, simple_rmsds)
         else:
             return []
 
