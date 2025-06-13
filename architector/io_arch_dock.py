@@ -95,10 +95,15 @@ def center_molecule_gen_grid(mol, parameters={}):
     outgrid, np.ndarray
         Nx3 Grid of points in [x,y,z] corresponding to mesh points.
     """
-    coords = mol.ase_atoms.get_positions()  # Get positions
-    new_coords = coords - coords.mean(
-        axis=0
-    )  # Move to 0,0,0 as center of geometry
+    if parameters.get('species_location_method', 'default') == 'spiral':
+        if parameters.get('debug', False):
+            print('NOT CENTERING via docking')
+        new_coords = mol.ase_atoms.get_positions()
+    else:
+        coords = mol.ase_atoms.get_positions()  # Get positions
+        new_coords = coords - coords.mean(
+            axis=0
+        )  # Move to 0,0,0 as center of geometry
     mol.ase_atoms.set_positions(new_coords)  # In the middle of the box.
     mins = (
         new_coords.min(axis=0) - parameters["species_grid_pad"]
@@ -115,7 +120,7 @@ def center_molecule_gen_grid(mol, parameters={}):
     return outgrid
 
 
-def get_rad_effective(mol):
+def get_rad_effective(mol, center=True):
     """get_rad_effective
     Calculate the effective radius of the molecule given.
 
@@ -123,6 +128,8 @@ def get_rad_effective(mol):
     ----------
     mol : architector.molecule.Molecule
         Molecule to calclulate the effective radius
+    center : bool, optional
+        Center molecule, default True
 
     Returns
     -------
@@ -131,7 +138,8 @@ def get_rad_effective(mol):
     """
     coords = mol.ase_atoms.get_positions()
     new_coords = coords - coords.mean(axis=0)
-    mol.ase_atoms.set_positions(new_coords)
+    if center:
+        mol.ase_atoms.set_positions(new_coords)
     dists = np.linalg.norm(new_coords, axis=1)
     out = (np.mean(dists), np.max(dists))
     return out
@@ -181,7 +189,7 @@ def species_generate_get_ref_params(
                 outdict = {"charge": species.charge, "uhf": species.uhf}
     else:  # Otherwise these should be assigned to the molecule
         outdict = {"charge": species.charge, "uhf": species.uhf}
-    mean_rad, max_rad = get_rad_effective(species)
+    mean_rad, max_rad = get_rad_effective(species, center=(not main_molecule))
     if any(
         [
             (species.charge is None),
@@ -192,7 +200,7 @@ def species_generate_get_ref_params(
     ):
         species.calc_suggested_spin()  # Use molecule spin/charge detection.
     outdict.update({"mean_rad": mean_rad, "max_rad": max_rad})
-    if parameters.get("species_location_method", "default") != "random":
+    if parameters.get("species_location_method", "default") not in ["random", "spiral"]:
         calc = CalcExecutor(
             species,
             parameters=parameters,
@@ -238,13 +246,15 @@ def species_generate_get_ref_params(
     return species
 
 
-def decide_new_species_location(mol, species, parameters={}):
+def decide_new_species_location(mol, species,
+                                parameters={}, species_index=None):
     """decide_new_species_location
     Select where the species should be added.
     Method can be changed with parameters['species_location_method'].
     Current options are only:
     1. "default" which does a basic colomb approximation.
     2. "random" which selects a random "valid" position.
+    3. "spiral" uses golden spiral to encircle molecule.
 
     Parameters
     ----------
@@ -256,6 +266,9 @@ def decide_new_species_location(mol, species, parameters={}):
         (overloaded with .param_dict object)
     parameters : dict, optional
         Generation parametrs, by default {}
+    species_index : int, optional
+        Index of the species added.
+        So far only relevant for "spiral" addition, default None
 
     Returns
     -------
@@ -287,6 +300,20 @@ def decide_new_species_location(mol, species, parameters={}):
     if parameters["species_location_method"] == "random":
         sel_ind = np.random.choice(shared_inds, size=1)
         out_location = grid[sel_ind]
+    elif parameters["species_location_method"] == "spiral":
+        possible_grid_locs = grid[shared_inds]
+        unit_grid_locs = possible_grid_locs/np.linalg.norm(possible_grid_locs,
+                                                           axis=1).reshape(
+                                                               -1, 1)
+        sel_ind = np.argmin(np.linalg.norm(
+            unit_grid_locs - parameters["spiral_coordinates"][species_index],
+            axis=1))
+        out_location = grid[shared_inds[sel_ind]]
+        if parameters.get('debug', False):
+            print('specind: ', species_index)
+            print('Coordadd: ', parameters["spiral_coordinates"][species_index])
+            print('ugrid_loc: ', unit_grid_locs[sel_ind])
+            print('Outloc: ', out_location)
     elif parameters["species_location_method"] == "default":
         if parameters["debug"]:
             print(
@@ -366,7 +393,7 @@ def decide_new_species_location(mol, species, parameters={}):
     return out_location
 
 
-def add_species(init_mol, species, parameters={}):
+def add_species(init_mol, species, parameters={}, species_index=None):
     """add_species
     Add a species to the central "init_mol"
 
@@ -380,6 +407,9 @@ def add_species(init_mol, species, parameters={}):
         (overloaded with .param_dict object)
     parameters : dict, optional
         Parameters to use, by default {}
+    species_index : int, optional
+        Index of the species added. 
+        So far only relevant for "spiral" addition, default None
 
     Returns
     -------
@@ -387,7 +417,7 @@ def add_species(init_mol, species, parameters={}):
         Molecule with species added.
     """
     spec_loc = decide_new_species_location(
-        init_mol, species, parameters=parameters
+        init_mol, species, parameters=parameters, species_index=species_index
     )
     tmp_spec = copy.deepcopy(species)
     init_mol.ase_atoms.calc = None
@@ -417,7 +447,9 @@ def add_species(init_mol, species, parameters={}):
                 species_run=True,
                 intermediate="rotation",
             )
-            if parameters["species_location_method"] in ["default", "random"]:
+            if parameters["species_location_method"] in ["default",
+                                                         "random",
+                                                         "spiral"]:
                 obj = calc.energy
             elif parameters["species_location_method"] in ["targeted"]:
                 target_inds = parameters["targeted_indices_close"]
@@ -470,9 +502,11 @@ def add_non_covbound_species(mol, parameters={}):
         "species_grid_rad_scale": 1, # Factor to multiply molecule+species vdw by to set molecules.
         # e.g. Reduce to allow for closer molecule-species distances
         "species_location_method": "default", # 'default' attempts a basic colomb repulsion placement.
-        # Another option is 'random' at the moment. Finally 'targeted' attempts to pick locations and rotations
+        # Another option is 'random'.
+        # targeted' attempts to pick locations and rotations
         # Optimizing for two indices (one from mol and 1 from the species added) to be close.
         # See "targeted_indices_close".
+        # 'spiral' option uses golden spiral positioning to evenly distribute around the central molecule.
         "species_add_copies": 1, # Number of species addition orientations to build
         "species_method": "GFN2-xTB", # Method to use on full species - right now only GFN2-xTB really works
         "species_relax": True, # Whether or not to relax the generated secondary solvation structures.
@@ -505,9 +539,11 @@ def add_non_covbound_species(mol, parameters={}):
     ValueError
         Needs either "species_list" or "n_species"/"species_smiles" specified.
     """
+    mol = io_molecule.convert_io_molecule(mol)
     if parameters.get("species_location_method", "default") in [
         "default",
         "random",
+        "spiral"
     ]:
         params = copy.deepcopy(defaults)
     elif parameters.get("species_location_method", "default") in ["targeted"]:
@@ -528,11 +564,22 @@ def add_non_covbound_species(mol, parameters={}):
         ]
     else:
         raise ValueError(
-            'Need either "species_list" specified OR "n_species" and "species_smiles" specified.'
+            'Need either "species_list" specified OR '
+            '"n_species" and "species_smiles" specified.'
         )
     unique_specs = list(set(species_list))
     species_add_list = []
     n = params.get("species_add_copies", 1)
+    # Pre-center
+    mol.ase_atoms.set_positions(
+        mol.ase_atoms.positions - mol.ase_atoms.positions.mean(axis=0))
+    # Set spiral coordinates before doing docking.
+    if params.get("species_location_method", "default") == "spiral":
+        params["spiral_coordinates"] = io_molecule.generate_unit_sphere(
+            len(species_list))
+        if parameters.get('debug', False):
+            print('N species:', len(species_list))
+            print('Spiral Coords: ', params["spiral_coordinates"])
     for j in range(n):
         species_dict = dict()
         for spec in unique_specs:
@@ -557,7 +604,8 @@ def add_non_covbound_species(mol, parameters={}):
                     )
                 )
             init_mol, good = add_species(
-                init_mol, species_dict[spec], parameters=params
+                init_mol, species_dict[spec], parameters=params,
+                species_index=i
             )
         # Ensure the last configuration is relaxed if requested.
         if (
