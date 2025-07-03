@@ -1801,13 +1801,15 @@ class Molecule:
         userlig_dict = {"user_lig": np.array(lig_angles)}
         return userlig_dict, denticity
 
-    def classify_metal_geo_type(self, return_result=False):
+    def classify_metal_geo_type(self, return_result=False, debug=False):
         """classify_metal_geo_type calculate the actual geometry of the metal centers
 
         Parameters
         ----------
         return_results: bool, optional
             return the results, by default False
+        debug : bool, optional
+            debug printing.
 
         Returns
         -------
@@ -1819,8 +1821,10 @@ class Molecule:
         metal_inds = self.find_metals()
         geo_dict = Geometries()
         if len(metal_inds) == 0:
-            raise ValueError("No metal or ind passed in this molecule.")
-        elif len(metal_inds) > 1:  # Look at every metal center
+            if debug:
+                print('No metal center. Defaulting to assinging first element.')
+            metal_inds = [0]
+        if len(metal_inds) > 1:  # Look at every metal center
             metal_center_geos = []
             for metal_indx in metal_inds:
                 tmpdict = dict()

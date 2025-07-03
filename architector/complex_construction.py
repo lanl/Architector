@@ -1010,7 +1010,8 @@ def build_complex_driver(inputDict1):
                         iscopy = True
                         break
                 if not iscopy:
-                    structs[i].complexMol.classify_metal_geo_type()
+                    structs[i].complexMol.classify_metal_geo_type(
+                        debug=inputDict["parameters"]["debug"])
                     ordered_conf_dict[keys[i]] = {
                         "ase_atoms": structs[i].complexMol.ase_atoms,
                         "total_charge": int(structs[i].complexMol.charge),
