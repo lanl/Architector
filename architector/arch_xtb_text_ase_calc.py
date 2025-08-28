@@ -115,8 +115,13 @@ class XTB_Calculator(Calculator):
                     file1.write("$write\n")
                     file1.write("    gbsa=true\n")
 
-                exec_lst.append("--alpb")
-                exec_lst.append("{}".format(self.parameters["xtb_solvent"]))
+                if 'gbsa' in self.parameters["xtb_solvent"]:
+                    exec_lst.append("--gbsa")
+                    exec_lst.append("{}".format(self.parameters["xtb_solvent"].replace(
+                        ',','').replace('gbsa','')))
+                else:
+                    exec_lst.append("--alpb")
+                    exec_lst.append("{}".format(self.parameters["xtb_solvent"]))
                 exec_lst.append("-I")
                 exec_lst.append("solv_options.txt")
 
