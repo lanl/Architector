@@ -839,7 +839,7 @@ def inparse(inputDict):
         if outparams['metal_spin'] is None:
             if outparams['metal_ox'] != io_ptable.metal_charge_dict.get(metal,100):
                 # Calculate from mendeleev reference - Generally aufbau.
-                outparams['metal_spin'] = mendeleev.__dict__[newinpDict['core']['metal']].ec.ionize(outparams['metal_ox']).unpaired_electrons()
+                outparams['metal_spin'] = mendeleev.element(newinpDict['core']['metal']).ec.ionize(outparams['metal_ox']).unpaired_electrons()
             else: # Otherwise use refdict.
                 outparams['metal_spin'] = io_ptable.metal_spin_dict[metal]
 
