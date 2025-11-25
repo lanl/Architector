@@ -236,7 +236,8 @@ class CalcExecutor:
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
                         try:
-                            self.init_energy = copy.deepcopy(self.mol.ase_atoms.get_total_energy())
+                            with arch_context_manage.suppress_stdout():
+                                self.init_energy = copy.deepcopy(self.mol.ase_atoms.get_total_energy())
                             if self.parameters['save_trajectories']:
                                 if self.logfile is not None:
                                     dyn = self.opt_method(self.mol.ase_atoms, 
@@ -254,7 +255,8 @@ class CalcExecutor:
                             dyn.run(fmax=self.fmax,steps=self.maxsteps)
                             if self.parameters['save_trajectories']:
                                 self.read_traj()
-                            self.energy = self.mol.ase_atoms.get_total_energy()
+                            with arch_context_manage.suppress_stdout():
+                                self.energy = self.mol.ase_atoms.get_total_energy()
                             self.rmsd, _, _ = rmsd_align(self.mol.ase_atoms,
                                                     io_molecule.convert_io_molecule(self.in_struct).ase_atoms,
                                                     in_place=True)
@@ -272,7 +274,8 @@ class CalcExecutor:
                     with arch_context_manage.make_temp_directory(
                         prefix=self.parameters['temp_prefix']) as _:
                         try:
-                            self.energy = self.mol.ase_atoms.get_total_energy()
+                            with arch_context_manage.suppress_stdout():
+                                self.energy = self.mol.ase_atoms.get_total_energy()
                             self.init_energy = copy.deepcopy(self.energy)
                             self.successful = True
                         except Exception as e:
