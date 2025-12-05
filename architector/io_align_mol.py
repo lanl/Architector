@@ -912,8 +912,8 @@ def find_sets(insetlist=[]):
         return find_sets(comb_setlist)
 
 
-def rmsd_group(conf_list, 
-               rmsd_cutoff=0.2, 
+def rmsd_group(conf_list,
+               rmsd_cutoff=0.2,
                rmsd_type='simple',
                value_list=[],
                return_new_conf_list=False):
@@ -934,12 +934,12 @@ def rmsd_group(conf_list,
         'align': align the molecules and calculate rmsd, no index permutation
         'permute': permute indices and calculate simple rmsd, no alignment
         'permute_align': permute indices and align molecules
-        'permute_mirror_align': try all the combinations to achieve alignment.
+        'mirror_permute_align': try all the combinations to achieve alignment.
         , by default 'simple'
     value_list : list(float), optional
         list of values to downselect, will select minimum value from each group.
     return_newlist : bool, optional
-        return a down-selected list of conformers, default False
+        return a down-selected list of conformers and values if present, default False
 
     Returns
     -------
@@ -966,25 +966,36 @@ def rmsd_group(conf_list,
         value_list = np.array(value_list)
     if np.any(rmsd_mat < rmsd_cutoff):
         setlist = []
+        all_visited = set()
         for i, j in zip(*np.where(rmsd_mat < rmsd_cutoff)):
+            i = int(i)
+            j = int(j)
             setlist.append({i, j})
+            all_visited.update({i, j})
+        for i in range(len(conf_list)):
+            if i not in all_visited:
+                setlist.append({i})
+        # print(setlist)
         out_setlist = find_sets(setlist)
         if return_new_conf_list:
             out_conf_list = []
+            out_value_list = []
             for s in out_setlist:
                 inds = np.array(list(s))
                 if len(value_list) > 0:
                     saveind = inds[np.argmin(value_list[inds])]
+                    out_value_list.append(np.min(value_list[inds]))
                 else:
                     saveind = inds[0]
-                out_conf_list.append(conf_list[saveind])
-            return out_setlist,out_conf_list
+                out_conf_list.append(str(conf_list[saveind]))
+            return out_setlist, out_conf_list, out_value_list
         else:
             return out_setlist
-    else: # All different conformers
+    else:  # All different conformers
+        # print('NO Same')
         out_setlist = [{x} for x in range(len(conf_list))]
         if return_new_conf_list:
-            return out_setlist, conf_list
+            return out_setlist, conf_list, value_list
         else:
             return out_setlist
 
