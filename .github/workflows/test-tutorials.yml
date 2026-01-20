@@ -1,0 +1,108 @@
+name: Tutorial Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tutorials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: 'latest'
+          environment-name: tutorial-env
+          create-args: >-
+            python=3.12
+            xtb
+            ase
+            numpy
+            openbabel
+            scipy
+            numba
+            py3Dmol
+            pandas
+            crest
+            pynauty
+            tqdm
+            mendeleev
+            tblite-python
+            jupytext
+            matplotlib
+            pytorch
+          init-shell: bash
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Install package and mace-torch
+        run: |
+          uv pip install --no-deps -e .
+          uv pip install mace-torch
+
+      - name: Convert notebooks to Python scripts
+        run: |
+          cd documentation/tutorials
+          for notebook in *.ipynb; do
+            jupytext --to py:percent "$notebook"
+          done
+
+      - name: Run tutorials
+        run: |
+          cd documentation/tutorials
+
+          # Tutorials to skip
+          SKIP_TUTORIALS=(
+            "10-Conformer_Searching.py"      # CREST sampling takes 6+ minutes
+            "12-Using_View_Structures.py"    # Visualization-focused, pymol renders
+          )
+
+          # Mock view_structures to avoid py3Dmol rendering issues
+          cat > mock_view.py << 'EOF'
+          import architector.visualization as viz
+          _original = viz.view_structures
+          def mock_view_structures(*args, **kwargs):
+              return None
+          viz.view_structures = mock_view_structures
+          import architector
+          architector.view_structures = mock_view_structures
+          EOF
+
+          # Run each tutorial
+          for script in *.py; do
+            skip=false
+            for skip_tutorial in "${SKIP_TUTORIALS[@]}"; do
+              if [[ "$script" == "$skip_tutorial" ]]; then
+                skip=true
+                echo "Skipping $script"
+                break
+              fi
+            done
+
+            if [[ "$skip" == "false" && "$script" != "mock_view.py" ]]; then
+              echo "Running $script..."
+              timeout 600 python -c "
+          import mock_view
+          exec(open('$script').read())
+          "
+            fi
+          done
+      - name: Cleanup
+        run: |
+          rm -rf documentation/tutorials/pymol_renders
+          rm -f documentation/tutorials/*.xyz
+          rm -f documentation/tutorials/*.py
+        if: always()
