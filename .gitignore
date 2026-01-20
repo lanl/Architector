@@ -12,3 +12,4 @@ meta_production_sample.pkl
 development/**/*.csv
 development/**/*.mol2
 pymol_renders/
+build/
