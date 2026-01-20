@@ -7,9 +7,48 @@ on:
     branches: [main]
 
 jobs:
-  tutorials:
+  find-tutorials:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    outputs:
+      tutorials: ${{ steps.set-matrix.outputs.tutorials }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+
+      - name: Find tutorial notebooks
+        id: set-matrix
+        run: |
+          # Tutorials to skip
+          SKIP_TUTORIALS=(
+            "10-Conformer_Searching.ipynb"   # CREST sampling takes 6+ minutes
+            "12-Using_View_Structures.ipynb" # Visualization-focused, pymol renders
+          )
+
+          # Find all notebooks and filter out skipped ones
+          TUTORIALS=$(find documentation/tutorials -name "*.ipynb" | while read notebook; do
+            basename=$(basename "$notebook")
+            skip=false
+            for skip_tutorial in "${SKIP_TUTORIALS[@]}"; do
+              if [[ "$basename" == "$skip_tutorial" ]]; then
+                skip=true
+                break
+              fi
+            done
+            if [[ "$skip" == "false" ]]; then
+              echo "$notebook"
+            fi
+          done | jq -R -s -c 'split("\n")[:-1]')
+
+          echo "tutorials=$TUTORIALS" >> $GITHUB_OUTPUT
+
+  run-tutorial:
+    needs: find-tutorials
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        tutorial: ${{ fromJson(needs.find-tutorials.outputs.tutorials) }}
     defaults:
       run:
         shell: bash -el {0}
@@ -53,24 +92,16 @@ jobs:
           uv pip install --no-deps -e .
           uv pip install mace-torch
 
-      - name: Convert notebooks to Python scripts
+      - name: Convert notebook to Python script
         run: |
-          cd documentation/tutorials
-          for notebook in *.ipynb; do
-            jupytext --to py:percent "$notebook"
-          done
+          jupytext --to py:percent "${{ matrix.tutorial }}"
 
-      - name: Run tutorials
+      - name: Run tutorial
         run: |
-          cd documentation/tutorials
+          cd $(dirname "${{ matrix.tutorial }}")
+          SCRIPT=$(basename "${{ matrix.tutorial }}" .ipynb).py
 
-          # Tutorials to skip
-          SKIP_TUTORIALS=(
-            "10-Conformer_Searching.py"      # CREST sampling takes 6+ minutes
-            "12-Using_View_Structures.py"    # Visualization-focused, pymol renders
-          )
-
-          # Mock view_structures to avoid py3Dmol rendering issues
+          # Create mock for view_structures to avoid py3Dmol rendering issues
           cat > mock_view.py << 'EOF'
           import architector.visualization as viz
           _original = viz.view_structures
@@ -81,25 +112,12 @@ jobs:
           architector.view_structures = mock_view_structures
           EOF
 
-          # Run each tutorial
-          for script in *.py; do
-            skip=false
-            for skip_tutorial in "${SKIP_TUTORIALS[@]}"; do
-              if [[ "$script" == "$skip_tutorial" ]]; then
-                skip=true
-                echo "Skipping $script"
-                break
-              fi
-            done
-
-            if [[ "$skip" == "false" && "$script" != "mock_view.py" ]]; then
-              echo "Running $script..."
-              timeout 600 python -c "
+          echo "Running $SCRIPT..."
+          timeout 600 python -c "
           import mock_view
-          exec(open('$script').read())
+          exec(open('$SCRIPT').read())
           "
-            fi
-          done
+
       - name: Cleanup
         run: |
           rm -rf documentation/tutorials/pymol_renders
