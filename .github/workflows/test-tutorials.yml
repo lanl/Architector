@@ -101,7 +101,7 @@ jobs:
           cd $(dirname "${{ matrix.tutorial }}")
           SCRIPT=$(basename "${{ matrix.tutorial }}" .ipynb).py
 
-          echo "Running $SCRIPT..."
+          echo "Running $SCRIPT...!"
           timeout 600 python "$SCRIPT"
 
       - name: Cleanup
