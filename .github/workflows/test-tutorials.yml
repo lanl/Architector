@@ -101,22 +101,8 @@ jobs:
           cd $(dirname "${{ matrix.tutorial }}")
           SCRIPT=$(basename "${{ matrix.tutorial }}" .ipynb).py
 
-          # Create mock for view_structures to avoid py3Dmol rendering issues
-          cat > mock_view.py << 'EOF'
-          import architector.visualization as viz
-          _original = viz.view_structures
-          def mock_view_structures(*args, **kwargs):
-              return None
-          viz.view_structures = mock_view_structures
-          import architector
-          architector.view_structures = mock_view_structures
-          EOF
-
           echo "Running $SCRIPT..."
-          timeout 600 python -c "
-          import mock_view
-          exec(open('$SCRIPT').read())
-          "
+          timeout 600 python "$SCRIPT"
 
       - name: Cleanup
         run: |
