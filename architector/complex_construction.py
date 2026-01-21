@@ -548,9 +548,9 @@ def complex_driver(inputDict1,in_metal=False):
             else:
                 if inputDict['parameters']['debug']:
                     print('No coordination environment avaiable for this ligand combination')
-        return conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1
+        return conf_dict, inputDict,core_preprocess_time, symmetry_preprocess_time, int_time1
     else:
-        return {},inputDict,0,0,0
+        return {}, inputDict, 0, 0, 0
     
 def build_complex_driver(inputDict1,in_metal=False):
     """build_complex_driver overall driver building of the complex
@@ -567,7 +567,11 @@ def build_complex_driver(inputDict1,in_metal=False):
     ordered_conf_dict : dict
         Conformer dictionary with stored values if generation successful.
     """
-    conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1 = complex_driver(inputDict1=inputDict1,in_metal=in_metal)
+    conf_dict,inputDict,core_preprocess_time,symmetry_preprocess_time,int_time1 = complex_driver(
+        inputDict1=inputDict1,
+        in_metal=in_metal
+    )
+
     if len(conf_dict) == 0:
         if inputDict['parameters']['debug']:
             print('No possible geometries for the input ligand/coreType(s) combination.')
@@ -607,14 +611,13 @@ def build_complex_driver(inputDict1,in_metal=False):
                     # if ('_init_only' in key) or ('_init_only' in keys[i]): # Do not do duplicate test on init_only structures.
                     #     continue
                     # else:
-                    _, rmsd_full, _ = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
+                    rmsd_result = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
                                                              coresize=10, override=True)
-                    if (rmsd_full < 0.5):
-                        iscopy = True
+                    if rmsd_result is not None and rmsd_result[1] < 0.5:
                         break
-                    rmsd_core, _, _ = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
+                    rmsd_result = io_align_mol.calc_rmsd(mol2strings[i], val['mol2string'],
                                                              override=True)
-                    if (rmsd_core < 0.7) and np.isclose(val['energy'],xtb_energies[i],atol=0.1):
+                    if rmsd_result is not None and rmsd_result[1] < 0.7 and np.isclose(val['energy'], xtb_energies[i], atol=0.1):
                         iscopy = True
                         break
                 if (not iscopy):
@@ -682,10 +685,7 @@ def build_complex(inputDict):
     # Try larger radii generation for multidentate complexes if no complexes generated in an attempt to get at high-spin
     # > Covalent radii typically understimated for higher spin conformations
     in_metal = inputDict['parameters']['original_metal']
-    if 'mol2string' in inputDict:
-        tmp_inputDict = io_process_input.inparse(inputDict)
-    else:
-        tmp_inputDict = io_process_input.inparse(inputDict)
+    tmp_inputDict = io_process_input.inparse(inputDict)
     if (len([x for x in ordered_conf_dict.keys() if ('_init_only' not in x)]) == 0) and \
        (max([len(x['coordList']) for x in tmp_inputDict['ligands']]) > 2):
         newinpdict = io_ptable.map_metal_radii(tmp_inputDict,larger=True) # Run with larger radii
@@ -735,8 +735,10 @@ def build_complex(inputDict):
             if tmp_inputDict['parameters']['crest_sampling'] and (j < tmp_inputDict['parameters']['crest_sampling_n_conformers']): 
                 if tmp_inputDict['parameters']['debug']:
                     print('Starting crest sampling on {} of {}!'.format(j+1,len(order)))
-                samples,energies = io_crest.crest_conformers(vals[i]['mol2string'],solvent=tmp_inputDict['parameters']['xtb_solvent'],
-                                                             crest_options=tmp_inputDict['parameters']['crest_options'])
+                samples, energies = io_crest.crest_conformers(
+                    vals[i]['mol2string'], solvent=tmp_inputDict['parameters']['xtb_solvent'],
+                    crest_options=tmp_inputDict['parameters']['crest_options']
+                )
                 if tmp_inputDict['parameters']['debug']:
                      print('Finished crest sampling on {} of {}!'.format(j+1,len(order)))
                 vals[i].update({'crest_conformers':samples,'crest_energies':energies})
@@ -774,7 +776,7 @@ def build_complex_2D(inputDict):
 
     # Assemble complex
     for i,ligand in enumerate(inputDict['ligands']):
-        obmollig = io_obabel.get_obmol_smiles(ligand['smiles'],addHydrogens=True,neutralize=False,build=False)
+        obmollig = io_obabel.get_obmol_smiles(ligand['smiles'], addHydrogens=True, neutralize=False, build=False)
         ligcharge = obmollig.GetTotalCharge()
         charge = charge + ligcharge
         bestConformer = io_obabel.convert_obmol_ase(obmollig,posits=None,set_zero=True)
