@@ -2,9 +2,9 @@ name: Tutorial Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, Secondary_Solvation_Shell]
   pull_request:
-    branches: [main]
+    branches: [main, Secondary_Solvation_Shell]
 
 jobs:
   find-tutorials:
