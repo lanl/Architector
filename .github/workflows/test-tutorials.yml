@@ -90,7 +90,7 @@ jobs:
       - name: Install package and mace-torch
         run: |
           uv pip install --no-deps -e .
-          uv pip install mace-torch
+          uv pip install mace-torch torch-dftd
 
       - name: Convert notebook to Python script
         run: |
