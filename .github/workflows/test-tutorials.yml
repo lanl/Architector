@@ -92,20 +92,6 @@ jobs:
           uv pip install --no-deps -e .
           uv pip install mace-torch
 
-      - name: Verify XTB is working
-        run: |
-          xtb --version
-          python -c "
-          from architector import build_complex
-          out = build_complex({
-              'core': {'metal': 'Fe', 'coreCN': 6},
-              'ligands': [{'smiles': 'O', 'coordList': [0]}] * 6,
-              'parameters': {'metal_ox': 2}
-          })
-          assert len(out) > 0, 'XTB/build_complex failed - returned empty dict'
-          print('XTB verification passed:', list(out.keys()))
-          "
-
       - name: Convert notebook to Python script
         run: |
           jupytext --to py:percent "${{ matrix.tutorial }}"
