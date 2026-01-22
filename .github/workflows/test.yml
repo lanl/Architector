@@ -12,7 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        # Python 3.13 blocked by openbabel not yet available on conda-forge
+        python-version: ['3.11', '3.12']
     defaults:
       run:
         shell: bash -el {0}
