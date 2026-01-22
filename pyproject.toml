@@ -41,8 +41,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mace = ["mace-torch"]
 dftd = ["torch-dftd"]
+mace = ["mace-torch"]
+tblite = ["tblite"]
 tutorials = ["jupytext", "matplotlib"]
 
 [project.urls]

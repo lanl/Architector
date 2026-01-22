@@ -27,7 +27,6 @@ jobs:
             xtb>6.5
             openbabel
             crest
-            tblite-python
           init-shell: bash
 
       - name: Install uv
@@ -37,7 +36,7 @@ jobs:
 
       - name: Install package
         run: |
-          uv pip install -e .
+          uv pip install -e ".[tblite]"
 
       - name: Run tests
         run: |
