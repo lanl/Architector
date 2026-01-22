@@ -67,8 +67,6 @@ jobs:
             xtb>6.5
             openbabel
             crest
-            tblite-python
-            pytorch
           init-shell: bash
 
       - name: Install uv
