@@ -41,7 +41,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mace = ["mace-torch", "torch-dftd"]
+mace = ["mace-torch"]
+dftd = ["torch-dftd"]
+tutorials = ["jupytext", "matplotlib"]
 
 [project.urls]
 Homepage = "https://github.com/lanl/Architector"
