@@ -68,6 +68,7 @@ jobs:
             openbabel
             crest
             jupytext
+            tblite-python
           init-shell: bash
 
       - name: Install uv
