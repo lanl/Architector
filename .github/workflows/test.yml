@@ -24,18 +24,9 @@ jobs:
           environment-name: test-env
           create-args: >-
             python=3.12
-            ase
-            numpy
-            openbabel
-            scipy
-            numba
-            py3Dmol
-            pandas
-            crest
             xtb>6.5
-            pynauty
-            tqdm
-            mendeleev
+            openbabel
+            crest
             tblite-python
           init-shell: bash
 
@@ -46,7 +37,7 @@ jobs:
 
       - name: Install package
         run: |
-          uv pip install --no-deps -e .
+          uv pip install -e .
 
       - name: Run tests
         run: |

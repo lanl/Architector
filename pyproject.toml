@@ -31,11 +31,13 @@ requires-python = ">=3.10"
 dependencies = [
     "ase",
     "mendeleev",
+    "numba",
     "numpy",
     "pandas",
     "py3Dmol",
     "pynauty",
     "scipy",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
