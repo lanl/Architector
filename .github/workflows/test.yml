@@ -13,9 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         # Python 3.13 blocked by openbabel not yet available on conda-forge
-        version:
-          - { python: '3.11', resolution: lowest-direct }
-          - { python: '3.12', resolution: highest }
+        python-version: ['3.11', '3.12']
     defaults:
       run:
         shell: bash -el {0}
@@ -30,7 +28,7 @@ jobs:
           micromamba-version: 'latest'
           environment-name: test-env
           create-args: >-
-            python=${{ matrix.version.python }}
+            python=${{ matrix.python-version }}
             xtb>6.5
             openbabel
             crest
@@ -44,7 +42,7 @@ jobs:
 
       - name: Install package
         run: |
-          uv pip install -e . --resolution=${{ matrix.version.resolution }}
+          uv pip install -e .
 
       - name: Run tests
         run: |
