@@ -64,22 +64,11 @@ jobs:
           environment-name: tutorial-env
           create-args: >-
             python=3.12
-            ase
-            numpy
             openbabel
-            scipy
-            numba
-            py3Dmol
-            pandas
             crest
-            pynauty
             xtb>6.5
-            tqdm
-            mendeleev
             tblite-python
             jupytext
-            matplotlib
-            pytorch
           init-shell: bash
 
       - name: Install uv
@@ -87,10 +76,9 @@ jobs:
         with:
           version: "latest"
 
-      - name: Install package and mace-torch
+      - name: Install package with optional dependencies
         run: |
-          uv pip install --no-deps -e .
-          uv pip install mace-torch torch-dftd
+          uv pip install -e ".[mace,dftd,tutorials]"
 
       - name: Convert notebook to Python script
         run: |
