@@ -73,6 +73,7 @@ jobs:
             pandas
             crest
             pynauty
+            xtb>6.4
             tqdm
             mendeleev
             tblite-python
