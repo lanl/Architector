@@ -24,7 +24,6 @@ jobs:
           environment-name: test-env
           create-args: >-
             python=3.12
-            xtb-python
             ase
             numpy
             openbabel
