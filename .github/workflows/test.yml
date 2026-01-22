@@ -32,7 +32,7 @@ jobs:
             py3Dmol
             pandas
             crest
-            xtb>6.4
+            xtb>6.5
             pynauty
             tqdm
             mendeleev
