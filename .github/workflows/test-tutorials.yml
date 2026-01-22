@@ -1,0 +1,100 @@
+name: Tutorial Tests
+
+on:
+  push:
+    branches: [main, Secondary_Solvation_Shell]
+  pull_request:
+    branches: [main, Secondary_Solvation_Shell]
+
+jobs:
+  find-tutorials:
+    runs-on: ubuntu-latest
+    outputs:
+      tutorials: ${{ steps.set-matrix.outputs.tutorials }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+
+      - name: Find tutorial notebooks
+        id: set-matrix
+        run: |
+          # Tutorials to skip
+          SKIP_TUTORIALS=(
+            "10-Conformer_Searching.ipynb"   # CREST sampling takes 6+ minutes
+            "12-Using_View_Structures.ipynb" # Visualization-focused, pymol renders
+          )
+
+          # Find all notebooks and filter out skipped ones
+          TUTORIALS=$(find documentation/tutorials -name "*.ipynb" | while read notebook; do
+            basename=$(basename "$notebook")
+            skip=false
+            for skip_tutorial in "${SKIP_TUTORIALS[@]}"; do
+              if [[ "$basename" == "$skip_tutorial" ]]; then
+                skip=true
+                break
+              fi
+            done
+            if [[ "$skip" == "false" ]]; then
+              echo "$notebook"
+            fi
+          done | jq -R -s -c 'split("\n")[:-1]')
+
+          echo "tutorials=$TUTORIALS" >> $GITHUB_OUTPUT
+
+  run-tutorial:
+    needs: find-tutorials
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        tutorial: ${{ fromJson(needs.find-tutorials.outputs.tutorials) }}
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: 'latest'
+          environment-name: tutorial-env
+          create-args: >-
+            python=3.12
+            openbabel
+            crest
+            xtb>6.5
+            tblite-python
+            jupytext
+          init-shell: bash
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Install package with optional dependencies
+        run: |
+          uv pip install -e ".[mace,dftd,tutorials]"
+
+      - name: Convert notebook to Python script
+        run: |
+          jupytext --to py:percent "${{ matrix.tutorial }}"
+
+      - name: Run tutorial
+        run: |
+          cd $(dirname "${{ matrix.tutorial }}")
+          SCRIPT=$(basename "${{ matrix.tutorial }}" .ipynb).py
+
+          echo "Running $SCRIPT...!"
+          timeout 600 python "$SCRIPT"
+
+      - name: Cleanup
+        run: |
+          rm -rf documentation/tutorials/pymol_renders
+          rm -f documentation/tutorials/*.xyz
+          rm -f documentation/tutorials/*.py
+        if: always()

@@ -39,8 +39,8 @@ pip install -e .
 
 ## XTB (backend) Potentially Useful References:
 * [Available Solvents](https://xtb-docs.readthedocs.io/en/latest/gbsa.html)
-* [Available Methods](https://xtb-python.readthedocs.io/en/latest/general-api.html)
-* [ASE Calculator](https://xtb-python.readthedocs.io/en/latest/ase-calculator.html)
+* [Available Methods](https://xtb-docs.readthedocs.io/en/latest/commandline.html)
+* [ASE Calculator](https://tblite.readthedocs.io/en/latest/users/ase.html#tblite.ase.TBLite)
 * [XTB Documentation](https://xtb-docs.readthedocs.io/en/latest/contents.html)
 
 ## Basic Use of complex construction functionality:

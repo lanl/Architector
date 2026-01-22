@@ -21,15 +21,6 @@ from ase.io import Trajectory
 from ase.optimize import LBFGS
 from ase.constraints import FixAtoms, FixBondLengths, FixInternals
 
-# Add any other ASE calculator here.
-# To extend to other methods.
-has_xtb_python = False
-try:
-    from xtb.ase.calculator import XTB
-    has_xtb_python = True
-except ImportError:
-    pass
-
 from architector.arch_xtb_text_ase_calc import XTB_Calculator
 from tblite.ase import TBLite
 
@@ -455,7 +446,7 @@ class CalcExecutor:
                         electronic_temperature=self.xtb_electronic_temperature,
                         verbosity=-1,
                     )
-                elif (not has_xtb_python) or (self.xtb_relax):
+                else:
                     calc = XTB_Calculator(
                         xtb_method=self.method,
                         xtb_accuracy=self.xtb_accuracy,
@@ -464,15 +455,6 @@ class CalcExecutor:
                         xtb_solvent=self.xtb_solvent,
                         xtb_relax=self.xtb_relax,
                     )
-                else:  # legacy xtb-python
-                    calc = XTB(
-                        method=self.method,
-                        solvent=self.xtb_solvent,
-                        max_iterations=self.xtb_max_iterations,
-                        electronic_temperature=self.xtb_electronic_temperature,
-                        accuracy=self.xtb_accuracy,
-                    )
-                    # verbosity=0)
                 # Difference of more than 1. Still perform a ff_preoptimization if requested.
                 if np.abs(self.mol.xtb_charge - self.mol.charge) > 1:
                     if len(self.trans_oxo_triples) > 0:

@@ -1,0 +1,49 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, Secondary_Solvation_Shell]
+  pull_request:
+    branches: [main, Secondary_Solvation_Shell]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Python 3.13 blocked by openbabel not yet available on conda-forge
+        python-version: ['3.11', '3.12']
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v5
+
+      - name: Setup micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: 'latest'
+          environment-name: test-env
+          create-args: >-
+            python=${{ matrix.python-version }}
+            xtb>6.5
+            openbabel
+            crest
+            tblite-python
+          init-shell: bash
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Install package
+        run: |
+          uv pip install -e .
+
+      - name: Run tests
+        run: |
+          python -m unittest discover tests

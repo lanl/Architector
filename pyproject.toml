@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "architector"
+version = "0.1.0"
+description = "The architector python package - for 3D Coordination Complex Design."
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+authors = [{ name = "Michael G. Taylor et al." }]
+keywords = [
+    "chemistry",
+    "computational-chemistry",
+    "coordination-complexes",
+    "inorganic-chemistry",
+    "molecular-design",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "ase",
+    "mendeleev",
+    "numba",
+    "numpy",
+    "pandas",
+    "py3Dmol",
+    "pynauty",
+    "scipy",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+dftd = ["torch-dftd"]
+mace = ["mace-torch"]
+tutorials = ["ipython", "matplotlib"]
+
+[project.urls]
+Homepage = "https://github.com/lanl/Architector"
+Repository = "https://github.com/lanl/Architector"
+Documentation = "https://lanl.github.io/Architector/"
+
+[tool.setuptools]
+packages = ["architector"]
+
+[tool.setuptools.package-data]
+"*" = ["data/*.csv"]
