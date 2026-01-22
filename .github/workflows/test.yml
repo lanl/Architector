@@ -36,7 +36,7 @@ jobs:
 
       - name: Install package
         run: |
-          uv pip install -e ".[tblite]"
+          uv pip install -e .
 
       - name: Run tests
         run: |

@@ -67,6 +67,7 @@ jobs:
             xtb>6.5
             openbabel
             crest
+            jupytext
           init-shell: bash
 
       - name: Install uv

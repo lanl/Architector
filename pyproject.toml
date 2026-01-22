@@ -38,13 +38,13 @@ dependencies = [
     "pynauty",
     "scipy",
     "tqdm",
+    "tblite",
 ]
 
 [project.optional-dependencies]
 dftd = ["torch-dftd"]
 mace = ["mace-torch"]
-tblite = ["tblite"]
-tutorials = ["jupytext", "matplotlib"]
+tutorials = ["matplotlib"]
 
 [project.urls]
 Homepage = "https://github.com/lanl/Architector"
