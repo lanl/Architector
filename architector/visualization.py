@@ -168,10 +168,10 @@ def add_bonds(
         for i, row in bondsdf.iterrows():
             # Allow for multiple different colors of interatomic distances.
             if (row["atom_pair"][0] in visited) and (
-                isinstance(distcolor, (list, np.ndarray))
+                hasattr(distcolor, "__len__")
             ):
                 tcolor = distcolor[visited.index(row["atom_pair"][0])]
-            elif isinstance(distcolor, (list, np.ndarray)):
+            elif hasattr(distcolor, "__len__"):
                 tcolor = distcolor[count]
                 visited.append(row["atom_pair"][0])
                 count += 1
@@ -442,7 +442,7 @@ def view_structures(
                 ]
             else:
                 labels = [str(i) for i in range(len(mols))]
-        elif isinstance(labels, list) or isinstance(labels, np.ndarray):
+        elif hasattr(labels, "__len__"):
             if len(labels) != len(mols):
                 print(
                     "Wrong amount of labels passed, defaulting to chemical formulas."
@@ -742,7 +742,7 @@ def view_structures(
                 label = [x.ase_atoms.get_chemical_formula() for x in mols]
             else:
                 label = []
-        elif isinstance(labels, list) or isinstance(labels, np.ndarray):
+        elif hasattr(labels, "__len__"):
             if len(labels) != len(mols):
                 print(
                     "Wrong amount of labels passed, defaulting to chemical formulas."
