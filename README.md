@@ -17,13 +17,45 @@ Conda installation recommended. The conda-forge distribution can be installed vi
 conda install -c conda-forge architector
 ```
 
-* In case a developer version of the sofware is required in the root directory for Architector run:
+* In case a developer version of the software is required in the root directory for Architector run (editable / developer install):
 
 ```bash
 conda env create -f environment.yml
 conda activate architector
+python -m pip install --upgrade pip build
 pip install -e .
 ```
+
+* Build distribution (PEP 517) and install the wheel:
+
+```bash
+python -m build
+pip install dist/*.whl
+```
+
+## Packaging and Versioning
+
+This project uses PEP 517/621 for builds with all configuration consolidated in `pyproject.toml`. Version numbers are automatically derived from git tags using `versioningit`. 
+
+- **Build distributions** (for package maintainers/developers creating releases):
+
+```bash
+python -m build --sdist --wheel
+```
+
+- **Install editable/developer version** (for development):
+
+```bash
+pip install -e .
+```
+
+- **Install from source** (regular installation):
+
+```bash
+pip install .
+```
+
+`versioningit` automatically generates `architector/_version.py` during build from git tags (format: `architector-X.Y.Z`). The package version is accessible via `architector.__version__`.
 
 ## Useful Tools/Examples:
 

@@ -8,3 +8,4 @@
 *.traj
 *__pycache__*
 **/.vscode/
+**/*_version.py

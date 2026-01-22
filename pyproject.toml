@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.2", "wheel", "versioningit"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "architector"
+description = "The architector python package - for 3D inorganometallic complex design."
+readme = "README.md"
+dynamic = ["version"]
+license = { text = "BSD 3-Clause License" }
+authors = [ { name = "Michael G. Taylor et al." } ]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Chemistry",
+]
+dependencies = [
+  "ase",
+  "numpy",
+  "py3Dmol",
+  "pynauty",
+  "scipy",
+  "pandas",
+  "mendeleev",
+]
+requires-python = ">=3.8"
+
+[tool.versioningit]
+
+[tool.versioningit.tag2version]
+rmprefix = "architector-"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["architector*"]
+
+[tool.setuptools.package-data]
+"architector" = ["data/*"]

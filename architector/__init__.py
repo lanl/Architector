@@ -1,3 +1,5 @@
+from importlib.metadata import version
+
 from architector.complex_construction import (build_complex,build_complex_2D)
 from architector.visualization import view_structures
 from architector.io_obabel import (get_obmol_smiles, 
@@ -6,3 +8,5 @@ from architector.io_obabel import (get_obmol_smiles,
                                    smiles2Atoms
                                    )
 from architector.io_molecule import convert_io_molecule
+
+__version__ = version("architector")
