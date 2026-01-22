@@ -7,25 +7,44 @@ name = "architector"
 version = "0.1.0"
 description = "The architector python package - for 3D Coordination Complex Design."
 readme = "README.md"
-license = {text = "BSD 3-Clause License"}
-authors = [
-    {name = "Michael G. Taylor et al."}
+license = { file = "LICENSE.txt" }
+authors = [{ name = "Michael G. Taylor et al." }]
+keywords = [
+    "chemistry",
+    "computational-chemistry",
+    "coordination-complexes",
+    "inorganic-chemistry",
+    "molecular-design",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Chemistry"
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Chemistry",
 ]
+requires-python = ">=3.10"
 dependencies = [
     "ase",
+    "mendeleev",
     "numpy",
+    "pandas",
     "py3Dmol",
     "pynauty",
     "scipy",
-    "pandas",
-    "mendeleev"
 ]
+
+[project.optional-dependencies]
+mace = ["mace-torch", "torch-dftd"]
+
+[project.urls]
+Homepage = "https://github.com/lanl/Architector"
+Repository = "https://github.com/lanl/Architector"
+Documentation = "https://lanl.github.io/Architector/"
 
 [tool.setuptools]
 packages = ["architector"]
