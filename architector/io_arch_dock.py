@@ -576,14 +576,14 @@ def add_non_covbound_species(mol, parameters={}):
     # Pre-center
     mol.ase_atoms.set_positions(
         mol.ase_atoms.positions - mol.ase_atoms.positions.mean(axis=0))
-    # Set spiral coordinates before doing docking.
-    if params.get("species_location_method", "default") == "spiral":
-        params["spiral_coordinates"] = io_molecule.generate_unit_sphere(
-            len(species_list), random_state=params["spiral_random_state"])
-        if parameters.get('debug', False):
-            print('N species:', len(species_list))
-            print('Spiral Coords: ', params["spiral_coordinates"])
     for j in range(n):
+        # Set spiral coordinates before doing docking.
+        if params.get("species_location_method", "default") == "spiral":
+            params["spiral_coordinates"] = io_molecule.generate_unit_sphere(
+                len(species_list), random_state=params["spiral_random_state"])
+            if parameters.get('debug', False):
+                print('N species:', len(species_list))
+                print('Spiral Coords: ', params["spiral_coordinates"])
         species_dict = dict()
         for spec in unique_specs:
             species = species_generate_get_ref_params(spec, parameters=params)
