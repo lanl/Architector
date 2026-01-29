@@ -240,7 +240,7 @@ def convert_xyz_ase(structure_str):
     return ase.io.read(StringIO(structure_str), format="xyz")
 
 
-def generate_unit_sphere(n_points):
+def generate_unit_sphere(n_points, random_state=None):
     """generate_unit_sphere
     Generate uniform points around a unit sphere centered around (0,0,0)
     Golden spiral method detailed:
@@ -250,6 +250,8 @@ def generate_unit_sphere(n_points):
     ----------
     n_points : int
         number of points
+    random_state : {None, int, np.random.Generator}
+        random_state, default None
 
     Returns
     -------
@@ -266,6 +268,9 @@ def generate_unit_sphere(n_points):
         np.cos(phi),
     )
     xyz_triple = np.stack([x, y, z], axis=1)
+    if random_state is not None:
+        rot = Rot.random(1, rng=random_state)
+        xyz_triple = rot.apply(xyz_triple)
     return xyz_triple
 
 

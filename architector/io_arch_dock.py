@@ -32,6 +32,7 @@ defaults = {
     "species_location_method": "default",  # Default attempts a basic colomb repulsion placement, targeted
     # Only other option is 'random' at the moment.
     "species_add_copies": 1,  # Number of species addition orientations to build
+    "spiral_random_state": None,  # Random state for species placement, spiral affected.
     "species_method": "GFN2-xTB",  # Method to use on full species - right now only GFN2-xTB really works
     "species_relax": True,  # Whether or not to relax the generated secondary solvation structures.
     "species_intermediate_method": "GFN-FF",  # Method to use for intermediate species screening - Suggested GFN-FF
@@ -63,6 +64,7 @@ targeted_defaults = {
     # e.g. Reduce to allow for closer molecule-species distances
     "species_location_method": "targeted",  # Default attempts a basic colomb repulsion placement, targeted
     # Only other option is 'random' at the moment.
+    "spiral_random_state": None,  # Random state for species placement, spiral/random affected.
     "species_add_copies": 5,  # Number of species orientations to build
     "species_method": "GFN2-xTB",  # Method to use on full species - right now only GFN2-xTB really works
     "species_relax": False,  # Whether or not to relax the generated secondary solvation structures.
@@ -507,6 +509,7 @@ def add_non_covbound_species(mol, parameters={}):
         # Optimizing for two indices (one from mol and 1 from the species added) to be close.
         # See "targeted_indices_close".
         # 'spiral' option uses golden spiral positioning to evenly distribute around the central molecule.
+        "spiral_random_state": None, # Random state for spiral rotation. {None, int, np.random.Generator}
         "species_add_copies": 1, # Number of species addition orientations to build
         "species_method": "GFN2-xTB", # Method to use on full species - right now only GFN2-xTB really works
         "species_relax": True, # Whether or not to relax the generated secondary solvation structures.
@@ -576,7 +579,7 @@ def add_non_covbound_species(mol, parameters={}):
     # Set spiral coordinates before doing docking.
     if params.get("species_location_method", "default") == "spiral":
         params["spiral_coordinates"] = io_molecule.generate_unit_sphere(
-            len(species_list))
+            len(species_list), random_state=params["spiral_random_state"])
         if parameters.get('debug', False):
             print('N species:', len(species_list))
             print('Spiral Coords: ', params["spiral_coordinates"])

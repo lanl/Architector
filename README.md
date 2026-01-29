@@ -233,7 +233,8 @@ inputDict = {
     "species_skin":0.2, # How much buffer or "skin" should be added to around a molecule 
     # to which the species could be added. (in Angstroms)
     "species_location_method":'default', # Default attempts a basic Coulomb repulsion placement.
-    # Only other option is 'random' at the moment.
+    # Other options are 'random', and 'spiral"
+    "spiral_random_state": None,  # Random state for species placement, spiral placement affected.
     "species_add_copies":1, # Number of full "species_list" orientations to build (from scratch)
     "species_method":'GFN2-xTB', # Method to use on full species - right now only GFN2-xTB really works
     "species_relax":True, # Whether or not to relax the generated secondary solvation structures.
