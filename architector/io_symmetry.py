@@ -54,29 +54,47 @@ def flatten(S):
     return S[:1] + flatten(S[1:])
 
 
-def chain_zip(input_lst, history=[]):
+def chain_zip(input_lst):
     """chain_zip
-    Combine an input list retaining the order
+    Interleave a list of lists in round-robin order.
+
+    This function combines multiple input lists by taking one element
+    at a time from each list in sequence (left to right). Unlike the
+    built-in ``zip`` function, it continues until the longest list is
+    exhausted, preserving all elements from uneven-length inputs.
+    It drops duplicate entries in the the final combined list.
 
     Parameters
     ----------
-    input_lst : list
-        list of lists
-    history : list, optional
-        list of lists
+    input_lst : list of lists
+        A sequence containing lists to be interleaved. The lists may
+        have different lengths.
 
-    Returns:
-        combined: ordered input list history.
+    Returns
+    -------
+    combined : list
+        A flattened list containing elements interleaved in round-robin
+        order from the input lists.
+
+    Notes
+    -----
+    Missing positions from shorter lists are ignored. Internally,
+    ``itertools.zip_longest`` is used with a unique sentinel value
+    to filter out padding elements.
+
+    Examples
+    --------
+    >>> chain_zip([[1, 2, 3], ['a', 'b'], [10, 20, 30, 40]])
+    [1, 'a', 10, 2, 'b', 20, 3, 30, 40]
     """
-    lengths = [len(x) for x in input_lst]
-    minlength = min(lengths)
-    newinp_lst = [x[:minlength] for x in input_lst]
-    additionals = [x[minlength:] for x in input_lst if len(x) > minlength]
-    combined = history + list(itertools.chain.from_iterable(zip(*newinp_lst)))
-    if len(additionals) == 0:
-        return combined
-    else:
-        return chain_zip(additionals, history=combined)
+    sentinel = object()
+    combined = []
+    for group in itertools.zip_longest(*input_lst, fillvalue=sentinel):
+        for item in group:
+            # Unique and not None
+            if (item is not sentinel) and (item not in combined):
+                combined.append(item)
+    return combined
 
 
 def generate_good_combos(sel_input_lst, sel_ind, prev_lig, occupied_max):
@@ -306,6 +324,9 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
     total_unique_symmetries = 0
     newLigInputDicts = ligInputDicts.copy()
 
+    if params.get('debug', False):
+        print("Starting Symmetry Assigment.")
+
     nsand = np.sum(
         [
             1
@@ -499,6 +520,9 @@ def select_cons(ligInputDicts, coreType, core_geo_class, params):
         return_counts=True,
     )
     # Calcuate repeat ligands
+
+    if params.get("debug", False):
+        print('Starting map to repeat highdent.')
 
     # Map to "higher-denticity" ligands to reduce computational overhead when
     # recursively Searching symmetries
